@@ -25,6 +25,7 @@ build/
 bin/
 *.tar.gz
 *.zip
+mining
 
 # IDE specific files
 .idea/
