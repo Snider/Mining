@@ -46,70 +46,43 @@ go get github.com/Snider/Mining
 
 ## Usage
 
-### CLI Usage
+### CLI Commands
 
-```bash
-# Start a miner
-mining start --name bitcoin-miner-1 --algorithm sha256 --pool pool.bitcoin.com
+The `miner-cli` provides the following commands:
 
-# List all miners
-mining list
-
-# Get miner status
-mining status <miner-id>
-
-# Stop a miner
-mining stop <miner-id>
-
-# Show version
-mining --version
-
-# Show help
-mining --help
+```
+miner-cli completion  Generate the autocompletion script for the specified shell
+miner-cli doctor      Check and refresh the status of installed miners
+miner-cli help        Help about any command
+miner-cli install     Install or update a miner
+miner-cli list        List running and available miners
+miner-cli serve       Start the mining service and interactive shell
+miner-cli start       Start a new miner
+miner-cli status      Get status of a running miner
+miner-cli stop        Stop a running miner
+miner-cli uninstall   Uninstall a miner
+miner-cli update      Check for updates to installed miners
 ```
 
-### As a Go Package
+For more details on any command, use `miner-cli [command] --help`.
 
-```go
-package main
+### RESTful API Endpoints
 
-import (
-    "fmt"
-    "github.com/Snider/Mining/pkg/mining"
-)
+When running the `miner-cli serve` command, the following RESTful API endpoints are exposed (default base path `/api/v1/mining`):
 
-func main() {
-    // Create a manager
-    manager := mining.NewManager()
+- `GET /api/v1/mining/info` - Get cached miner installation information and system details.
+- `POST /api/v1/mining/doctor` - Perform a live check on all available miners to verify their installation status, version, and path.
+- `POST /api/v1/mining/update` - Check if any installed miners have a new version available for download.
+- `GET /api/v1/mining/miners` - Get a list of all running miners.
+- `GET /api/v1/mining/miners/available` - Get a list of all available miners.
+- `POST /api/v1/mining/miners/:miner_name` - Start a new miner with the given configuration.
+- `POST /api/v1/mining/miners/:miner_name/install` - Install a new miner or update an existing one.
+- `DELETE /api/v1/mining/miners/:miner_name/uninstall` - Remove all files for a specific miner.
+- `DELETE /api/v1/mining/miners/:miner_name` - Stop a running miner by its name.
+- `GET /api/v1/mining/miners/:miner_name/stats` - Get statistics for a running miner.
+- `GET /api/v1/mining/swagger/*any` - Serve Swagger UI for API documentation.
 
-    // Start a miner
-    config := mining.MinerConfig{
-        Name:      "my-miner",
-        Algorithm: "sha256",
-        Pool:      "pool.example.com",
-        Wallet:    "your-wallet-address",
-    }
-
-    miner, err := manager.StartMiner(config)
-    if err != nil {
-        panic(err)
-    }
-
-    fmt.Printf("Started miner: %s\n", miner.ID)
-
-    // Update hash rate
-    manager.UpdateHashRate(miner.ID, 150.5)
-
-    // List all miners
-    miners := manager.ListMiners()
-    for _, m := range miners {
-        fmt.Printf("%s: %s (%.2f H/s)\n", m.ID, m.Name, m.HashRate)
-    }
-
-    // Stop the miner
-    manager.StopMiner(miner.ID)
-}
-```
+Swagger documentation is typically available at `http://<host>:<port>/api/v1/mining/swagger/index.html`.
 
 ## Development
 
@@ -122,10 +95,7 @@ func main() {
 
 ```bash
 # Build the CLI
-go build -o mining ./cmd/mining
-
-# Run demo
-go run main.go
+go build -o miner-cli ./cmd/mining
 
 # Run tests
 go test ./...
@@ -172,28 +142,6 @@ git push origin v0.1.0
 
 # GoReleaser will automatically build and publish
 ```
-
-## API Reference
-
-### Types
-
-#### `Manager`
-Main manager for miner operations.
-
-#### `Miner`
-Represents a mining instance with ID, name, status, and performance metrics.
-
-#### `MinerConfig`
-Configuration for starting a new miner.
-
-### Functions
-
-- `NewManager() *Manager` - Create a new miner manager
-- `StartMiner(config MinerConfig) (*Miner, error)` - Start a new miner
-- `StopMiner(id string) error` - Stop a running miner
-- `GetMiner(id string) (*Miner, error)` - Get miner by ID
-- `ListMiners() []*Miner` - List all miners
-- `UpdateHashRate(id string, hashRate float64) error` - Update miner hash rate
 
 ## Contributing
 

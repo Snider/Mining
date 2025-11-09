@@ -2,30 +2,38 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
-	Use:   "status [miner-id]",
-	Short: "Get status of a miner",
-	Long:  `Get detailed status information for a specific miner.`,
+	Use:   "status [miner_name]",
+	Short: "Get status of a running miner",
+	Long:  `Get detailed status information for a specific running miner.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		minerID := args[0]
+		minerName := args[0]
+		mgr := getManager()
 
-		miner, err := getManager().GetMiner(minerID)
+		miner, err := mgr.GetMiner(minerName)
 		if err != nil {
 			return fmt.Errorf("failed to get miner: %w", err)
 		}
 
-		fmt.Printf("Miner Status:\n")
-		fmt.Printf("  ID:         %s\n", miner.ID)
-		fmt.Printf("  Name:       %s\n", miner.Name)
-		fmt.Printf("  Status:     %s\n", miner.Status)
-		fmt.Printf("  Start Time: %s\n", miner.StartTime.Format("2006-01-02 15:04:05"))
-		fmt.Printf("  Hash Rate:  %.2f H/s\n", miner.HashRate)
+		stats, err := miner.GetStats()
+		if err != nil {
+			return fmt.Errorf("failed to get miner stats: %w", err)
+		}
+
+		fmt.Printf("Miner Status for %s:\n", strings.Title(minerName))
+		fmt.Printf("  Hash Rate:  %d H/s\n", stats.Hashrate)
+		fmt.Printf("  Shares:     %d\n", stats.Shares)
+		fmt.Printf("  Rejected:   %d\n", stats.Rejected)
+		fmt.Printf("  Uptime:     %d seconds\n", stats.Uptime)
+		fmt.Printf("  Algorithm:  %s\n", stats.Algorithm)
+
 		return nil
 	},
 }

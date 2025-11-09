@@ -1,0 +1,422 @@
+basePath: /api/v1/mining
+definitions:
+  mining.API:
+    properties:
+      enabled:
+        type: boolean
+      listenHost:
+        type: string
+      listenPort:
+        type: integer
+    type: object
+  mining.AvailableMiner:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  mining.Config:
+    properties:
+      algo:
+        description: Network options
+        type: string
+      apiId:
+        type: string
+      apiWorkerId:
+        description: API options (can be overridden or supplemented here)
+        type: string
+      argon2Impl:
+        type: string
+      asm:
+        type: string
+      av:
+        type: integer
+      background:
+        description: Misc options
+        type: boolean
+      bench:
+        type: string
+      coin:
+        type: string
+      cpuAffinity:
+        type: string
+      cpuMaxThreadsHint:
+        type: integer
+      cpuMemoryPool:
+        type: integer
+      cpuNoYield:
+        type: boolean
+      cpuPriority:
+        type: integer
+      donateLevel:
+        type: integer
+      donateOverProxy:
+        type: boolean
+      hash:
+        type: string
+      healthPrintTime:
+        type: integer
+      httpAccessToken:
+        type: string
+      httpHost:
+        type: string
+      httpNoRestricted:
+        type: boolean
+      httpPort:
+        type: integer
+      hugePages:
+        type: boolean
+      hugePagesJIT:
+        type: boolean
+      hugepageSize:
+        type: integer
+      keepalive:
+        type: boolean
+      logFile:
+        type: string
+      miner:
+        type: string
+      nicehash:
+        type: boolean
+      noColor:
+        type: boolean
+      noCpu:
+        description: CPU backend options
+        type: boolean
+      noDMI:
+        type: boolean
+      noTitle:
+        type: boolean
+      password:
+        description: Corresponds to -p, not --userpass
+        type: string
+      pauseOnActive:
+        type: integer
+      pauseOnBattery:
+        type: boolean
+      pool:
+        type: string
+      printTime:
+        type: integer
+      proxy:
+        type: string
+      randomX1GBPages:
+        type: boolean
+      randomXCacheQoS:
+        type: boolean
+      randomXInit:
+        type: integer
+      randomXMode:
+        type: string
+      randomXNoNuma:
+        type: boolean
+      randomXNoRdmsr:
+        type: boolean
+      randomXWrmsr:
+        type: string
+      retries:
+        type: integer
+      retryPause:
+        type: integer
+      rigId:
+        type: string
+      seed:
+        type: string
+      stress:
+        type: boolean
+      submit:
+        type: boolean
+      syslog:
+        description: Logging options
+        type: boolean
+      threads:
+        type: integer
+      title:
+        type: string
+      tls:
+        type: boolean
+      tlsFingerprint:
+        type: string
+      userAgent:
+        type: string
+      userPass:
+        description: Corresponds to -O
+        type: string
+      verbose:
+        type: boolean
+      verify:
+        type: string
+      wallet:
+        type: string
+    type: object
+  mining.InstallationDetails:
+    properties:
+      is_installed:
+        type: boolean
+      miner_binary:
+        type: string
+      path:
+        type: string
+      version:
+        type: string
+    type: object
+  mining.PerformanceMetrics:
+    properties:
+      algorithm:
+        type: string
+      extraData:
+        additionalProperties: true
+        type: object
+      hashrate:
+        type: integer
+      lastShare:
+        type: integer
+      rejected:
+        type: integer
+      shares:
+        type: integer
+      uptime:
+        type: integer
+    type: object
+  mining.SystemInfo:
+    properties:
+      architecture:
+        type: string
+      available_cpu_cores:
+        type: integer
+      go_version:
+        type: string
+      installed_miners_info:
+        items:
+          $ref: '#/definitions/mining.InstallationDetails'
+        type: array
+      os:
+        type: string
+      timestamp:
+        type: string
+      total_system_ram_gb:
+        type: number
+    type: object
+  mining.XMRigMiner:
+    properties:
+      api:
+        $ref: '#/definitions/mining.API'
+      configPath:
+        type: string
+      lastHeartbeat:
+        type: integer
+      miner_binary:
+        description: New field for the full path to the miner executable
+        type: string
+      name:
+        type: string
+      path:
+        description: This will now be the versioned folder path
+        type: string
+      running:
+        type: boolean
+      url:
+        type: string
+      version:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a sample server for a mining application.
+  title: Mining API
+  version: "1.0"
+paths:
+  /doctor:
+    post:
+      description: Performs a live check on all available miners to verify their installation
+        status, version, and path.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/mining.InstallationDetails'
+            type: array
+      summary: Check miner installations
+      tags:
+      - system
+  /info:
+    get:
+      description: Retrieves the last cached installation details for all miners,
+        along with system information.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.SystemInfo'
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get cached miner installation information
+      tags:
+      - system
+  /miners:
+    get:
+      description: Get a list of all running miners
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/mining.XMRigMiner'
+            type: array
+      summary: List all running miners
+      tags:
+      - miners
+  /miners/{miner_name}:
+    delete:
+      description: Stop a running miner by its name
+      parameters:
+      - description: Miner Name
+        in: path
+        name: miner_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Stop a running miner
+      tags:
+      - miners
+  /miners/{miner_name}/stats:
+    get:
+      description: Get statistics for a running miner
+      parameters:
+      - description: Miner Name
+        in: path
+        name: miner_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.PerformanceMetrics'
+      summary: Get miner stats
+      tags:
+      - miners
+  /miners/{miner_type}:
+    post:
+      consumes:
+      - application/json
+      description: Start a new miner with the given configuration
+      parameters:
+      - description: Miner Type
+        in: path
+        name: miner_type
+        required: true
+        type: string
+      - description: Miner Configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/mining.Config'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.XMRigMiner'
+      summary: Start a new miner
+      tags:
+      - miners
+  /miners/{miner_type}/install:
+    post:
+      description: Install a new miner or update an existing one.
+      parameters:
+      - description: Miner Type to install/update
+        in: path
+        name: miner_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Install or update a miner
+      tags:
+      - miners
+  /miners/{miner_type}/uninstall:
+    delete:
+      description: Removes all files for a specific miner.
+      parameters:
+      - description: Miner Type to uninstall
+        in: path
+        name: miner_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Uninstall a miner
+      tags:
+      - miners
+  /miners/available:
+    get:
+      description: Get a list of all available miners
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/mining.AvailableMiner'
+            type: array
+      summary: List all available miners
+      tags:
+      - miners
+  /update:
+    post:
+      description: Checks if any installed miners have a new version available for
+        download.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Check for miner updates
+      tags:
+      - system
+swagger: "2.0"

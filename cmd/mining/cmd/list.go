@@ -9,26 +9,39 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all miners",
-	Long:  `List all miners and their current status.`,
+	Short: "List running and available miners",
+	Long:  `List all running miners and their status, as well as all miners that are available to be installed and started.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		miners := getManager().ListMiners()
+		manager := getManager()
 
-		if len(miners) == 0 {
-			fmt.Println("No miners found")
-			return nil
+		// List running miners
+		runningMiners := manager.ListMiners()
+		fmt.Println("Running Miners:")
+		if len(runningMiners) == 0 {
+			fmt.Println("  No running miners found.")
+		} else {
+			fmt.Printf("  %-20s\n", "Name")
+			fmt.Println("  --------------------")
+			for _, miner := range runningMiners {
+				fmt.Printf("  %-20s\n", miner.GetName())
+			}
 		}
 
-		fmt.Printf("%-20s %-20s %-10s %-12s\n", "ID", "Name", "Status", "Hash Rate")
-		fmt.Println("--------------------------------------------------------------------------------")
-		for _, miner := range miners {
-			fmt.Printf("%-20s %-20s %-10s %-12.2f\n",
-				miner.ID,
-				miner.Name,
-				miner.Status,
-				miner.HashRate,
-			)
+		fmt.Println()
+
+		// List available miners
+		availableMiners := manager.ListAvailableMiners()
+		fmt.Println("Available Miners:")
+		if len(availableMiners) == 0 {
+			fmt.Println("  No available miners found.")
+		} else {
+			fmt.Printf("  %-20s %s\n", "Name", "Description")
+			fmt.Println("  -----------------------------------------------------------------")
+			for _, miner := range availableMiners {
+				fmt.Printf("  %-20s %s\n", miner.Name, miner.Description)
+			}
 		}
+
 		return nil
 	},
 }

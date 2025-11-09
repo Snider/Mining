@@ -11,7 +11,8 @@ before:
 builds:
   - id: mining-cli
     main: ./cmd/mining
-    binary: mining
+    binary: miner-cli
+    output: "{{ .Arch }}/{{ .Os }}/{{ .Binary }}" # New output path within the archive
     env:
       - CGO_ENABLED=0
     goos:

@@ -1,0 +1,147 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/Snider/Mining/pkg/mining"
+	"github.com/adrg/xdg"
+	"github.com/spf13/cobra"
+)
+
+const signpostFilename = ".installed-miners"
+
+// doctorCmd represents the doctor command
+var doctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Check and refresh the status of installed miners",
+	Long:  `Performs a live check for installed miners, displays their status, and updates the local cache.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("--- Mining Doctor ---")
+		fmt.Println("Performing live check and refreshing cache...")
+		fmt.Println()
+
+		if err := updateDoctorCache(); err != nil {
+			return fmt.Errorf("failed to run doctor check: %w", err)
+		}
+		// After updating the cache, display the fresh results
+		_, err := loadAndDisplayCache()
+		return err
+	},
+}
+
+func loadAndDisplayCache() (bool, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false, fmt.Errorf("could not get home directory: %w", err)
+	}
+	signpostPath := filepath.Join(homeDir, signpostFilename)
+
+	if _, err := os.Stat(signpostPath); os.IsNotExist(err) {
+		fmt.Println("No cached data found. Run 'install' for a miner first.")
+		return false, nil // No cache to load
+	}
+
+	configPathBytes, err := os.ReadFile(signpostPath)
+	if err != nil {
+		return false, fmt.Errorf("could not read signpost file: %w", err)
+	}
+	configPath := string(configPathBytes)
+
+	cacheBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		// If the cache file is missing (e.g., after an uninstall), it's not a fatal error
+		if os.IsNotExist(err) {
+			fmt.Println("No cached data found. Run 'install' for a miner first.")
+			return false, nil
+		}
+		return false, fmt.Errorf("could not read cache file from %s: %w", configPath, err)
+	}
+
+	var cachedDetails []*mining.InstallationDetails
+	if err := json.Unmarshal(cacheBytes, &cachedDetails); err != nil {
+		return false, fmt.Errorf("could not parse cache file: %w", err)
+	}
+
+	for _, details := range cachedDetails {
+		var minerName string
+		if details.Path != "" { // Use path to infer miner name if available
+			// This is a weak heuristic, but works for now.
+			// A more robust solution would store miner name in InstallationDetails.
+			if strings.Contains(details.Path, "xmrig") {
+				minerName = "XMRig"
+			} else {
+				minerName = "Unknown Miner"
+			}
+		} else {
+			minerName = "Unknown Miner"
+		}
+		displayDetails(minerName, details)
+	}
+
+	return true, nil
+}
+
+func saveResultsToCache(details []*mining.InstallationDetails) error {
+	// Filter out non-installed miners before saving
+	var installedOnly []*mining.InstallationDetails
+	for _, d := range details {
+		if d.IsInstalled {
+			installedOnly = append(installedOnly, d)
+		}
+	}
+
+	configDir, err := xdg.ConfigFile("lethean-desktop/miners")
+	if err != nil {
+		return fmt.Errorf("could not get config directory: %w", err)
+	}
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("could not create config directory: %w", err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+
+	data, err := json.MarshalIndent(installedOnly, "", "  ")
+	if err != nil {
+		return fmt.Errorf("could not marshal cache data: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("could not write cache file: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("could not get home directory for signpost: %w", err)
+	}
+	signpostPath := filepath.Join(homeDir, signpostFilename)
+	if err := os.WriteFile(signpostPath, []byte(configPath), 0644); err != nil {
+		return fmt.Errorf("could not write signpost file: %w", err)
+	}
+
+	fmt.Printf("\n(Cache updated at %s)\n", configPath)
+	return nil
+}
+
+func displayDetails(minerName string, details *mining.InstallationDetails) {
+	fmt.Printf("--- %s ---\n", minerName)
+	if details.IsInstalled {
+		fmt.Printf("  Status:      Installed\n")
+		fmt.Printf("  Version:     %s\n", details.Version)
+		fmt.Printf("  Install Path: %s\n", details.Path)
+		if details.MinerBinary != "" {
+			fmt.Printf("  Miner Binary: %s\n", details.MinerBinary)
+		}
+		fmt.Println("  (Add this path to your AV scanner's whitelist to prevent interference)")
+	} else {
+		fmt.Printf("  Status:      Not Installed\n")
+		fmt.Printf("  To install, run: install %s\n", strings.ToLower(minerName))
+	}
+	fmt.Println()
+}
+
+func init() {
+	rootCmd.AddCommand(doctorCmd)
+}

@@ -1,0 +1,633 @@
+{
+  "schemes": [],
+  "swagger": "2.0",
+  "info": {
+    "description": "This is a sample server for a mining application.",
+    "title": "Mining Module API",
+    "contact": {},
+    "version": "1.0"
+  },
+  "host": "127.0.0.1:9090",
+  "basePath": "/api/v1/mining",
+  "paths": {
+    "/doctor": {
+      "post": {
+        "description": "Performs a live check on all available miners to verify their installation status, version, and path.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "system"
+        ],
+        "summary": "Check miner installations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mining.InstallationDetails"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/info": {
+      "get": {
+        "description": "Retrieves the last cached installation details for all miners, along with system information.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "system"
+        ],
+        "summary": "Get cached miner installation information",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/mining.SystemInfo"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/miners": {
+      "get": {
+        "description": "Get a list of all running miners",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "List all running miners",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mining.XMRigMiner"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/miners/available": {
+      "get": {
+        "description": "Get a list of all available miners",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "List all available miners",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mining.AvailableMiner"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/miners/{miner_name}": {
+      "delete": {
+        "description": "Stop a running miner by its name",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "Stop a running miner",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Miner Name",
+            "name": "miner_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/miners/{miner_name}/stats": {
+      "get": {
+        "description": "Get statistics for a running miner",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "Get miner stats",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Miner Name",
+            "name": "miner_name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/mining.PerformanceMetrics"
+            }
+          }
+        }
+      }
+    },
+    "/miners/{miner_type}": {
+      "post": {
+        "description": "Start a new miner with the given configuration",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "Start a new miner",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Miner Type",
+            "name": "miner_type",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Miner Configuration",
+            "name": "config",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/mining.Config"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/mining.XMRigMiner"
+            }
+          }
+        }
+      }
+    },
+    "/miners/{miner_type}/install": {
+      "post": {
+        "description": "Install a new miner or update an existing one.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "Install or update a miner",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Miner Type to install/update",
+            "name": "miner_type",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/miners/{miner_type}/uninstall": {
+      "delete": {
+        "description": "Removes all files for a specific miner.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "miners"
+        ],
+        "summary": "Uninstall a miner",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Miner Type to uninstall",
+            "name": "miner_type",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update": {
+      "post": {
+        "description": "Checks if any installed miners have a new version available for download.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "system"
+        ],
+        "summary": "Check for miner updates",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "mining.API": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "listenHost": {
+          "type": "string"
+        },
+        "listenPort": {
+          "type": "integer"
+        }
+      }
+    },
+    "mining.AvailableMiner": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "mining.Config": {
+      "type": "object",
+      "properties": {
+        "algo": {
+          "description": "Network options",
+          "type": "string"
+        },
+        "apiId": {
+          "type": "string"
+        },
+        "apiWorkerId": {
+          "description": "API options (can be overridden or supplemented here)",
+          "type": "string"
+        },
+        "argon2Impl": {
+          "type": "string"
+        },
+        "asm": {
+          "type": "string"
+        },
+        "av": {
+          "type": "integer"
+        },
+        "background": {
+          "description": "Misc options",
+          "type": "boolean"
+        },
+        "bench": {
+          "type": "string"
+        },
+        "coin": {
+          "type": "string"
+        },
+        "cpuAffinity": {
+          "type": "string"
+        },
+        "cpuMaxThreadsHint": {
+          "type": "integer"
+        },
+        "cpuMemoryPool": {
+          "type": "integer"
+        },
+        "cpuNoYield": {
+          "type": "boolean"
+        },
+        "cpuPriority": {
+          "type": "integer"
+        },
+        "donateLevel": {
+          "type": "integer"
+        },
+        "donateOverProxy": {
+          "type": "boolean"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "healthPrintTime": {
+          "type": "integer"
+        },
+        "httpAccessToken": {
+          "type": "string"
+        },
+        "httpHost": {
+          "type": "string"
+        },
+        "httpNoRestricted": {
+          "type": "boolean"
+        },
+        "httpPort": {
+          "type": "integer"
+        },
+        "hugePages": {
+          "type": "boolean"
+        },
+        "hugePagesJIT": {
+          "type": "boolean"
+        },
+        "hugepageSize": {
+          "type": "integer"
+        },
+        "keepalive": {
+          "type": "boolean"
+        },
+        "logFile": {
+          "type": "string"
+        },
+        "miner": {
+          "type": "string"
+        },
+        "nicehash": {
+          "type": "boolean"
+        },
+        "noColor": {
+          "type": "boolean"
+        },
+        "noCpu": {
+          "description": "CPU backend options",
+          "type": "boolean"
+        },
+        "noDMI": {
+          "type": "boolean"
+        },
+        "noTitle": {
+          "type": "boolean"
+        },
+        "password": {
+          "description": "Corresponds to -p, not --userpass",
+          "type": "string"
+        },
+        "pauseOnActive": {
+          "type": "integer"
+        },
+        "pauseOnBattery": {
+          "type": "boolean"
+        },
+        "pool": {
+          "type": "string"
+        },
+        "printTime": {
+          "type": "integer"
+        },
+        "proxy": {
+          "type": "string"
+        },
+        "randomX1GBPages": {
+          "type": "boolean"
+        },
+        "randomXCacheQoS": {
+          "type": "boolean"
+        },
+        "randomXInit": {
+          "type": "integer"
+        },
+        "randomXMode": {
+          "type": "string"
+        },
+        "randomXNoNuma": {
+          "type": "boolean"
+        },
+        "randomXNoRdmsr": {
+          "type": "boolean"
+        },
+        "randomXWrmsr": {
+          "type": "string"
+        },
+        "retries": {
+          "type": "integer"
+        },
+        "retryPause": {
+          "type": "integer"
+        },
+        "rigId": {
+          "type": "string"
+        },
+        "seed": {
+          "type": "string"
+        },
+        "stress": {
+          "type": "boolean"
+        },
+        "submit": {
+          "type": "boolean"
+        },
+        "syslog": {
+          "description": "Logging options",
+          "type": "boolean"
+        },
+        "threads": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        },
+        "tlsFingerprint": {
+          "type": "string"
+        },
+        "userAgent": {
+          "type": "string"
+        },
+        "userPass": {
+          "description": "Corresponds to -O",
+          "type": "string"
+        },
+        "verbose": {
+          "type": "boolean"
+        },
+        "verify": {
+          "type": "string"
+        },
+        "wallet": {
+          "type": "string"
+        }
+      }
+    },
+    "mining.InstallationDetails": {
+      "type": "object",
+      "properties": {
+        "is_installed": {
+          "type": "boolean"
+        },
+        "miner_binary": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "mining.PerformanceMetrics": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "extraData": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "hashrate": {
+          "type": "integer"
+        },
+        "lastShare": {
+          "type": "integer"
+        },
+        "rejected": {
+          "type": "integer"
+        },
+        "shares": {
+          "type": "integer"
+        },
+        "uptime": {
+          "type": "integer"
+        }
+      }
+    },
+    "mining.SystemInfo": {
+      "type": "object",
+      "properties": {
+        "architecture": {
+          "type": "string"
+        },
+        "available_cpu_cores": {
+          "type": "integer"
+        },
+        "go_version": {
+          "type": "string"
+        },
+        "installed_miners_info": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mining.InstallationDetails"
+          }
+        },
+        "os": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "total_system_ram_gb": {
+          "type": "number"
+        }
+      }
+    },
+    "mining.XMRigMiner": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "$ref": "#/definitions/mining.API"
+        },
+        "configPath": {
+          "type": "string"
+        },
+        "lastHeartbeat": {
+          "type": "integer"
+        },
+        "miner_binary": {
+          "description": "New field for the full path to the miner executable",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "description": "This will now be the versioned folder path",
+          "type": "string"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

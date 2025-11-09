@@ -1,7 +1,7 @@
-.PHONY: all build test clean install run demo help lint fmt vet
+.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev
 
 # Variables
-BINARY_NAME=mining
+BINARY_NAME=miner-cli
 MAIN_PACKAGE=./cmd/mining
 GO=go
 GOFLAGS=-v
@@ -16,16 +16,16 @@ build:
 # Build for multiple platforms
 build-all:
 	@echo "Building for multiple platforms..."
-	GOOS=linux GOARCH=amd64 $(GO) build -o dist/$(BINARY_NAME)-linux-amd64 $(MAIN_PACKAGE)
-	GOOS=linux GOARCH=arm64 $(GO) build -o dist/$(BINARY_NAME)-linux-arm64 $(MAIN_PACKAGE)
-	GOOS=darwin GOARCH=amd64 $(GO) build -o dist/$(BINARY_NAME)-darwin-amd64 $(MAIN_PACKAGE)
-	GOOS=darwin GOARCH=arm64 $(GO) build -o dist/$(BINARY_NAME)-darwin-arm64 $(MAIN_PACKAGE)
-	GOOS=windows GOARCH=amd64 $(GO) build -o dist/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PACKAGE)
+	GOOS=linux GOARCH=amd64 $(GO) build -o dist/amd64/linux/$(BINARY_NAME) $(MAIN_PACKAGE)
+	GOOS=linux GOARCH=arm64 $(GO) build -o dist/arm64/linux/$(BINARY_NAME) $(MAIN_PACKAGE)
+	GOOS=darwin GOARCH=amd64 $(GO) build -o dist/amd64/darwin/$(BINARY_NAME) $(MAIN_PACKAGE)
+	GOOS=darwin GOARCH=arm64 $(GO) build -o dist/arm64/darwin/$(BINARY_NAME) $(MAIN_PACKAGE)
+	GOOS=windows GOARCH=amd64 $(GO) build -o dist/amd64/windows/$(BINARY_NAME).exe $(MAIN_PACKAGE)
 
 # Install the binary
 install:
 	@echo "Installing $(BINARY_NAME)..."
-	$(GO) install $(MAIN_PACKAGE)
+	$(GO) install -o $(BINARY_NAME) $(MAIN_PACKAGE)
 
 # Run tests
 test:
@@ -83,6 +83,21 @@ deps:
 	@echo "Downloading dependencies..."
 	$(GO) mod download
 
+# Generate Swagger documentation
+docs:
+	@echo "Generating Swagger documentation..."
+	swag init -g ./cmd/mining/main.go
+
+# Install the swag CLI
+install-swag:
+	@echo "Installing swag CLI..."
+	go install github.com/swaggo/swag/cmd/swag@latest
+
+# Development workflow
+dev: tidy docs build
+	@echo "Starting development server..."
+	./$(BINARY_NAME) serve --host 127.0.0.1 --port 9090 --namespace /api/v1/mining
+
 # Help
 help:
 	@echo "Available targets:"
@@ -100,4 +115,7 @@ help:
 	@echo "  lint        - Run linters"
 	@echo "  tidy        - Tidy dependencies"
 	@echo "  deps        - Download dependencies"
+	@echo "  docs        - Generate Swagger documentation"
+	@echo "  install-swag- Install the swag CLI"
+	@echo "  dev         - Start the development server with docs and build"
 	@echo "  help        - Show this help message"
