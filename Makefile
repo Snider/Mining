@@ -1,4 +1,4 @@
-.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev
+.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package
 
 # Variables
 BINARY_NAME=miner-cli
@@ -92,6 +92,15 @@ docs:
 install-swag:
 	@echo "Installing swag CLI..."
 	go install github.com/swaggo/swag/cmd/swag@latest
+# Install the swag CLI
+install-goreleaser:
+	@echo "Installing go release..."
+	go install github.com/goreleaser/goreleaser/v2@latest
+
+# Create local packages using goreleaser
+package:
+	@echo "Creating local packages with GoReleaser..."
+	goreleaser release --snapshot --clean
 
 # Development workflow
 dev: tidy docs build
@@ -117,5 +126,6 @@ help:
 	@echo "  deps        - Download dependencies"
 	@echo "  docs        - Generate Swagger documentation"
 	@echo "  install-swag- Install the swag CLI"
+	@echo "  package     - Create local distribution packages using GoReleaser"
 	@echo "  dev         - Start the development server with docs and build"
 	@echo "  help        - Show this help message"

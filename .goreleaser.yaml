@@ -12,7 +12,7 @@ builds:
   - id: mining-cli
     main: ./cmd/mining
     binary: miner-cli
-    output: "{{ .Arch }}/{{ .Os }}/{{ .Binary }}" # New output path within the archive
+
     env:
       - CGO_ENABLED=0
     goos:
@@ -33,8 +33,8 @@ builds:
 archives:
   - id: mining
     name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
+      {{ .Binary }}-{{ .Version }}-
+      {{- title .Os }}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
