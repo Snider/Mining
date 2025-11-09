@@ -32,6 +32,10 @@ test:
 	@echo "Running tests..."
 	$(GO) test -v -race -coverprofile=coverage.out ./...
 
+# Run tests and build for all platforms
+test-release: test build-all
+	@echo "Test release successful"
+
 # Run tests with coverage report
 coverage: test
 	@echo "Generating coverage report..."

@@ -3,9 +3,9 @@
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![GoDoc](https://pkg.go.dev/badge/github.com/Snider/Mining.svg)](https://pkg.go.dev/github.com/Snider/Mining)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Snider/Mining)](https://goreportcard.com/report/github.com/Snider/Mining)
-[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
-[![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
 [![codecov](https://codecov.io/gh/Snider/Mining/branch/main/graph/badge.svg)](https://codecov.io/gh/Snider/Mining)
+[![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
 
 GoLang Miner management with RESTful control - A modern, modular package for managing cryptocurrency miners.
 
