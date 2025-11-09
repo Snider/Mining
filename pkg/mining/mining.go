@@ -9,6 +9,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	// HighResolutionDuration is the duration for which hashrate data is kept at high resolution (10s intervals)
+	HighResolutionDuration = 5 * time.Minute
+	// HighResolutionInterval is the interval at which hashrate data is collected for high resolution
+	HighResolutionInterval = 10 * time.Second
+	// LowResolutionInterval is the interval for aggregated hashrate data (1m averages)
+	LowResolutionInterval = 1 * time.Minute
+	// LowResHistoryRetention is the duration for which low-resolution hashrate data is retained
+	LowResHistoryRetention = 24 * time.Hour // Example: keep 24 hours of 1-minute averages
+)
+
 // Miner is the interface for a miner
 type Miner interface {
 	Install() error
@@ -20,6 +31,9 @@ type Miner interface {
 	GetPath() string
 	CheckInstallation() (*InstallationDetails, error)
 	GetLatestVersion() (string, error)
+	GetHashrateHistory() []HashratePoint  // New method to get hashrate history
+	AddHashratePoint(point HashratePoint) // New method to add a hashrate point
+	ReduceHashrateHistory(now time.Time)  // New method to trigger history reduction
 }
 
 // InstallationDetails contains information about an installed miner
@@ -146,19 +160,28 @@ type History struct {
 	Updated int64                `json:"updated"`
 }
 
+// HashratePoint represents a single hashrate measurement at a specific time
+type HashratePoint struct {
+	Timestamp time.Time `json:"timestamp"`
+	Hashrate  int       `json:"hashrate"`
+}
+
 // XMRigMiner represents an XMRig miner
 type XMRigMiner struct {
-	Name          string `json:"name"`
-	Version       string `json:"version"`
-	URL           string `json:"url"`
-	Path          string `json:"path"`         // This will now be the versioned folder path
-	MinerBinary   string `json:"miner_binary"` // New field for the full path to the miner executable
-	Running       bool   `json:"running"`
-	LastHeartbeat int64  `json:"lastHeartbeat"`
-	ConfigPath    string `json:"configPath"`
-	API           *API   `json:"api"`
-	mu            sync.Mutex
-	cmd           *exec.Cmd `json:"-"`
+	Name                  string `json:"name"`
+	Version               string `json:"version"`
+	URL                   string `json:"url"`
+	Path                  string `json:"path"`         // This will now be the versioned folder path
+	MinerBinary           string `json:"miner_binary"` // New field for the full path to the miner executable
+	Running               bool   `json:"running"`
+	LastHeartbeat         int64  `json:"lastHeartbeat"`
+	ConfigPath            string `json:"configPath"`
+	API                   *API   `json:"api"`
+	mu                    sync.Mutex
+	cmd                   *exec.Cmd       `json:"-"`
+	HashrateHistory       []HashratePoint `json:"hashrateHistory"`       // High-resolution (10s)
+	LowResHashrateHistory []HashratePoint `json:"lowResHashrateHistory"` // Low-resolution (1m averages)
+	LastLowResAggregation time.Time       `json:"-"`                     // Timestamp of the last low-res aggregation
 }
 
 // API represents the XMRig API configuration

@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,6 +36,9 @@ func NewXMRigMiner() *XMRigMiner {
 			ListenHost: "127.0.0.1",
 			ListenPort: 9000,
 		},
+		HashrateHistory:       make([]HashratePoint, 0),
+		LowResHashrateHistory: make([]HashratePoint, 0),
+		LastLowResAggregation: time.Now(),
 	}
 }
 
@@ -343,7 +347,6 @@ func (m *XMRigMiner) Start(config *Config) error {
 	if config.CPUNoYield {
 		args = append(args, "--cpu-no-yield")
 	}
-	// HugePages is handled by config file, but --no-huge-pages is a CLI option
 	if !config.HugePages { // If HugePages is explicitly false in config, add --no-huge-pages
 		args = append(args, "--no-huge-pages")
 	}
@@ -382,15 +385,13 @@ func (m *XMRigMiner) Start(config *Config) error {
 	}
 
 	// API options (CLI options override config file and m.API defaults)
-	// The API settings in m.API are used for GetStats, but CLI options can override for starting the miner
-	if m.API.Enabled { // Only add API related CLI args if API is generally enabled
+	if m.API.Enabled {
 		if config.APIWorkerID != "" {
 			args = append(args, "--api-worker-id", config.APIWorkerID)
 		}
 		if config.APIID != "" {
 			args = append(args, "--api-id", config.APIID)
 		}
-		// Prefer config.HTTPHost/Port, fallback to m.API, then to XMRig defaults
 		if config.HTTPHost != "" {
 			args = append(args, "--http-host", config.HTTPHost)
 		} else {
@@ -467,12 +468,10 @@ func (m *XMRigMiner) Start(config *Config) error {
 		args = append(args, "--no-dmi")
 	}
 
-	// Print the command being executed for debugging
 	fmt.Fprintf(os.Stderr, "Executing XMRig command: %s %s\n", m.MinerBinary, strings.Join(args, " "))
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
-	// If LogOutput is true, redirect stdout and stderr
 	if config.LogOutput {
 		m.cmd.Stdout = os.Stdout
 		m.cmd.Stderr = os.Stderr
@@ -504,7 +503,6 @@ func (m *XMRigMiner) Stop() error {
 		return errors.New("miner is not running")
 	}
 
-	// Kill the process. The goroutine in Start() will handle Wait() and state change.
 	return m.cmd.Process.Kill()
 }
 
@@ -547,10 +545,118 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 	}, nil
 }
 
+// GetHashrateHistory returns the combined high-resolution and low-resolution hashrate history.
+func (m *XMRigMiner) GetHashrateHistory() []HashratePoint {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Combine low-res and high-res history
+	combinedHistory := make([]HashratePoint, 0, len(m.LowResHashrateHistory)+len(m.HashrateHistory))
+	combinedHistory = append(combinedHistory, m.LowResHashrateHistory...)
+	combinedHistory = append(combinedHistory, m.HashrateHistory...)
+
+	return combinedHistory
+}
+
+// AddHashratePoint adds a new hashrate measurement to the high-resolution history.
+func (m *XMRigMiner) AddHashratePoint(point HashratePoint) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.HashrateHistory = append(m.HashrateHistory, point)
+	// No trimming here; trimming is handled by ReduceHashrateHistory
+}
+
+// ReduceHashrateHistory aggregates older high-resolution data into 1-minute averages
+// and adds them to the low-resolution history.
+func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Only aggregate if enough time has passed since the last aggregation
+	// or if it's the first aggregation
+	if !m.LastLowResAggregation.IsZero() && now.Sub(m.LastLowResAggregation) < LowResolutionInterval {
+		return
+	}
+
+	// Find points in HashrateHistory that are older than HighResolutionDuration
+	// These are the candidates for aggregation into low-resolution history.
+	var pointsToAggregate []HashratePoint
+	var newHighResHistory []HashratePoint
+
+	// The cutoff is exclusive: points *at or before* this time are candidates for aggregation.
+	// We want to aggregate points that are *strictly older* than HighResolutionDuration ago.
+	// So, if HighResolutionDuration is 5 minutes, points older than (now - 5 minutes) are aggregated.
+	cutoff := now.Add(-HighResolutionDuration)
+
+	for _, p := range m.HashrateHistory {
+		if p.Timestamp.Before(cutoff) { // Use Before to ensure strict older-than
+			pointsToAggregate = append(pointsToAggregate, p)
+		} else {
+			newHighResHistory = append(newHighResHistory, p)
+		}
+	}
+	m.HashrateHistory = newHighResHistory // Update high-res history to only contain recent points
+
+	if len(pointsToAggregate) == 0 {
+		// If no points to aggregate, just update LastLowResAggregation and return
+		m.LastLowResAggregation = now
+		return
+	}
+
+	// Aggregate into 1-minute slices
+	// Group points by minute (truncated timestamp)
+	minuteGroups := make(map[time.Time][]int)
+	for _, p := range pointsToAggregate {
+		// Round timestamp down to the nearest minute for grouping
+		minute := p.Timestamp.Truncate(LowResolutionInterval)
+		minuteGroups[minute] = append(minuteGroups[minute], p.Hashrate)
+	}
+
+	// Calculate average for each minute and add to low-res history
+	var newLowResPoints []HashratePoint
+	for minute, hashrates := range minuteGroups {
+		if len(hashrates) > 0 {
+			totalHashrate := 0
+			for _, hr := range hashrates {
+				totalHashrate += hr
+			}
+			avgHashrate := totalHashrate / len(hashrates)
+			newLowResPoints = append(newLowResPoints, HashratePoint{
+				Timestamp: minute,
+				Hashrate:  avgHashrate,
+			})
+		}
+	}
+
+	// Sort new low-res points by timestamp to maintain chronological order
+	sort.Slice(newLowResPoints, func(i, j int) bool {
+		return newLowResPoints[i].Timestamp.Before(newLowResPoints[j].Timestamp)
+	})
+
+	m.LowResHashrateHistory = append(m.LowResHashrateHistory, newLowResPoints...)
+
+	// Trim low-resolution history to LowResHistoryRetention
+	lowResCutoff := now.Add(-LowResHistoryRetention)
+	// Find the first point that is *after* or equal to the lowResCutoff
+	firstValidLowResIndex := 0
+	for i, p := range m.LowResHashrateHistory {
+		if p.Timestamp.After(lowResCutoff) || p.Timestamp.Equal(lowResCutoff) {
+			firstValidLowResIndex = i
+			break
+		}
+		if i == len(m.LowResHashrateHistory)-1 { // All points are older than cutoff
+			firstValidLowResIndex = len(m.LowResHashrateHistory) // Clear all
+		}
+	}
+	m.LowResHashrateHistory = m.LowResHashrateHistory[firstValidLowResIndex:]
+
+	m.LastLowResAggregation = now
+}
+
 func (m *XMRigMiner) createConfig(config *Config) error {
 	configPath, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
 	if err != nil {
-		// Fallback to home directory if XDG is not available
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return err
@@ -563,7 +669,6 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 		return err
 	}
 
-	// Create the config
 	c := map[string]interface{}{
 		"api": map[string]interface{}{
 			"enabled":      m.API.Enabled,
@@ -587,7 +692,6 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 		},
 	}
 
-	// Write the config to the file
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
@@ -603,21 +707,17 @@ func (m *XMRigMiner) unzip(src, dest string) error {
 	defer r.Close()
 
 	for _, f := range r.File {
-		// Store filename/path for returning and using later on
 		fpath := filepath.Join(dest, f.Name)
 
-		// Check for ZipSlip. More Info: http://bit.ly/2MsjAWE
 		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
 			return fmt.Errorf("%s: illegal file path", fpath)
 		}
 
 		if f.FileInfo().IsDir() {
-			// Make Folder
 			os.MkdirAll(fpath, os.ModePerm)
 			continue
 		}
 
-		// Make File
 		if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
 			return err
 		}
@@ -634,7 +734,6 @@ func (m *XMRigMiner) unzip(src, dest string) error {
 
 		_, err = io.Copy(outFile, rc)
 
-		// Close the file without defer to close before next iteration of loop
 		outFile.Close()
 		rc.Close()
 
@@ -664,20 +763,14 @@ func (m *XMRigMiner) untar(src, dest string) error {
 		header, err := tr.Next()
 
 		switch {
-
-		// if no more files are found return
 		case err == io.EOF:
 			return nil
-
-		// return any other error
 		case err != nil:
 			return err
-		// if the header is nil, just skip it (not sure how this happens)
 		case header == nil:
 			continue
 		}
 
-		// Sanitize the header name to prevent path traversal
 		cleanedName := filepath.Clean(header.Name)
 		if strings.HasPrefix(cleanedName, "..") || strings.HasPrefix(cleanedName, "/") || cleanedName == "." {
 			continue
@@ -689,18 +782,13 @@ func (m *XMRigMiner) untar(src, dest string) error {
 			continue
 		}
 
-		// check the file type
 		switch header.Typeflag {
-
-		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
 				if err := os.MkdirAll(target, 0755); err != nil {
 					return err
 				}
 			}
-
-		// if it's a file create it
 		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
@@ -710,12 +798,10 @@ func (m *XMRigMiner) untar(src, dest string) error {
 				return err
 			}
 
-			// copy over contents
 			if _, err := io.Copy(f, tr); err != nil {
 				return err
 			}
 
-			// manually close here after each file operation; defering would cause each file to wait until all operations have completed.
 			f.Close()
 		}
 	}

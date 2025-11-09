@@ -61,6 +61,9 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
+		// Stop the manager's background goroutines
+		s.Manager.Stop()
+
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.Server.Shutdown(ctxShutdown); err != nil {
@@ -88,6 +91,7 @@ func (s *Service) setupRoutes() {
 			minersGroup.DELETE("/:miner_name/uninstall", s.handleUninstallMiner)
 			minersGroup.DELETE("/:miner_name", s.handleStopMiner)
 			minersGroup.GET("/:miner_name/stats", s.handleGetMinerStats)
+			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory) // New endpoint
 		}
 	}
 
@@ -388,4 +392,22 @@ func (s *Service) handleGetMinerStats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, stats)
+}
+
+// handleGetMinerHashrateHistory godoc
+// @Summary Get miner hashrate history
+// @Description Get historical hashrate data for a running miner
+// @Tags miners
+// @Produce  json
+// @Param miner_name path string true "Miner Name"
+// @Success 200 {array} HashratePoint
+// @Router /miners/{miner_name}/hashrate-history [get]
+func (s *Service) handleGetMinerHashrateHistory(c *gin.Context) {
+	minerName := c.Param("miner_name")
+	history, err := s.Manager.GetMinerHashrateHistory(minerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, history)
 }

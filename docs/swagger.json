@@ -139,6 +139,38 @@
                 }
             }
         },
+        "/miners/{miner_name}/hashrate-history": {
+            "get": {
+                "description": "Get historical hashrate data for a running miner",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miners"
+                ],
+                "summary": "Get miner hashrate history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Miner Name",
+                        "name": "miner_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/mining.HashratePoint"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/miners/{miner_name}/stats": {
             "get": {
                 "description": "Get statistics for a running miner",
@@ -525,6 +557,17 @@
                 }
             }
         },
+        "mining.HashratePoint": {
+            "type": "object",
+            "properties": {
+                "hashrate": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "mining.InstallationDetails": {
             "type": "object",
             "properties": {
@@ -607,8 +650,22 @@
                 "configPath": {
                     "type": "string"
                 },
+                "hashrateHistory": {
+                    "description": "High-resolution (10s)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/mining.HashratePoint"
+                    }
+                },
                 "lastHeartbeat": {
                     "type": "integer"
+                },
+                "lowResHashrateHistory": {
+                    "description": "Low-resolution (1m averages)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/mining.HashratePoint"
+                    }
                 },
                 "miner_binary": {
                     "description": "New field for the full path to the miner executable",

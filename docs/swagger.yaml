@@ -153,6 +153,13 @@ definitions:
       wallet:
         type: string
     type: object
+  mining.HashratePoint:
+    properties:
+      hashrate:
+        type: integer
+      timestamp:
+        type: string
+    type: object
   mining.InstallationDetails:
     properties:
       is_installed:
@@ -207,8 +214,18 @@ definitions:
         $ref: '#/definitions/mining.API'
       configPath:
         type: string
+      hashrateHistory:
+        description: High-resolution (10s)
+        items:
+          $ref: '#/definitions/mining.HashratePoint'
+        type: array
       lastHeartbeat:
         type: integer
+      lowResHashrateHistory:
+        description: Low-resolution (1m averages)
+        items:
+          $ref: '#/definitions/mining.HashratePoint'
+        type: array
       miner_binary:
         description: New field for the full path to the miner executable
         type: string
@@ -301,6 +318,27 @@ paths:
               type: string
             type: object
       summary: Stop a running miner
+      tags:
+      - miners
+  /miners/{miner_name}/hashrate-history:
+    get:
+      description: Get historical hashrate data for a running miner
+      parameters:
+      - description: Miner Name
+        in: path
+        name: miner_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/mining.HashratePoint'
+            type: array
+      summary: Get miner hashrate history
       tags:
       - miners
   /miners/{miner_name}/stats:

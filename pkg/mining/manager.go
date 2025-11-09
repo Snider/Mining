@@ -3,22 +3,34 @@ package mining
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Manager handles miner lifecycle and operations
 type Manager struct {
-	miners map[string]Miner
+	miners    map[string]Miner
+	mu        sync.RWMutex // Mutex to protect the miners map
+	stopChan  chan struct{}
+	waitGroup sync.WaitGroup
 }
 
 // NewManager creates a new miner manager
 func NewManager() *Manager {
-	return &Manager{
-		miners: make(map[string]Miner),
+	m := &Manager{
+		miners:    make(map[string]Miner),
+		stopChan:  make(chan struct{}),
+		waitGroup: sync.WaitGroup{},
 	}
+	m.startStatsCollection()
+	return m
 }
 
 // StartMiner starts a new miner with the given configuration
 func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	var miner Miner
 	switch strings.ToLower(minerType) {
 	case "xmrig":
@@ -43,6 +55,9 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 
 // StopMiner stops a running miner
 func (m *Manager) StopMiner(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	minerKey := strings.ToLower(name) // Normalize input name to lowercase
 	miner, exists := m.miners[minerKey]
 	if !exists {
@@ -59,6 +74,9 @@ func (m *Manager) StopMiner(name string) error {
 
 // GetMiner retrieves a miner by ID
 func (m *Manager) GetMiner(name string) (Miner, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	minerKey := strings.ToLower(name) // Normalize input name to lowercase
 	miner, exists := m.miners[minerKey]
 	if !exists {
@@ -69,6 +87,9 @@ func (m *Manager) GetMiner(name string) (Miner, error) {
 
 // ListMiners returns all miners
 func (m *Manager) ListMiners() []Miner {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	miners := make([]Miner, 0, len(m.miners))
 	for _, miner := range m.miners {
 		miners = append(miners, miner)
@@ -84,4 +105,67 @@ func (m *Manager) ListAvailableMiners() []AvailableMiner {
 			Description: "XMRig is a high performance, open source, cross platform RandomX, KawPow, CryptoNight and AstroBWT CPU/GPU miner and RandomX benchmark.",
 		},
 	}
+}
+
+// startStatsCollection starts a goroutine to periodically collect stats from active miners
+func (m *Manager) startStatsCollection() {
+	m.waitGroup.Add(1)
+	go func() {
+		defer m.waitGroup.Done()
+		ticker := time.NewTicker(HighResolutionInterval) // Collect stats every 10 seconds
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				m.collectMinerStats()
+			case <-m.stopChan:
+				return
+			}
+		}
+	}()
+}
+
+// collectMinerStats iterates through active miners and collects their stats
+func (m *Manager) collectMinerStats() {
+	m.mu.RLock()
+	minersToCollect := make([]Miner, 0, len(m.miners))
+	for _, miner := range m.miners {
+		minersToCollect = append(minersToCollect, miner)
+	}
+	m.mu.RUnlock()
+
+	now := time.Now()
+	for _, miner := range minersToCollect {
+		stats, err := miner.GetStats()
+		if err != nil {
+			// Log the error but don't stop the collection for other miners
+			fmt.Printf("Error getting stats for miner %s: %v\n", miner.GetName(), err)
+			continue
+		}
+		miner.AddHashratePoint(HashratePoint{
+			Timestamp: now,
+			Hashrate:  stats.Hashrate,
+		})
+		miner.ReduceHashrateHistory(now) // Call the reducer
+	}
+}
+
+// GetMinerHashrateHistory returns the hashrate history for a specific miner
+func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	minerKey := strings.ToLower(name)
+	miner, exists := m.miners[minerKey]
+	if !exists {
+		return nil, fmt.Errorf("miner not found: %s", name)
+	}
+	return miner.GetHashrateHistory(), nil
+}
+
+// Stop stops the manager and its background goroutines
+func (m *Manager) Stop() {
+	close(m.stopChan)
+	m.waitGroup.Wait() // Wait for the stats collection goroutine to finish
 }
