@@ -58,6 +58,11 @@ func (m *XMRigMiner) GetPath() string {
 	return dataPath
 }
 
+// GetBinaryPath returns the full path to the miner executable.
+func (m *XMRigMiner) GetBinaryPath() string {
+	return m.MinerBinary
+}
+
 // GetLatestVersion returns the latest version of XMRig
 func (m *XMRigMiner) GetLatestVersion() (string, error) {
 	resp, err := httpClient.Get("https://api.github.com/repos/xmrig/xmrig/releases/latest")

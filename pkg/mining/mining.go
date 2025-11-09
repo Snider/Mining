@@ -29,6 +29,7 @@ type Miner interface {
 	GetStats() (*PerformanceMetrics, error)
 	GetName() string
 	GetPath() string
+	GetBinaryPath() string // New method to get the full path to the miner executable
 	CheckInstallation() (*InstallationDetails, error)
 	GetLatestVersion() (string, error)
 	GetHashrateHistory() []HashratePoint  // New method to get hashrate history
