@@ -38,6 +38,14 @@ jobs:
 #          npm install
 #          npm run build
 
+      - name: Run pre-release tests
+        run: make test-release
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
