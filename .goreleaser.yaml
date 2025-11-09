@@ -49,8 +49,10 @@ archives:
       - LICENSE
       # Add the compiled UI to the archive.
       # This will place the contents of ui/dist into a 'ui' directory in the archive.
-      - src: ui/dist/**/*
-        dst: ui
+      - src: ui/dist/mbe-mining-dashboard.js
+        strip_parent: true
+
+
 
 checksum:
   name_template: 'checksums.txt'
@@ -97,7 +99,10 @@ release:
     ## Mining Release {{ .Tag }}
 
     **Full Changelog**: https://github.com/Snider/Mining/compare/{{ .PreviousTag }}...{{ .Tag }}
-
+  # Upload the standalone UI file as a release asset.
+  extra_files:
+    - glob: mbe-mining-dashboard.js
+      name_template: "mbe-mining-dashboard-{{ .Version }}.js"
 
 # Announce releases
 announce:
