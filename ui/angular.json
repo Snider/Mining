@@ -16,6 +16,9 @@
             "outputPath": "dist",
             "index": "src/index.html",
             "main": "src/main.ts",
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -25,11 +28,9 @@
             ],
             "styles": [
               "src/styles.css",
-              "node_modules/@shoelace-style/shoelace/dist/themes/light.css"
+              "node_modules/@awesome.me/webawesome/dist/styles/themes/awesome.css"
             ],
-            "scripts": [
-              "node_modules/@shoelace-style/shoelace/dist/shoelace.js"
-            ],
+            "scripts": [],
             "outputHashing": "none",
             "namedChunks": false,
             "optimization": true
@@ -93,5 +94,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

@@ -22,12 +22,17 @@
   },
   "private": true,
   "dependencies": {
+    "@angular-devkit/build-angular": "^20.3.9",
     "@angular/common": "^20.3.0",
     "@angular/compiler": "^20.3.0",
     "@angular/core": "^20.3.0",
+    "@angular/elements": "^20.3.10",
     "@angular/forms": "^20.3.0",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "@awesome.me/webawesome": "^3.0.0",
+    "install": "^0.13.0",
+    "npm": "^11.6.2",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"

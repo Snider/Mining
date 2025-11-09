@@ -14,6 +14,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/Snider/Mining/docs"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/shirou/gopsutil/v4/mem" // Import mem for memory stats
 	"github.com/swaggo/swag"
@@ -50,6 +51,7 @@ func NewService(manager *Manager, listenAddr string, displayAddr string, swagger
 
 func (s *Service) ServiceStartup(ctx context.Context) error {
 	s.Router = gin.Default()
+	s.Router.Use(cors.Default())
 	s.setupRoutes()
 	s.Server.Handler = s.Router
 

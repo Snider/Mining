@@ -7,6 +7,8 @@ before:
   hooks:
     - go mod tidy
     - go test ./...
+    # Build the UI for the release
+    - sh -c 'cd ui && npm install && npm run build'
 
 builds:
   - id: mining-cli
@@ -45,6 +47,10 @@ archives:
     files:
       - README.md
       - LICENSE
+      # Add the compiled UI to the archive.
+      # This will place the contents of ui/dist into a 'ui' directory in the archive.
+      - src: ui/dist/**/*
+        dst: ui
 
 checksum:
   name_template: 'checksums.txt'

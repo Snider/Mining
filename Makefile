@@ -105,7 +105,7 @@ package:
 # Development workflow
 dev: tidy docs build
 	@echo "Starting development server..."
-	./$(BINARY_NAME) serve --host 127.0.0.1 --port 9090 --namespace /api/v1/mining
+	./$(BINARY_NAME) serve --host localhost --port 9090 --namespace /api/v1/mining
 
 # Help
 help:
