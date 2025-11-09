@@ -92,9 +92,6 @@ release:
 
     **Full Changelog**: https://github.com/Snider/Mining/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-# Generate SBOM (Software Bill of Materials)
-sboms:
-  - artifacts: archive
 
 # Announce releases
 announce:
