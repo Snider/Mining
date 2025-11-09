@@ -2,27 +2,11 @@ package mining
 
 import (
 	"fmt"
-	"log"        // Import log for general logging
-	"log/syslog" // Import syslog
+	"log"
 	"strings"
 	"sync"
 	"time"
 )
-
-var syslogWriter *syslog.Writer
-
-func init() {
-	// Initialize syslog writer globally.
-	// LOG_NOTICE is for normal but significant condition.
-	// LOG_DAEMON is for system daemons.
-	// "mining-service" is the tag for the log messages.
-	var err error
-	syslogWriter, err = syslog.New(syslog.LOG_NOTICE|syslog.LOG_DAEMON, "mining-service")
-	if err != nil {
-		log.Printf("Failed to connect to syslog: %v. Falling back to standard logger.", err)
-		// If syslog fails, syslogWriter remains nil, and we'll use standard log.
-	}
-}
 
 // Manager handles miner lifecycle and operations
 type Manager struct {
@@ -68,13 +52,9 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 
 	m.miners[minerKey] = miner
 
-	// Log to syslog if available, otherwise use standard logger
+	// Log to syslog (or standard log on Windows)
 	logMessage := fmt.Sprintf("CryptoCurrency Miner started: %s (Binary: %s)", miner.GetName(), miner.GetBinaryPath())
-	if syslogWriter != nil {
-		syslogWriter.Notice(logMessage)
-	} else {
-		log.Println(logMessage)
-	}
+	logToSyslog(logMessage)
 
 	return miner, nil
 }
@@ -166,7 +146,7 @@ func (m *Manager) collectMinerStats() {
 		stats, err := miner.GetStats()
 		if err != nil {
 			// Log the error but don't stop the collection for other miners
-			fmt.Printf("Error getting stats for miner %s: %v\n", miner.GetName(), err)
+			log.Printf("Error getting stats for miner %s: %v\n", miner.GetName(), err)
 			continue
 		}
 		miner.AddHashratePoint(HashratePoint{
