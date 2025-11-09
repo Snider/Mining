@@ -27,21 +27,24 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 		return nil, fmt.Errorf("unsupported miner type: %s", minerType)
 	}
 
-	if _, exists := m.miners[miner.GetName()]; exists {
-		return nil, fmt.Errorf("miner already started: %s", miner.GetName())
+	// Ensure the miner's internal name is used for map key
+	minerKey := miner.GetName()
+	if _, exists := m.miners[minerKey]; exists {
+		return nil, fmt.Errorf("miner already started: %s", minerKey)
 	}
 
 	if err := miner.Start(config); err != nil {
 		return nil, err
 	}
 
-	m.miners[miner.GetName()] = miner
+	m.miners[minerKey] = miner
 	return miner, nil
 }
 
 // StopMiner stops a running miner
 func (m *Manager) StopMiner(name string) error {
-	miner, exists := m.miners[name]
+	minerKey := strings.ToLower(name) // Normalize input name to lowercase
+	miner, exists := m.miners[minerKey]
 	if !exists {
 		return fmt.Errorf("miner not found: %s", name)
 	}
@@ -50,13 +53,14 @@ func (m *Manager) StopMiner(name string) error {
 		return err
 	}
 
-	delete(m.miners, name)
+	delete(m.miners, minerKey)
 	return nil
 }
 
 // GetMiner retrieves a miner by ID
 func (m *Manager) GetMiner(name string) (Miner, error) {
-	miner, exists := m.miners[name]
+	minerKey := strings.ToLower(name) // Normalize input name to lowercase
+	miner, exists := m.miners[minerKey]
 	if !exists {
 		return nil, fmt.Errorf("miner not found: %s", name)
 	}

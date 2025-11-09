@@ -416,6 +416,10 @@ const docTemplate = `{
                 "logFile": {
                     "type": "string"
                 },
+                "logOutput": {
+                    "description": "New field to control stdout/stderr logging",
+                    "type": "boolean"
+                },
                 "miner": {
                     "type": "string"
                 },

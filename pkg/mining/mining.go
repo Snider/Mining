@@ -111,6 +111,7 @@ type Config struct {
 	HealthPrintTime int    `json:"healthPrintTime,omitempty"`
 	NoColor         bool   `json:"noColor,omitempty"`
 	Verbose         bool   `json:"verbose,omitempty"`
+	LogOutput       bool   `json:"logOutput,omitempty"` // New field to control stdout/stderr logging
 
 	// Misc options
 	Background     bool   `json:"background,omitempty"`
@@ -177,7 +178,7 @@ type XMRigSummary struct {
 		SharesTotal uint64 `json:"shares_total"`
 	} `json:"results"`
 	Uptime    uint64 `json:"uptime"`
-	Algorithm string `json:"algo"`
+	Algorithm string `json:"algorithm"`
 }
 
 // AvailableMiner represents a miner that is available to be started

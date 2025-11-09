@@ -295,9 +295,9 @@ func (m *XMRigMiner) Start(config *Config) error {
 		args = append(args, "--rig-id", config.RigID)
 	}
 	// TLS is handled by config file, but --tls-fingerprint is a CLI option
-	if config.TLS { // If TLS is true in config, ensure --tls is passed if not already in config file
-		args = append(args, "--tls")
-	}
+	//if config.TLS { // If TLS is true in config, ensure --tls is passed if not already in config file
+	args = append(args, "--tls")
+	//}
 	if config.TLSSingerprint != "" {
 		args = append(args, "--tls-fingerprint", config.TLSSingerprint)
 	}
@@ -467,7 +467,17 @@ func (m *XMRigMiner) Start(config *Config) error {
 		args = append(args, "--no-dmi")
 	}
 
+	// Print the command being executed for debugging
+	fmt.Fprintf(os.Stderr, "Executing XMRig command: %s %s\n", m.MinerBinary, strings.Join(args, " "))
+
 	m.cmd = exec.Command(m.MinerBinary, args...)
+
+	// If LogOutput is true, redirect stdout and stderr
+	if config.LogOutput {
+		m.cmd.Stdout = os.Stdout
+		m.cmd.Stderr = os.Stderr
+	}
+
 	if err := m.cmd.Start(); err != nil {
 		return err
 	}
