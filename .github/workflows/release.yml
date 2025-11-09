@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - '**'
     tags:
       - 'v*.*.*'
 
@@ -11,11 +13,38 @@ permissions:
   issues: write
   id-token: write
 
-
 jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Run pre-release tests
+        run: make test-release
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   release:
     name: Release
+    needs: test
     runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,19 +61,11 @@ jobs:
         with:
           node-version: '20'
 
-#      - name: Build UI
-#        run: |
-#          cd ui
-#          npm install
-#          npm run build
-
-      - name: Run pre-release tests
-        run: make test-release
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # - name: Build UI
+      #   run: |
+      #     cd ui
+      #     npm install
+      #     npm run build
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
