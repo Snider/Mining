@@ -95,6 +95,10 @@ func (s *Service) setupRoutes() {
 		}
 	}
 
+	// New route to serve the custom HTML element bundle
+	// This path now points to the output of the Angular project within the 'ui' directory
+	s.Router.StaticFile("/component/mining-dashboard.js", "./ui/dist/ui/main.js")
+
 	// Register Swagger UI route under a distinct sub-path to avoid conflicts
 	swaggerURL := ginSwagger.URL(fmt.Sprintf("http://%s%s/doc.json", s.DisplayAddr, s.SwaggerUIPath))
 	s.Router.GET(s.SwaggerUIPath+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL, ginSwagger.InstanceName(s.SwaggerInstanceName)))
