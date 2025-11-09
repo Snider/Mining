@@ -41,7 +41,7 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ 'zip' ]
     files:
       - README.md
       - LICENSE
@@ -96,3 +96,7 @@ release:
 # Announce releases
 announce:
   skip: false
+  discord:
+    enabled: true
+    message_template: "miner-cli {{.Tag}} is out!  Check it out at {{ .ReleaseURL }}"
+    author: "Lethean Releases"
