@@ -7,7 +7,16 @@
 [![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
 
-GoLang Miner management with RESTful control - A modern, modular package for managing cryptocurrency miners.
+GoLang Miner management with embedable RESTful control - A modern, modular package for managing cryptocurrency miners.
+
+```html
+<script type="module" src="./mbe-mining-dashboard.js"></script>
+<mde-mining-dashboard miner-name="xmrig" wallet="..." pool="..."></mde-mining-dashboard>
+```
+
+<img width="834" height="657" alt="image" src="https://github.com/user-attachments/assets/d4fc4704-819c-4aca-bcd3-ae4af6e25c1b" />
+
+
 
 ## Overview
 
