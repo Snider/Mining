@@ -16,6 +16,8 @@ type Manager struct {
 	waitGroup sync.WaitGroup
 }
 
+var _ ManagerInterface = (*Manager)(nil)
+
 // NewManager creates a new miner manager
 func NewManager() *Manager {
 	m := &Manager{
