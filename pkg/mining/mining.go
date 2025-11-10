@@ -1,12 +1,9 @@
 package mining
 
 import (
-	"net/http"
 	"os/exec"
 	"sync"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -56,15 +53,6 @@ type SystemInfo struct {
 	InstalledMinersInfo []*InstallationDetails `json:"installed_miners_info"`
 }
 
-type Service struct {
-	Manager             *Manager
-	Router              *gin.Engine
-	Server              *http.Server
-	DisplayAddr         string // The address to display in messages (e.g., 127.0.0.1:8080)
-	SwaggerInstanceName string
-	APIBasePath         string // The base path for all API routes (e.g., /api/v1/mining)
-	SwaggerUIPath       string // The path where Swagger UI assets are served (e.g., /api/v1/mining/swagger)
-}
 
 // Config represents the config for a miner, including XMRig specific options
 type Config struct {

@@ -23,8 +23,19 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// Service encapsulates the gin-gonic router and the mining manager.
+type Service struct {
+	Manager             ManagerInterface
+	Router              *gin.Engine
+	Server              *http.Server
+	DisplayAddr         string
+	SwaggerInstanceName string
+	APIBasePath         string
+	SwaggerUIPath       string
+}
+
 // NewService creates a new mining service
-func NewService(manager *Manager, listenAddr string, displayAddr string, swaggerNamespace string) *Service {
+func NewService(manager ManagerInterface, listenAddr string, displayAddr string, swaggerNamespace string) *Service {
 	apiBasePath := "/" + strings.Trim(swaggerNamespace, "/")
 	swaggerUIPath := apiBasePath + "/swagger" // Serve Swagger UI under a distinct sub-path
 
