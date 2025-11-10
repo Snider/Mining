@@ -95,12 +95,16 @@ func TestXMRigMiner_Start_Stop(t *testing.T) {
 	tmpDir := t.TempDir()
 	dummyExePath := filepath.Join(tmpDir, "xmrig")
 	if runtime.GOOS == "windows" {
-		dummyExePath += ".exe"
-	}
-
-	// Create a dummy executable file
-	if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\n"), 0755); err != nil {
-		t.Fatalf("failed to create dummy executable: %v", err)
+		dummyExePath += ".bat"
+		// Create a dummy batch file for Windows
+		if err := os.WriteFile(dummyExePath, []byte("@echo off\n"), 0755); err != nil {
+			t.Fatalf("failed to create dummy executable: %v", err)
+		}
+	} else {
+		// Create a dummy shell script for other OSes
+		if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create dummy executable: %v", err)
+		}
 	}
 
 	miner := NewXMRigMiner()
