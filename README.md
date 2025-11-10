@@ -9,9 +9,13 @@
 
 GoLang Miner management with embedable RESTful control - A modern, modular package for managing cryptocurrency miners.
 
+```bash
+miner-cli serve --host localhost --port 9090 --namespace /api/v1/mining
+```
+
 ```html
 <script type="module" src="./mbe-mining-dashboard.js"></script>
-<mde-mining-dashboard miner-name="xmrig" wallet="..." pool="..."></mde-mining-dashboard>
+<mde-mining-dashboard miner-name="xmrig" wallet="..." pool="..." api-base-url="http://localhost:9090/api/v1/mining"></mde-mining-dashboard>
 ```
 
 <img width="834" height="657" alt="image" src="https://github.com/user-attachments/assets/d4fc4704-819c-4aca-bcd3-ae4af6e25c1b" />
