@@ -210,14 +210,12 @@ func TestXMRigMiner_HashrateHistory(t *testing.T) {
 	miner.ReduceHashrateHistory(future)
 
 	// After reduction, high-res history should be smaller
-	miner.mu.Lock()
-	if len(miner.HashrateHistory) >= 10 {
-		t.Errorf("High-res history not reduced, size: %d", len(miner.HashrateHistory))
+	if miner.GetHighResHistoryLength() >= 10 {
+		t.Errorf("High-res history not reduced, size: %d", miner.GetHighResHistoryLength())
 	}
-	if len(miner.LowResHashrateHistory) == 0 {
+	if miner.GetLowResHistoryLength() == 0 {
 		t.Error("Low-res history not populated")
 	}
-	miner.mu.Unlock()
 
 	combinedHistory := miner.GetHashrateHistory()
 	if len(combinedHistory) == 0 {

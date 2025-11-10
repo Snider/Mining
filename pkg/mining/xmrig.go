@@ -574,6 +574,18 @@ func (m *XMRigMiner) AddHashratePoint(point HashratePoint) {
 
 // ReduceHashrateHistory aggregates older high-resolution data into 1-minute averages
 // and adds them to the low-resolution history.
+func (m *XMRigMiner) GetHighResHistoryLength() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.HashrateHistory)
+}
+
+func (m *XMRigMiner) GetLowResHistoryLength() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.LowResHashrateHistory)
+}
+
 func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
