@@ -1,0 +1,51 @@
+<wa-card class="card">
+
+  <div slot="header" class="header-container">
+    <h3 class="header-title">
+      <span class="title-quiet">Mining Dashboard:</span> {{ minerName }}
+    </h3>
+    <div *ngIf="!loading && !error" class="header-stats">
+      <div class="stat-item">
+        <wa-icon name="speedometer"></wa-icon>
+        <span>{{ currentHashrate.toFixed(2) }} H/s</span>
+      </div>
+      <div class="stat-item">
+        <wa-icon name="clock"></wa-icon>
+        <span>{{ lastUpdated | date:'mediumTime' }}</span>
+      </div>
+    </div>
+    <wa-button appearance="plain" slot="header-actions" size="small" (click)="toggleDetails()">
+      <wa-icon name="cog" label="Toggle Details"></wa-icon>
+    </wa-button>
+  </div>
+
+  <div class="wa-stack wa-gap-sm">
+    <p *ngIf="loading">Loading hashrate data...</p>
+    <p *ngIf="error" class="error-message">Error: {{ error }}</p>
+
+    <div *ngIf="!loading && !error">
+      <highcharts-chart
+        [options]="chartOptions"
+        [(update)]="updateFlag"
+        class="chart"
+      ></highcharts-chart>
+    </div>
+
+    <div *ngIf="showDetails" class="details-section">
+      <h4>Hashrate History ({{ hashrateHistory.length }} points)</h4>
+      <ul class="history-list">
+        <li *ngFor="let point of hashrateHistory | slice:0:5">
+          {{ point.timestamp | date:'mediumTime' }}: {{ point.hashrate }} H/s
+        </li>
+        <li *ngIf="hashrateHistory.length > 5">...</li>
+      </ul>
+      <h5>Raw History Data:</h5>
+      <pre>{{ hashrateHistory | json }}</pre>
+    </div>
+  </div>
+
+  <wa-divider></wa-divider>
+  <div slot="footer" class="card-footer">
+    <wa-button variant="neutral" (click)="toggleDetails()">{{ showDetails ? 'Hide Details' : 'Show Details' }}</wa-button>
+  </div>
+</wa-card>

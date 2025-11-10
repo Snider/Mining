@@ -27,8 +27,7 @@
               }
             ],
             "styles": [
-              "src/styles.css",
-              "node_modules/@awesome.me/webawesome/dist/styles/themes/awesome.css"
+              "src/styles.css"
             ],
             "scripts": [],
             "outputHashing": "none",

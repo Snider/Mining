@@ -1,18 +1,12 @@
 import { createApplication } from '@angular/platform-browser';
 import { createCustomElement } from '@angular/elements';
 import { MiningDashboardElementComponent } from './app/app'; // Renamed App to MiningDashboardElementComponent
-import { importProvidersFrom } from '@angular/core';
-import { HttpClientModule } from '@angular/common/http';
-import { CommonModule } from '@angular/common';
+import {appConfig} from './app/app.config';
 
 (async () => {
   // Bootstrap a minimal Angular application to provide
   // necessary services like HttpClient to the custom element.
-  const app = await createApplication({
-    providers: [
-      importProvidersFrom(HttpClientModule, CommonModule)
-    ]
-  });
+  const app = await createApplication(appConfig);
 
   // Define your custom element
   const MiningDashboardElement = createCustomElement(MiningDashboardElementComponent, { injector: app.injector });
