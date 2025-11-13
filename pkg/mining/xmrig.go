@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -161,76 +162,76 @@ func (m *XMRigMiner) Uninstall() error {
 	return os.RemoveAll(m.GetPath())
 }
 
-// CheckInstallation checks if the miner is installed and returns its details
-func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
+// findMinerBinary searches for the miner executable, first in the standard installation path,
+// then falls back to the system's PATH.
+func (m *XMRigMiner) findMinerBinary() (string, error) {
+	executableName := "xmrig"
+	if runtime.GOOS == "windows" {
+		executableName += ".exe"
+	}
+
+	// 1. Check the standard installation directory first
 	baseInstallPath := m.GetPath()
-	details := &InstallationDetails{
-		Path: baseInstallPath, // Initialize with base path, will be updated to versioned path
-	}
-
-	if _, err := os.Stat(baseInstallPath); os.IsNotExist(err) {
-		details.IsInstalled = false
-		return details, nil
-	}
-
-	// The directory exists, now check for the executable by finding the versioned sub-folder
-	files, err := os.ReadDir(baseInstallPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read installation directory: %w", err)
-	}
-
-	var versionedDir string
-	for _, f := range files {
-		if f.IsDir() && strings.HasPrefix(f.Name(), "xmrig-") {
-			versionedDir = f.Name()
-			break
+	if _, err := os.Stat(baseInstallPath); err == nil {
+		files, err := os.ReadDir(baseInstallPath)
+		if err == nil {
+			for _, f := range files {
+				if f.IsDir() && strings.HasPrefix(f.Name(), "xmrig-") {
+					versionedPath := filepath.Join(baseInstallPath, f.Name())
+					fullPath := filepath.Join(versionedPath, executableName)
+					if _, err := os.Stat(fullPath); err == nil {
+						log.Printf("Found miner binary at standard path: %s", fullPath)
+						return fullPath, nil
+					}
+				}
+			}
 		}
 	}
 
-	if versionedDir == "" {
-		details.IsInstalled = false // Directory exists but is empty or malformed
-		return details, nil
+	// 2. Fallback to searching the system PATH
+	path, err := exec.LookPath(executableName)
+	if err == nil {
+		log.Printf("Found miner binary in system PATH: %s", path)
+		return path, nil
 	}
 
-	// Update the Path to be the versioned directory
-	details.Path = filepath.Join(baseInstallPath, versionedDir)
+	return "", errors.New("miner executable not found in standard directory or system PATH")
+}
 
-	var executableName string
-	if runtime.GOOS == "windows" {
-		executableName = "xmrig.exe"
-	} else {
-		executableName = "xmrig"
-	}
+// CheckInstallation checks if the miner is installed and returns its details
+func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
+	details := &InstallationDetails{}
 
-	executablePath := filepath.Join(details.Path, executableName)
-	if _, err := os.Stat(executablePath); os.IsNotExist(err) {
-		details.IsInstalled = false // Versioned folder exists, but no executable
-		return details, nil
+	binaryPath, err := m.findMinerBinary()
+	if err != nil {
+		details.IsInstalled = false
+		return details, nil // Return not-installed, but no error
 	}
 
 	details.IsInstalled = true
-	details.MinerBinary = executablePath // Set the full path to the miner binary
+	details.MinerBinary = binaryPath
+	details.Path = filepath.Dir(binaryPath) // The directory containing the executable
 
 	// Try to get the version from the executable
-	cmd := exec.Command(executablePath, "--version")
+	cmd := exec.Command(binaryPath, "--version")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
 		details.Version = "Unknown (could not run executable)"
-		return details, nil
-	}
-
-	// XMRig version output is typically "XMRig 6.18.0"
-	fields := strings.Fields(out.String())
-	if len(fields) >= 2 {
-		details.Version = fields[1]
 	} else {
-		details.Version = "Unknown (could not parse version)"
+		// XMRig version output is typically "XMRig 6.18.0"
+		fields := strings.Fields(out.String())
+		if len(fields) >= 2 {
+			details.Version = fields[1]
+		} else {
+			details.Version = "Unknown (could not parse version)"
+		}
 	}
 
-	// Update the XMRigMiner struct's Path and MinerBinary fields
+	// Update the XMRigMiner struct's fields
 	m.Path = details.Path
 	m.MinerBinary = details.MinerBinary
+	m.Version = details.Version // Keep the miner's version in sync
 
 	return details, nil
 }

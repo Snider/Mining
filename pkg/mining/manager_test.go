@@ -1,47 +1,104 @@
 package mining
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
-// TestManager_StartStopMultipleMiners tests starting and stopping multiple miners.
-func TestManager_StartStopMultipleMiners(t *testing.T) {
-	manager := NewManager()
-	defer manager.Stop()
+// setupTestManager creates a new Manager and a dummy executable for tests.
+// It also temporarily modifies the PATH to include the dummy executable's directory.
+func setupTestManager(t *testing.T) *Manager {
+	dummyDir := t.TempDir()
+	executableName := "xmrig"
+	if runtime.GOOS == "windows" {
+		executableName += ".exe"
+	}
+	dummyPath := filepath.Join(dummyDir, executableName)
 
-	configs := []*Config{
-		{Pool: "pool1", Wallet: "wallet1"},
+	// Create a script that does nothing but exit, to simulate the miner executable
+	var script []byte
+	if runtime.GOOS == "windows" {
+		script = []byte("@echo off\r\nexit 0")
+	} else {
+		script = []byte("#!/bin/sh\nexit 0")
 	}
 
-	minerNames := []string{"xmrig"}
-
-	for i, config := range configs {
-		// Since we can't start a real miner in the test, we'll just check that the manager doesn't crash.
-		// A more complete test would involve a mock miner.
-		_, err := manager.StartMiner(minerNames[i], config)
-		if err == nil {
-			t.Errorf("Expected error when starting miner without executable")
-		}
+	if err := os.WriteFile(dummyPath, script, 0755); err != nil {
+		t.Fatalf("Failed to create dummy miner executable: %v", err)
 	}
+
+	// Prepend the dummy directory to the PATH
+	originalPath := os.Getenv("PATH")
+	t.Cleanup(func() {
+		os.Setenv("PATH", originalPath)
+	})
+	os.Setenv("PATH", dummyDir+string(os.PathListSeparator)+originalPath)
+
+	return NewManager()
 }
 
-// TestManager_collectMinerStats tests the stat collection logic.
-func TestManager_collectMinerStats(t *testing.T) {
-	manager := NewManager()
-	defer manager.Stop()
+// TestStartMiner tests the StartMiner function
+func TestStartMiner(t *testing.T) {
+	m := setupTestManager(t)
+	defer m.Stop()
 
-	// Since we can't start a real miner, we can't fully test this.
-	// A more complete test would involve a mock miner that can be added to the manager.
-	manager.collectMinerStats()
-}
+	config := &Config{
+		HTTPPort: 9001, // Use a different port to avoid conflict
+		Pool:     "test:1234",
+		Wallet:   "testwallet",
+	}
 
-// TestManager_GetMinerHashrateHistory tests getting hashrate history.
-func TestManager_GetMinerHashrateHistory(t *testing.T) {
-	manager := NewManager()
-	defer manager.Stop()
+	// Case 1: Successfully start a supported miner
+	miner, err := m.StartMiner("xmrig", config)
+	if err != nil {
+		t.Fatalf("Expected to start miner, but got error: %v", err)
+	}
+	if miner == nil {
+		t.Fatal("Expected miner to be non-nil, but it was")
+	}
+	if _, exists := m.miners[miner.GetName()]; !exists {
+		t.Errorf("Miner %s was not added to the manager's list", miner.GetName())
+	}
 
-	_, err := manager.GetMinerHashrateHistory("non-existent")
+	// Case 2: Attempt to start an unsupported miner
+	_, err = m.StartMiner("unsupported", config)
 	if err == nil {
-		t.Error("Expected error for getting hashrate history for non-existent miner")
+		t.Error("Expected an error when starting an unsupported miner, but got nil")
+	}
+
+	// Case 3: Attempt to start a duplicate miner
+	_, err = m.StartMiner("xmrig", config)
+	if err == nil {
+		t.Error("Expected an error when starting a duplicate miner, but got nil")
+	}
+}
+
+// TestStopMiner tests the StopMiner function
+func TestStopMiner(t *testing.T) {
+	m := setupTestManager(t)
+	defer m.Stop()
+
+	config := &Config{
+		HTTPPort: 9002,
+		Pool:     "test:1234",
+		Wallet:   "testwallet",
+	}
+
+	// Case 1: Stop a running miner
+	miner, _ := m.StartMiner("xmrig", config)
+	err := m.StopMiner(miner.GetName())
+	if err != nil {
+		t.Fatalf("Expected to stop miner, but got error: %v", err)
+	}
+	if _, exists := m.miners[miner.GetName()]; exists {
+		t.Errorf("Miner %s was not removed from the manager's list", miner.GetName())
+	}
+
+	// Case 2: Attempt to stop a non-existent miner
+	err = m.StopMiner("nonexistent")
+	if err == nil {
+		t.Error("Expected an error when stopping a non-existent miner, but got nil")
 	}
 }
