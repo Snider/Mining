@@ -102,3 +102,55 @@ func TestStopMiner(t *testing.T) {
 		t.Error("Expected an error when stopping a non-existent miner, but got nil")
 	}
 }
+
+// TestGetMiner tests the GetMiner function
+func TestGetMiner(t *testing.T) {
+	m := setupTestManager(t)
+	defer m.Stop()
+
+	config := &Config{
+		HTTPPort: 9003,
+		Pool:     "test:1234",
+		Wallet:   "testwallet",
+	}
+
+	// Case 1: Get an existing miner
+	startedMiner, _ := m.StartMiner("xmrig", config)
+	retrievedMiner, err := m.GetMiner(startedMiner.GetName())
+	if err != nil {
+		t.Fatalf("Expected to get miner, but got error: %v", err)
+	}
+	if retrievedMiner.GetName() != startedMiner.GetName() {
+		t.Errorf("Expected to get miner %s, but got %s", startedMiner.GetName(), retrievedMiner.GetName())
+	}
+
+	// Case 2: Attempt to get a non-existent miner
+	_, err = m.GetMiner("nonexistent")
+	if err == nil {
+		t.Error("Expected an error when getting a non-existent miner, but got nil")
+	}
+}
+
+// TestListMiners tests the ListMiners function
+func TestListMiners(t *testing.T) {
+	m := setupTestManager(t)
+	defer m.Stop()
+
+	// Case 1: List miners when empty
+	miners := m.ListMiners()
+	if len(miners) != 0 {
+		t.Errorf("Expected 0 miners, but got %d", len(miners))
+	}
+
+	// Case 2: List miners when not empty
+	config := &Config{
+		HTTPPort: 9004,
+		Pool:     "test:1234",
+		Wallet:   "testwallet",
+	}
+	_, _ = m.StartMiner("xmrig", config)
+	miners = m.ListMiners()
+	if len(miners) != 1 {
+		t.Errorf("Expected 1 miner, but got %d", len(miners))
+	}
+}

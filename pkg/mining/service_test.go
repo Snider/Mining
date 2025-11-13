@@ -92,6 +92,35 @@ func TestHandleListMiners(t *testing.T) {
 	}
 }
 
+func TestHandleGetInfo(t *testing.T) {
+	router, _ := setupTestRouter()
+
+	// Case 1: Successful response
+	req, _ := http.NewRequest("GET", "/info", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
+func TestHandleDoctor(t *testing.T) {
+	router, mockManager := setupTestRouter()
+	mockManager.ListAvailableMinersFunc = func() []AvailableMiner {
+		return []AvailableMiner{{Name: "xmrig"}}
+	}
+
+	// Case 1: Successful response
+	req, _ := http.NewRequest("POST", "/doctor", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
 func TestHandleStartMiner(t *testing.T) {
 	router, mockManager := setupTestRouter()
 	mockManager.StartMinerFunc = func(minerType string, config *Config) (Miner, error) {
