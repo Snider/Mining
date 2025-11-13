@@ -39,7 +39,7 @@ func tempDir(t *testing.T) string {
 	return dir
 }
 
-func TestNewXMRigMiner(t *testing.T) {
+func TestNewXMRigMiner_Good(t *testing.T) {
 	miner := NewXMRigMiner()
 	if miner == nil {
 		t.Fatal("NewXMRigMiner returned nil")
@@ -55,14 +55,14 @@ func TestNewXMRigMiner(t *testing.T) {
 	}
 }
 
-func TestXMRigMiner_GetName(t *testing.T) {
+func TestXMRigMiner_GetName_Good(t *testing.T) {
 	miner := NewXMRigMiner()
 	if name := miner.GetName(); name != "xmrig" {
 		t.Errorf("Expected GetName() to return 'xmrig', got '%s'", name)
 	}
 }
 
-func TestXMRigMiner_GetLatestVersion(t *testing.T) {
+func TestXMRigMiner_GetLatestVersion_Good(t *testing.T) {
 	originalClient := httpClient
 	httpClient = newTestClient(func(req *http.Request) *http.Response {
 		if req.URL.String() != "https://api.github.com/repos/xmrig/xmrig/releases/latest" {
@@ -90,7 +90,25 @@ func TestXMRigMiner_GetLatestVersion(t *testing.T) {
 	}
 }
 
-func TestXMRigMiner_Start_Stop(t *testing.T) {
+func TestXMRigMiner_GetLatestVersion_Bad(t *testing.T) {
+	originalClient := httpClient
+	httpClient = newTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(strings.NewReader("Not Found")),
+			Header:     make(http.Header),
+		}
+	})
+	defer func() { httpClient = originalClient }()
+
+	miner := NewXMRigMiner()
+	_, err := miner.GetLatestVersion()
+	if err == nil {
+		t.Fatalf("GetLatestVersion() did not return an error")
+	}
+}
+
+func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
 	// Create a temporary directory for the dummy executable
 	tmpDir := t.TempDir()
 	dummyExePath := filepath.Join(tmpDir, "xmrig")
@@ -140,7 +158,22 @@ func TestXMRigMiner_Start_Stop(t *testing.T) {
 	miner.mu.Unlock()
 }
 
-func TestXMRigMiner_GetStats(t *testing.T) {
+func TestXMRigMiner_Start_Stop_Bad(t *testing.T) {
+	miner := NewXMRigMiner()
+	miner.MinerBinary = "nonexistent"
+
+	config := &Config{
+		Pool:   "test:1234",
+		Wallet: "testwallet",
+	}
+
+	err := miner.Start(config)
+	if err == nil {
+		t.Fatalf("Start() did not return an error")
+	}
+}
+
+func TestXMRigMiner_GetStats_Good(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		summary := XMRigSummary{
 			Hashrate: struct {
@@ -190,7 +223,20 @@ func TestXMRigMiner_GetStats(t *testing.T) {
 	}
 }
 
-func TestXMRigMiner_HashrateHistory(t *testing.T) {
+func TestXMRigMiner_GetStats_Bad(t *testing.T) {
+	// Don't start a server, so the API call will fail
+	miner := NewXMRigMiner()
+	miner.Running = true // Mock running state
+	miner.API.ListenHost = "127.0.0.1"
+	miner.API.ListenPort = 9999 // A port that is unlikely to be in use
+
+	_, err := miner.GetStats()
+	if err == nil {
+		t.Fatalf("GetStats() did not return an error")
+	}
+}
+
+func TestXMRigMiner_HashrateHistory_Good(t *testing.T) {
 	miner := NewXMRigMiner()
 	now := time.Now()
 
