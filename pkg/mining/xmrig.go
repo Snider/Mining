@@ -26,10 +26,20 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-// NewXMRigMiner creates a new XMRig miner
+// NewXMRigMiner creates a new XMRig miner instance with default settings.
+// This is the entry point for creating a new XMRig miner that can be managed
+// by the Manager. The returned miner is ready to be installed and started.
+//
+// Example:
+//
+//	// Create a new XMRig miner
+//	xmrigMiner := mining.NewXMRigMiner()
+//
+//	// Now you can use the miner to perform actions like
+//	// installing, starting, and stopping.
 func NewXMRigMiner() *XMRigMiner {
 	return &XMRigMiner{
-		Name:    "xmrig", // Changed to lowercase for consistency
+		Name:    "xmrig",
 		Version: "latest",
 		URL:     "https://github.com/xmrig/xmrig/releases",
 		API: &API{
@@ -43,28 +53,30 @@ func NewXMRigMiner() *XMRigMiner {
 	}
 }
 
-// GetName returns the name of the miner
+// GetName returns the name of the miner.
 func (m *XMRigMiner) GetName() string {
 	return m.Name
 }
 
-// GetPath returns the path of the miner
-// This now returns the base installation directory for xmrig, not the versioned one.
+// GetPath returns the base installation directory for the XMRig miner.
+// This is the directory where different versions of the miner are stored.
 func (m *XMRigMiner) GetPath() string {
 	dataPath, err := xdg.DataFile("lethean-desktop/miners/xmrig")
 	if err != nil {
-		// Fallback for safety, though it should ideally not fail if Install works.
 		return ""
 	}
 	return dataPath
 }
 
-// GetBinaryPath returns the full path to the miner executable.
+// GetBinaryPath returns the full path to the miner's executable file.
+// This path is set after a successful installation or check of the installation status.
 func (m *XMRigMiner) GetBinaryPath() string {
 	return m.MinerBinary
 }
 
-// GetLatestVersion returns the latest version of XMRig
+// GetLatestVersion fetches the latest version of XMRig from the GitHub API.
+// It returns the version string (e.g., "v6.18.0") or an error if the
+// version could not be retrieved.
 func (m *XMRigMiner) GetLatestVersion() (string, error) {
 	resp, err := httpClient.Get("https://api.github.com/repos/xmrig/xmrig/releases/latest")
 	if err != nil {
@@ -85,7 +97,9 @@ func (m *XMRigMiner) GetLatestVersion() (string, error) {
 	return release.TagName, nil
 }
 
-// Download and install the latest version of XMRig
+// Install downloads and installs the latest version of the XMRig miner.
+// It determines the correct release for the current operating system,
+// downloads it, and extracts it to the appropriate installation directory.
 func (m *XMRigMiner) Install() error {
 	version, err := m.GetLatestVersion()
 	if err != nil {
@@ -156,14 +170,17 @@ func (m *XMRigMiner) Install() error {
 	return nil
 }
 
-// Uninstall removes the miner files
+// Uninstall removes all files related to the XMRig miner.
+// This is a destructive operation that will remove the entire installation
+// directory of the miner.
 func (m *XMRigMiner) Uninstall() error {
-	// Uninstall should remove the base path, which contains the versioned folder
 	return os.RemoveAll(m.GetPath())
 }
 
-// findMinerBinary searches for the miner executable, first in the standard installation path,
-// then falls back to the system's PATH.
+// findMinerBinary searches for the miner's executable file.
+// It first checks the standard installation path, and if not found, falls
+// back to searching the system's PATH. This allows for both managed
+// installations and pre-existing installations to be used.
 func (m *XMRigMiner) findMinerBinary() (string, error) {
 	executableName := "xmrig"
 	if runtime.GOOS == "windows" {
@@ -198,7 +215,10 @@ func (m *XMRigMiner) findMinerBinary() (string, error) {
 	return "", errors.New("miner executable not found in standard directory or system PATH")
 }
 
-// CheckInstallation checks if the miner is installed and returns its details
+// CheckInstallation verifies if the XMRig miner is installed correctly.
+// It returns details about the installation, such as whether it is installed,
+// its version, and the path to the executable. This method also updates the
+// miner's internal state with the installation details.
 func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
 	details := &InstallationDetails{}
 
@@ -236,7 +256,28 @@ func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
 	return details, nil
 }
 
-// Start the miner
+// Start launches the XMRig miner with the specified configuration.
+// It creates a configuration file, constructs the necessary command-line
+// arguments, and starts the miner process in the background.
+//
+// Example:
+//
+//	// Create a new XMRig miner and a configuration
+//	xmrigMiner := mining.NewXMRigMiner()
+//	config := &mining.Config{
+//		Pool:    "your-pool-address",
+//		Wallet:  "your-wallet-address",
+//		Threads: 4,
+//	}
+//
+//	// Start the miner
+//	err := xmrigMiner.Start(config)
+//	if err != nil {
+//		log.Fatalf("Failed to start miner: %v", err)
+//	}
+//
+//	// Stop the miner when you are done
+//	defer xmrigMiner.Stop()
 func (m *XMRigMiner) Start(config *Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -500,7 +541,8 @@ func (m *XMRigMiner) Start(config *Config) error {
 	return nil
 }
 
-// Stop the miner
+// Stop terminates the XMRig miner process.
+// It sends a kill signal to the running miner process.
 func (m *XMRigMiner) Stop() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -512,7 +554,9 @@ func (m *XMRigMiner) Stop() error {
 	return m.cmd.Process.Kill()
 }
 
-// GetStats returns the stats for the miner
+// GetStats retrieves the performance statistics from the running XMRig miner.
+// It queries the miner's API and returns a PerformanceMetrics struct
+// containing the hashrate, share counts, and uptime.
 func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 	m.mu.Lock()
 	running := m.Running
@@ -552,6 +596,7 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 }
 
 // GetHashrateHistory returns the combined high-resolution and low-resolution hashrate history.
+// This provides a complete view of the miner's performance over time.
 func (m *XMRigMiner) GetHashrateHistory() []HashratePoint {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -565,73 +610,69 @@ func (m *XMRigMiner) GetHashrateHistory() []HashratePoint {
 }
 
 // AddHashratePoint adds a new hashrate measurement to the high-resolution history.
+// This method is called periodically by the Manager to record the miner's performance.
 func (m *XMRigMiner) AddHashratePoint(point HashratePoint) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.HashrateHistory = append(m.HashrateHistory, point)
-	// No trimming here; trimming is handled by ReduceHashrateHistory
 }
 
-// ReduceHashrateHistory aggregates older high-resolution data into 1-minute averages
-// and adds them to the low-resolution history.
+// GetHighResHistoryLength returns the number of data points in the high-resolution hashrate history.
 func (m *XMRigMiner) GetHighResHistoryLength() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.HashrateHistory)
 }
 
+// GetLowResHistoryLength returns the number of data points in the low-resolution hashrate history.
 func (m *XMRigMiner) GetLowResHistoryLength() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.LowResHashrateHistory)
 }
 
+// ReduceHashrateHistory aggregates older high-resolution hashrate data into
+// lower-resolution data, and trims the history to a manageable size.
+// This method is called periodically by the Manager to maintain the hashrate
+// history.
 func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Only aggregate if enough time has passed since the last aggregation
-	// or if it's the first aggregation
 	if !m.LastLowResAggregation.IsZero() && now.Sub(m.LastLowResAggregation) < LowResolutionInterval {
 		return
 	}
 
-	// Find points in HashrateHistory that are older than HighResolutionDuration
-	// These are the candidates for aggregation into low-resolution history.
 	var pointsToAggregate []HashratePoint
 	var newHighResHistory []HashratePoint
 
 	// The cutoff is exclusive: points *at or before* this time are candidates for aggregation.
 	// We want to aggregate points that are *strictly older* than HighResolutionDuration ago.
-	// So, if HighResolutionDuration is 5 minutes, points older than (now - 5 minutes) are aggregated.
 	cutoff := now.Add(-HighResolutionDuration)
 
 	for _, p := range m.HashrateHistory {
-		if p.Timestamp.Before(cutoff) { // Use Before to ensure strict older-than
+		if p.Timestamp.Before(cutoff) {
 			pointsToAggregate = append(pointsToAggregate, p)
 		} else {
 			newHighResHistory = append(newHighResHistory, p)
 		}
 	}
-	m.HashrateHistory = newHighResHistory // Update high-res history to only contain recent points
+	m.HashrateHistory = newHighResHistory
 
 	if len(pointsToAggregate) == 0 {
-		// If no points to aggregate, just update LastLowResAggregation and return
 		m.LastLowResAggregation = now
 		return
 	}
 
-	// Aggregate into 1-minute slices
-	// Group points by minute (truncated timestamp)
+	// Group points by minute and calculate average hashrate
 	minuteGroups := make(map[time.Time][]int)
 	for _, p := range pointsToAggregate {
-		// Round timestamp down to the nearest minute for grouping
 		minute := p.Timestamp.Truncate(LowResolutionInterval)
 		minuteGroups[minute] = append(minuteGroups[minute], p.Hashrate)
 	}
 
-	// Calculate average for each minute and add to low-res history
 	var newLowResPoints []HashratePoint
 	for minute, hashrates := range minuteGroups {
 		if len(hashrates) > 0 {
@@ -647,7 +688,6 @@ func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
 		}
 	}
 
-	// Sort new low-res points by timestamp to maintain chronological order
 	sort.Slice(newLowResPoints, func(i, j int) bool {
 		return newLowResPoints[i].Timestamp.Before(newLowResPoints[j].Timestamp)
 	})
@@ -656,15 +696,14 @@ func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
 
 	// Trim low-resolution history to LowResHistoryRetention
 	lowResCutoff := now.Add(-LowResHistoryRetention)
-	// Find the first point that is *after* or equal to the lowResCutoff
 	firstValidLowResIndex := 0
 	for i, p := range m.LowResHashrateHistory {
 		if p.Timestamp.After(lowResCutoff) || p.Timestamp.Equal(lowResCutoff) {
 			firstValidLowResIndex = i
 			break
 		}
-		if i == len(m.LowResHashrateHistory)-1 { // All points are older than cutoff
-			firstValidLowResIndex = len(m.LowResHashrateHistory) // Clear all
+		if i == len(m.LowResHashrateHistory)-1 {
+			firstValidLowResIndex = len(m.LowResHashrateHistory)
 		}
 	}
 	m.LowResHashrateHistory = m.LowResHashrateHistory[firstValidLowResIndex:]
@@ -672,6 +711,9 @@ func (m *XMRigMiner) ReduceHashrateHistory(now time.Time) {
 	m.LastLowResAggregation = now
 }
 
+// createConfig creates a JSON configuration file for the XMRig miner.
+// This allows for a consistent and reproducible way to configure the miner,
+// based on the provided Config struct.
 func (m *XMRigMiner) createConfig(config *Config) error {
 	configPath, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
 	if err != nil {
@@ -717,6 +759,8 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 	return os.WriteFile(m.ConfigPath, data, 0644)
 }
 
+// unzip extracts a zip archive to a destination directory.
+// This is a helper function used during the installation of the miner.
 func (m *XMRigMiner) unzip(src, dest string) error {
 	r, err := zip.OpenReader(src)
 	if err != nil {
@@ -762,6 +806,8 @@ func (m *XMRigMiner) unzip(src, dest string) error {
 	return nil
 }
 
+// untar extracts a tar.gz archive to a destination directory.
+// This is a helper function used during the installation of the miner.
 func (m *XMRigMiner) untar(src, dest string) error {
 	file, err := os.Open(src)
 	if err != nil {
