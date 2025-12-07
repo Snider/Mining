@@ -17,7 +17,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/shirou/gopsutil/v4/mem" // Import mem for memory stats
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/swaggo/swag"
 
 	swaggerFiles "github.com/swaggo/files"
@@ -142,18 +142,26 @@ func (s *Service) handleGetInfo(c *gin.Context) {
 		return
 	}
 
-	systemInfo.Timestamp = time.Now()
-	vMem, err := mem.VirtualMemory()
-	if err == nil {
-		systemInfo.TotalSystemRAMGB = float64(vMem.Total) / (1024 * 1024 * 1024)
-	}
-
 	c.JSON(http.StatusOK, systemInfo)
 }
 
 // updateInstallationCache performs a live check and updates the cache file.
 func (s *Service) updateInstallationCache() (*SystemInfo, error) {
-	var allDetails []*InstallationDetails
+	// Always create a complete SystemInfo object
+	systemInfo := &SystemInfo{
+		Timestamp:           time.Now(),
+		OS:                  runtime.GOOS,
+		Architecture:        runtime.GOARCH,
+		GoVersion:           runtime.Version(),
+		AvailableCPUCores:   runtime.NumCPU(),
+		InstalledMinersInfo: []*InstallationDetails{}, // Initialize as empty slice
+	}
+
+	vMem, err := mem.VirtualMemory()
+	if err == nil {
+		systemInfo.TotalSystemRAMGB = float64(vMem.Total) / (1024 * 1024 * 1024)
+	}
+
 	for _, availableMiner := range s.Manager.ListAvailableMiners() {
 		var miner Miner
 		switch availableMiner.Name {
@@ -163,16 +171,7 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 			continue
 		}
 		details, _ := miner.CheckInstallation()
-		allDetails = append(allDetails, details)
-	}
-
-	systemInfo := &SystemInfo{
-		Timestamp:           time.Now(),
-		OS:                  runtime.GOOS,
-		Architecture:        runtime.GOARCH,
-		GoVersion:           runtime.Version(),
-		AvailableCPUCores:   runtime.NumCPU(),
-		InstalledMinersInfo: allDetails,
+		systemInfo.InstalledMinersInfo = append(systemInfo.InstalledMinersInfo, details)
 	}
 
 	configDir, err := xdg.ConfigFile("lethean-desktop/miners")

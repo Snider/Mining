@@ -1,6 +1,7 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   ElementRef,
   ViewEncapsulation,
   CUSTOM_ELEMENTS_SCHEMA
@@ -8,8 +9,10 @@ import {
 import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { of, forkJoin } from 'rxjs';
-import { switchMap, catchError, map } from 'rxjs/operators';
+import { of, forkJoin, Subscription, interval } from 'rxjs';
+import { switchMap, catchError, map, startWith } from 'rxjs/operators';
+import { HighchartsChartComponent, ChartConstructorType } from 'highcharts-angular'; // Corrected import
+import * as Highcharts from 'highcharts';
 
 // Import Web Awesome components
 import "@awesome.me/webawesome/dist/webawesome.js";
@@ -20,7 +23,7 @@ import '@awesome.me/webawesome/dist/components/icon/icon.js';
 import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
 import '@awesome.me/webawesome/dist/components/input/input.js';
 
-// Define interfaces for our data structures
+// Define interfaces
 interface InstallationDetails {
   is_installed: boolean;
   version: string;
@@ -35,16 +38,21 @@ interface AvailableMiner {
   description: string;
 }
 
+interface HashratePoint {
+  timestamp: string;
+  hashrate: number;
+}
+
 @Component({
   selector: 'snider-mining-dashboard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [CommonModule, HttpClientModule, FormsModule],
+  imports: [CommonModule, HttpClientModule, FormsModule, HighchartsChartComponent], // Corrected import
   templateUrl: './app.html',
   styleUrls: ["app.css"],
   encapsulation: ViewEncapsulation.ShadowDom
 })
-export class MiningDashboardElementComponent implements OnInit {
+export class MiningDashboardElementComponent implements OnInit, OnDestroy {
   apiBaseUrl: string = 'http://localhost:9090/api/v1/mining';
 
   // State management
@@ -60,6 +68,14 @@ export class MiningDashboardElementComponent implements OnInit {
   installedMiners: InstallationDetails[] = [];
   whitelistPaths: string[] = [];
 
+  // Charting
+  Highcharts: typeof Highcharts = Highcharts;
+  chartOptionsMap: Map<string, Highcharts.Options> = new Map();
+  chartConstructor: ChartConstructorType = 'chart';
+  updateFlag: boolean = false;
+  oneToOneFlag: boolean = true;
+  private statsSubscription: Subscription | undefined;
+
   // Form inputs
   poolAddress: string = 'pool.hashvault.pro:80';
   walletAddress: string = '888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H';
@@ -69,6 +85,10 @@ export class MiningDashboardElementComponent implements OnInit {
 
   ngOnInit(): void {
     this.checkSystemState();
+  }
+
+  ngOnDestroy(): void {
+    this.stopStatsPolling();
   }
 
   private handleError(err: HttpErrorResponse, defaultMessage: string) {
@@ -92,7 +112,6 @@ export class MiningDashboardElementComponent implements OnInit {
       switchMap(({ available, info }) => {
         this.apiAvailable = true;
         this.systemInfo = info;
-
         const trulyInstalledMiners = (info.installed_miners_info || []).filter((m: InstallationDetails) => m.is_installed);
 
         if (trulyInstalledMiners.length === 0) {
@@ -100,21 +119,14 @@ export class MiningDashboardElementComponent implements OnInit {
           this.manageableMiners = available.map(availMiner => ({ ...availMiner, is_installed: false }));
           this.installedMiners = [];
           this.runningMiners = [];
+          this.stopStatsPolling();
           return of(null);
         }
 
         this.needsSetup = false;
-        const installedMap = new Map<string, InstallationDetails>(
-          (info.installed_miners_info || []).map((m: InstallationDetails) => [this.getMinerType(m), m])
-        );
-
-        this.manageableMiners = available.map(availMiner => ({
-          ...availMiner,
-          is_installed: installedMap.get(availMiner.name)?.is_installed ?? false,
-        }));
-
+        const installedMap = new Map<string, InstallationDetails>((info.installed_miners_info || []).map((m: InstallationDetails) => [this.getMinerType(m), m]));
+        this.manageableMiners = available.map(availMiner => ({ ...availMiner, is_installed: installedMap.get(availMiner.name)?.is_installed ?? false }));
         this.installedMiners = trulyInstalledMiners.map((m: InstallationDetails) => ({ ...m, type: this.getMinerType(m) }));
-
         this.updateWhitelistPaths();
         return this.fetchRunningMiners();
       }),
@@ -144,13 +156,81 @@ export class MiningDashboardElementComponent implements OnInit {
 
   fetchRunningMiners() {
     return this.http.get<any[]>(`${this.apiBaseUrl}/miners`).pipe(
-      map(miners => { this.runningMiners = miners; this.updateWhitelistPaths(); }),
+      map(miners => {
+        this.runningMiners = miners;
+        this.updateWhitelistPaths();
+        if (this.runningMiners.length > 0 && !this.statsSubscription) {
+          this.startStatsPolling();
+        } else if (this.runningMiners.length === 0) {
+          this.stopStatsPolling();
+        }
+      }),
       catchError(err => {
         this.handleError(err, 'Could not fetch running miners');
         this.runningMiners = [];
         return of([]);
       })
     );
+  }
+
+  startStatsPolling(): void {
+    this.stopStatsPolling();
+    this.statsSubscription = interval(5000).pipe(
+      startWith(0),
+      switchMap(() => forkJoin(
+        this.runningMiners.map(miner =>
+          this.http.get<HashratePoint[]>(`${this.apiBaseUrl}/miners/${miner.name}/hashrate-history`).pipe(
+            map(history => ({ name: miner.name, history })),
+            catchError(() => of({ name: miner.name, history: [] }))
+          )
+        )
+      ))
+    ).subscribe(results => {
+      results.forEach(result => {
+        this.updateChart(result.name, result.history);
+      });
+    });
+  }
+
+  stopStatsPolling(): void {
+    if (this.statsSubscription) {
+      this.statsSubscription.unsubscribe();
+      this.statsSubscription = undefined;
+    }
+  }
+
+  updateChart(minerName: string, history: HashratePoint[]): void {
+    const chartData = history.map(point => [new Date(point.timestamp).getTime(), point.hashrate]);
+    let options = this.chartOptionsMap.get(minerName);
+
+    if (!options) {
+      options = this.createChartOptions(minerName);
+      this.chartOptionsMap.set(minerName, options);
+    }
+
+    // Directly update the data property of the series
+    if (options.series && options.series.length > 0) {
+      const series = options.series[0] as Highcharts.SeriesLineOptions;
+      series.data = chartData;
+    }
+
+    // Trigger change detection by creating a new options object reference
+    // This is the correct way to make Highcharts detect updates when oneToOne is true
+    this.chartOptionsMap.set(minerName, { ...options });
+
+    // Toggle updateFlag to force re-render
+    this.updateFlag = !this.updateFlag;
+  }
+
+  createChartOptions(minerName: string): Highcharts.Options {
+    return {
+      chart: { type: 'spline' },
+      title: { text: `${minerName} Hashrate` },
+      xAxis: { type: 'datetime', title: { text: 'Time' } },
+      yAxis: { title: { text: 'Hashrate (H/s)' }, min: 0 },
+      series: [{ name: 'Hashrate', type: 'line', data: [] }],
+      credits: { enabled: false },
+    };
   }
 
   private updateWhitelistPaths() {
