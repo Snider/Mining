@@ -29,10 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/mining.InstallationDetails"
-                            }
+                            "$ref": "#/definitions/mining.SystemInfo"
                         }
                     }
                 }
@@ -569,6 +566,10 @@ const docTemplate = `{
         "mining.InstallationDetails": {
             "type": "object",
             "properties": {
+                "config_path": {
+                    "description": "Add path to the miner-specific config",
+                    "type": "string"
+                },
                 "is_installed": {
                     "type": "boolean"
                 },

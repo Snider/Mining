@@ -154,6 +154,9 @@ definitions:
     type: object
   mining.InstallationDetails:
     properties:
+      config_path:
+        description: Add path to the miner-specific config
+        type: string
       is_installed:
         type: boolean
       miner_binary:
@@ -244,9 +247,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/mining.InstallationDetails'
-            type: array
+            $ref: '#/definitions/mining.SystemInfo'
       summary: Check miner installations
       tags:
       - system

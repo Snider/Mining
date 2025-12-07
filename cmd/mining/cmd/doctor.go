@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Snider/Mining/pkg/mining"
 	"github.com/adrg/xdg"
@@ -53,7 +54,6 @@ func loadAndDisplayCache() (bool, error) {
 
 	cacheBytes, err := os.ReadFile(configPath)
 	if err != nil {
-		// If the cache file is missing (e.g., after an uninstall), it's not a fatal error
 		if os.IsNotExist(err) {
 			fmt.Println("No cached data found. Run 'install' for a miner first.")
 			return false, nil
@@ -61,16 +61,19 @@ func loadAndDisplayCache() (bool, error) {
 		return false, fmt.Errorf("could not read cache file from %s: %w", configPath, err)
 	}
 
-	var cachedDetails []*mining.InstallationDetails
-	if err := json.Unmarshal(cacheBytes, &cachedDetails); err != nil {
+	var systemInfo mining.SystemInfo
+	if err := json.Unmarshal(cacheBytes, &systemInfo); err != nil {
 		return false, fmt.Errorf("could not parse cache file: %w", err)
 	}
 
-	for _, details := range cachedDetails {
+	fmt.Printf("System Info (cached at %s):\n", systemInfo.Timestamp.Format(time.RFC1123))
+	fmt.Printf("  OS: %s, Arch: %s\n", systemInfo.OS, systemInfo.Architecture)
+	fmt.Println()
+
+	for _, details := range systemInfo.InstalledMinersInfo {
+		// Infer miner name from path for display purposes
 		var minerName string
-		if details.Path != "" { // Use path to infer miner name if available
-			// This is a weak heuristic, but works for now.
-			// A more robust solution would store miner name in InstallationDetails.
+		if details.Path != "" {
 			if strings.Contains(details.Path, "xmrig") {
 				minerName = "XMRig"
 			} else {
@@ -85,15 +88,7 @@ func loadAndDisplayCache() (bool, error) {
 	return true, nil
 }
 
-func saveResultsToCache(details []*mining.InstallationDetails) error {
-	// Filter out non-installed miners before saving
-	var installedOnly []*mining.InstallationDetails
-	for _, d := range details {
-		if d.IsInstalled {
-			installedOnly = append(installedOnly, d)
-		}
-	}
-
+func saveResultsToCache(systemInfo *mining.SystemInfo) error {
 	configDir, err := xdg.ConfigFile("lethean-desktop/miners")
 	if err != nil {
 		return fmt.Errorf("could not get config directory: %w", err)
@@ -103,7 +98,7 @@ func saveResultsToCache(details []*mining.InstallationDetails) error {
 	}
 	configPath := filepath.Join(configDir, "config.json")
 
-	data, err := json.MarshalIndent(installedOnly, "", "  ")
+	data, err := json.MarshalIndent(systemInfo, "", "  ")
 	if err != nil {
 		return fmt.Errorf("could not marshal cache data: %w", err)
 	}

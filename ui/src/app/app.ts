@@ -8,7 +8,7 @@ import {
 import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { of } from 'rxjs';
+import { of, forkJoin } from 'rxjs';
 import { switchMap, catchError, map } from 'rxjs/operators';
 
 // Import Web Awesome components
@@ -19,6 +19,21 @@ import '@awesome.me/webawesome/dist/components/tooltip/tooltip.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
 import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
 import '@awesome.me/webawesome/dist/components/input/input.js';
+
+// Define interfaces for our data structures
+interface InstallationDetails {
+  is_installed: boolean;
+  version: string;
+  path: string;
+  miner_binary: string;
+  config_path?: string;
+  type?: string;
+}
+
+interface AvailableMiner {
+  name: string;
+  description: string;
+}
 
 @Component({
   selector: 'mde-mining-dashboard',
@@ -33,13 +48,17 @@ export class MiningDashboardElementComponent implements OnInit {
   apiBaseUrl: string = 'http://localhost:9090/api/v1/mining';
 
   // State management
+  needsSetup: boolean = false;
   apiAvailable: boolean = true;
   error: string | null = null;
+  showAdminPanel: boolean = false;
+  actionInProgress: string | null = null; // To track which miner action is running
 
   systemInfo: any = null;
-  availableMiners: any[] = [];
+  manageableMiners: any[] = [];
   runningMiners: any[] = [];
-  installedMiners: any[] = [];
+  installedMiners: InstallationDetails[] = [];
+  whitelistPaths: string[] = [];
 
   // Form inputs
   poolAddress: string = 'pool.hashvault.pro:80';
@@ -55,10 +74,8 @@ export class MiningDashboardElementComponent implements OnInit {
   private handleError(err: HttpErrorResponse, defaultMessage: string) {
     console.error(err);
     if (err.error && err.error.error) {
-      // Handles { "error": "..." } from the backend
       this.error = `${defaultMessage}: ${err.error.error}`;
     } else if (typeof err.error === 'string' && err.error.length < 200) {
-      // Handles plain text errors
       this.error = `${defaultMessage}: ${err.error}`;
     } else {
       this.error = `${defaultMessage}. Please check the console for details.`;
@@ -67,43 +84,66 @@ export class MiningDashboardElementComponent implements OnInit {
 
   checkSystemState() {
     this.error = null;
-    this.http.get<any>(`${this.apiBaseUrl}/info`).pipe(
-      switchMap(info => {
+    forkJoin({
+      available: this.http.get<AvailableMiner[]>(`${this.apiBaseUrl}/miners/available`),
+      info: this.http.get<any>(`${this.apiBaseUrl}/info`)
+    }).pipe(
+      switchMap(({ available, info }) => {
         this.apiAvailable = true;
         this.systemInfo = info;
 
-        this.installedMiners = (info.installed_miners_info || [])
-          .filter((m: any) => m.is_installed)
-          .map((m: any) => ({ ...m, type: this.getMinerType(m) }));
+        const trulyInstalledMiners = (info.installed_miners_info || []).filter((m: InstallationDetails) => m.is_installed);
 
-        if (this.installedMiners.length === 0) {
-          this.fetchAvailableMiners();
+        if (trulyInstalledMiners.length === 0) {
+          this.needsSetup = true;
+          this.manageableMiners = available.map(availMiner => ({ ...availMiner, is_installed: false }));
+          this.installedMiners = [];
+          this.runningMiners = [];
+          return of(null);
         }
 
+        this.needsSetup = false;
+        const installedMap = new Map<string, InstallationDetails>(
+          (info.installed_miners_info || []).map((m: InstallationDetails) => [this.getMinerType(m), m])
+        );
+
+        this.manageableMiners = available.map(availMiner => ({
+          ...availMiner,
+          is_installed: installedMap.get(availMiner.name)?.is_installed ?? false,
+        }));
+
+        this.installedMiners = trulyInstalledMiners.map((m: InstallationDetails) => ({ ...m, type: this.getMinerType(m) }));
+
+        this.updateWhitelistPaths();
         return this.fetchRunningMiners();
       }),
       catchError(err => {
-        this.apiAvailable = false;
-        this.error = 'Failed to connect to the mining API.';
+        if (err.status === 500) {
+          this.needsSetup = true;
+          this.fetchAvailableMinersForWizard();
+        } else {
+          this.apiAvailable = false;
+          this.error = 'Failed to connect to the mining API.';
+        }
         this.systemInfo = {};
         this.installedMiners = [];
         this.runningMiners = [];
-        console.error('API not available:', err);
+        console.error('API not available or needs setup:', err);
         return of(null);
       })
     ).subscribe();
   }
 
-  fetchAvailableMiners(): void {
-    this.http.get<any[]>(`${this.apiBaseUrl}/miners/available`).subscribe({
-      next: miners => { this.availableMiners = miners; },
-      error: err => { this.handleError(err, 'Could not fetch available miners'); }
+  fetchAvailableMinersForWizard(): void {
+    this.http.get<AvailableMiner[]>(`${this.apiBaseUrl}/miners/available`).subscribe({
+      next: miners => { this.manageableMiners = miners.map(m => ({...m, is_installed: false})); },
+      error: err => { this.handleError(err, 'Could not fetch available miners for setup'); }
     });
   }
 
   fetchRunningMiners() {
     return this.http.get<any[]>(`${this.apiBaseUrl}/miners`).pipe(
-      map(miners => { this.runningMiners = miners; }),
+      map(miners => { this.runningMiners = miners; this.updateWhitelistPaths(); }),
       catchError(err => {
         this.handleError(err, 'Could not fetch running miners');
         this.runningMiners = [];
@@ -112,22 +152,55 @@ export class MiningDashboardElementComponent implements OnInit {
     );
   }
 
-  private performAction(action: any) {
-    action.subscribe({
+  private updateWhitelistPaths() {
+    const paths = new Set<string>();
+    this.installedMiners.forEach(miner => {
+      if (miner.miner_binary) paths.add(miner.miner_binary);
+      if (miner.config_path) paths.add(miner.config_path);
+    });
+    this.runningMiners.forEach(miner => {
+      if (miner.configPath) paths.add(miner.configPath);
+    });
+    this.whitelistPaths = Array.from(paths);
+  }
+
+  installMiner(minerType: string): void {
+    this.actionInProgress = `install-${minerType}`;
+    this.error = null;
+    this.http.post(`${this.apiBaseUrl}/miners/${minerType}/install`, {}).subscribe({
       next: () => {
-        setTimeout(() => this.checkSystemState(), 1000);
+        setTimeout(() => {
+          this.checkSystemState();
+          this.actionInProgress = null;
+        }, 1000);
       },
       error: (err: HttpErrorResponse) => {
-        this.handleError(err, 'Action failed');
+        this.handleError(err, `Failed to install ${minerType}`);
+        this.actionInProgress = null;
       }
     });
   }
 
-  installMiner(minerType: string): void {
-    this.performAction(this.http.post(`${this.apiBaseUrl}/miners/${minerType}/install`, {}));
+  uninstallMiner(minerType: string): void {
+    this.actionInProgress = `uninstall-${minerType}`;
+    this.error = null;
+    this.http.delete(`${this.apiBaseUrl}/miners/${minerType}/uninstall`).subscribe({
+      next: () => {
+        setTimeout(() => {
+          this.checkSystemState();
+          this.actionInProgress = null;
+        }, 1000);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.handleError(err, `Failed to uninstall ${minerType}`);
+        this.actionInProgress = null;
+      }
+    });
   }
 
   startMiner(miner: any, useLastConfig: boolean = false): void {
+    this.actionInProgress = `start-${miner.type}`;
+    this.error = null;
     let config = {};
     if (!useLastConfig) {
       config = {
@@ -137,7 +210,18 @@ export class MiningDashboardElementComponent implements OnInit {
         hugePages: true,
       };
     }
-    this.performAction(this.http.post(`${this.apiBaseUrl}/miners/${miner.type}`, config));
+    this.http.post(`${this.apiBaseUrl}/miners/${miner.type}`, config).subscribe({
+      next: () => {
+        setTimeout(() => {
+          this.checkSystemState();
+          this.actionInProgress = null;
+        }, 1000);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.handleError(err, `Failed to start ${miner.type}`);
+        this.actionInProgress = null;
+      }
+    });
     this.showStartOptionsFor = null;
   }
 
@@ -147,10 +231,28 @@ export class MiningDashboardElementComponent implements OnInit {
       this.error = "Cannot stop a miner that is not running.";
       return;
     }
-    this.performAction(this.http.delete(`${this.apiBaseUrl}/miners/${runningInstance.name}`));
+    this.actionInProgress = `stop-${miner.type}`;
+    this.error = null;
+    this.http.delete(`${this.apiBaseUrl}/miners/${runningInstance.name}`).subscribe({
+      next: () => {
+        setTimeout(() => {
+          this.checkSystemState();
+          this.actionInProgress = null;
+        }, 1000);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.handleError(err, `Failed to stop ${runningInstance.name}`);
+        this.actionInProgress = null;
+      }
+    });
   }
 
-  toggleStartOptions(minerType: string): void {
+  toggleAdminPanel(): void {
+    this.showAdminPanel = !this.showAdminPanel;
+  }
+
+  toggleStartOptions(minerType: string | undefined): void {
+    if (!minerType) return;
     this.showStartOptionsFor = this.showStartOptionsFor === minerType ? null : minerType;
   }
 

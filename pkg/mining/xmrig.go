@@ -1,13 +1,19 @@
 package mining
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/adrg/xdg"
 )
 
 // XMRigMiner represents an XMRig miner, embedding the BaseMiner for common functionality.
@@ -36,6 +42,20 @@ func NewXMRigMiner() *XMRigMiner {
 			LastLowResAggregation: time.Now(),
 		},
 	}
+}
+
+// getXMRigConfigPath returns the platform-specific path for the xmrig.json file.
+func getXMRigConfigPath() (string, error) {
+	path, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
+	if err != nil {
+		// Fallback for non-XDG environments or when XDG variables are not set
+		homeDir, homeErr := os.UserHomeDir()
+		if homeErr != nil {
+			return "", homeErr
+		}
+		return filepath.Join(homeDir, ".config", "lethean-desktop", "xmrig.json"), nil
+	}
+	return path, nil
 }
 
 // GetLatestVersion fetches the latest version of XMRig from the GitHub API.
@@ -91,4 +111,56 @@ func (m *XMRigMiner) Install() error {
 	}
 
 	return nil
+}
+
+// Uninstall removes all files related to the XMRig miner, including its specific config file.
+func (m *XMRigMiner) Uninstall() error {
+	// Remove the specific xmrig.json config file using the centralized helper
+	configPath, err := getXMRigConfigPath()
+	if err == nil {
+		os.Remove(configPath) // Ignore error if it doesn't exist
+	}
+
+	// Call the base uninstall method to remove the installation directory
+	return m.BaseMiner.Uninstall()
+}
+
+// CheckInstallation verifies if the XMRig miner is installed correctly.
+func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
+	binaryPath, err := m.findMinerBinary()
+	if err != nil {
+		return &InstallationDetails{IsInstalled: false}, err
+	}
+
+	m.MinerBinary = binaryPath
+	m.Path = filepath.Dir(binaryPath)
+
+	cmd := exec.Command(binaryPath, "--version")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		m.Version = "Unknown (could not run executable)"
+	} else {
+		fields := strings.Fields(out.String())
+		if len(fields) >= 2 {
+			m.Version = fields[1]
+		} else {
+			m.Version = "Unknown (could not parse version)"
+		}
+	}
+
+	// Get the config path using the helper
+	configPath, err := getXMRigConfigPath()
+	if err != nil {
+		// Log the error but don't fail CheckInstallation if config path can't be determined
+		configPath = "Error: Could not determine config path"
+	}
+
+	return &InstallationDetails{
+		IsInstalled: true,
+		MinerBinary: m.MinerBinary,
+		Path:        m.Path,
+		Version:     m.Version,
+		ConfigPath:  configPath, // Include the config path
+	}, nil
 }

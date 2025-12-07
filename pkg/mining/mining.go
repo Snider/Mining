@@ -5,20 +5,13 @@ import (
 )
 
 const (
-	// HighResolutionDuration is the duration for which hashrate data is kept at high resolution (10s intervals)
 	HighResolutionDuration = 5 * time.Minute
-	// HighResolutionInterval is the interval at which hashrate data is collected for high resolution
 	HighResolutionInterval = 10 * time.Second
-	// LowResolutionInterval is the interval for aggregated hashrate data (1m averages)
-	LowResolutionInterval = 1 * time.Minute
-	// LowResHistoryRetention is the duration for which low-resolution hashrate data is retained
-	LowResHistoryRetention = 24 * time.Hour // Example: keep 24 hours of 1-minute averages
+	LowResolutionInterval  = 1 * time.Minute
+	LowResHistoryRetention = 24 * time.Hour
 )
 
 // Miner defines the standard interface for a cryptocurrency miner.
-// This interface abstracts the core functionalities of a miner, such as installation,
-// starting, stopping, and statistics retrieval, allowing for different miner
-// implementations to be used interchangeably.
 type Miner interface {
 	Install() error
 	Uninstall() error
@@ -41,6 +34,7 @@ type InstallationDetails struct {
 	Version     string `json:"version"`
 	Path        string `json:"path"`
 	MinerBinary string `json:"miner_binary"`
+	ConfigPath  string `json:"config_path,omitempty"` // Add path to the miner-specific config
 }
 
 // SystemInfo provides general system and miner installation information.

@@ -10,10 +10,19 @@ import (
 	"time"
 )
 
+// ManagerInterface defines the contract for a miner manager.
+type ManagerInterface interface {
+	StartMiner(minerType string, config *Config) (Miner, error)
+	StopMiner(name string) error
+	GetMiner(name string) (Miner, error)
+	ListMiners() []Miner
+	ListAvailableMiners() []AvailableMiner
+	GetMinerHashrateHistory(name string) ([]HashratePoint, error)
+	UninstallMiner(minerType string) error
+	Stop()
+}
+
 // Manager handles the lifecycle and operations of multiple miners.
-// It provides a centralized way to start, stop, and manage different miner
-// instances, while also collecting and exposing their performance data.
-// The Manager is safe for concurrent use.
 type Manager struct {
 	miners    map[string]Miner
 	mu        sync.RWMutex
@@ -23,15 +32,72 @@ type Manager struct {
 
 var _ ManagerInterface = (*Manager)(nil)
 
-// NewManager creates a new miner manager.
+// NewManager creates a new miner manager and autostarts miners based on config.
 func NewManager() *Manager {
 	m := &Manager{
 		miners:    make(map[string]Miner),
 		stopChan:  make(chan struct{}),
 		waitGroup: sync.WaitGroup{},
 	}
+	m.syncMinersConfig() // Ensure config file is populated
+	m.autostartMiners()
 	m.startStatsCollection()
 	return m
+}
+
+// syncMinersConfig ensures the miners.json config file has entries for all available miners.
+func (m *Manager) syncMinersConfig() {
+	cfg, err := LoadMinersConfig()
+	if err != nil {
+		log.Printf("Warning: could not load miners config for sync: %v", err)
+		return
+	}
+
+	availableMiners := m.ListAvailableMiners()
+	configUpdated := false
+
+	for _, availableMiner := range availableMiners {
+		found := false
+		for _, configuredMiner := range cfg.Miners {
+			if strings.EqualFold(configuredMiner.MinerType, availableMiner.Name) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			cfg.Miners = append(cfg.Miners, MinerAutostartConfig{
+				MinerType: availableMiner.Name,
+				Autostart: false,
+				Config:    nil, // No default config
+			})
+			configUpdated = true
+			log.Printf("Added default config for missing miner: %s", availableMiner.Name)
+		}
+	}
+
+	if configUpdated {
+		if err := SaveMinersConfig(cfg); err != nil {
+			log.Printf("Warning: failed to save updated miners config: %v", err)
+		}
+	}
+}
+
+// autostartMiners loads the miners config and starts any miners marked for autostart.
+func (m *Manager) autostartMiners() {
+	cfg, err := LoadMinersConfig()
+	if err != nil {
+		log.Printf("Warning: could not load miners config for autostart: %v", err)
+		return
+	}
+
+	for _, minerCfg := range cfg.Miners {
+		if minerCfg.Autostart && minerCfg.Config != nil {
+			log.Printf("Autostarting miner: %s", minerCfg.MinerType)
+			if _, err := m.StartMiner(minerCfg.MinerType, minerCfg.Config); err != nil {
+				log.Printf("Failed to autostart miner %s: %v", minerCfg.MinerType, err)
+			}
+		}
+	}
 }
 
 // findAvailablePort finds an available TCP port on the local machine.
@@ -40,7 +106,6 @@ func findAvailablePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return 0, err
@@ -49,12 +114,11 @@ func findAvailablePort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-// StartMiner starts a new miner with the given configuration.
+// StartMiner starts a new miner and saves its configuration.
 func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Prevent nil pointer panic if request body is empty
 	if config == nil {
 		config = &Config{}
 	}
@@ -99,10 +163,89 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 
 	m.miners[instanceName] = miner
 
+	if err := m.updateMinerConfig(minerType, true, config); err != nil {
+		log.Printf("Warning: failed to save miner config for autostart: %v", err)
+	}
+
 	logMessage := fmt.Sprintf("CryptoCurrency Miner started: %s (Binary: %s)", miner.GetName(), miner.GetBinaryPath())
 	logToSyslog(logMessage)
 
 	return miner, nil
+}
+
+// UninstallMiner stops, uninstalls, and removes a miner's configuration.
+func (m *Manager) UninstallMiner(minerType string) error {
+	m.mu.Lock()
+	for name, runningMiner := range m.miners {
+		if rm, ok := runningMiner.(*XMRigMiner); ok && strings.EqualFold(rm.ExecutableName, minerType) {
+			if err := runningMiner.Stop(); err != nil {
+				log.Printf("Warning: failed to stop running miner %s during uninstall: %v", name, err)
+			}
+			delete(m.miners, name)
+		}
+		if rm, ok := runningMiner.(*TTMiner); ok && strings.EqualFold(rm.ExecutableName, minerType) {
+			if err := runningMiner.Stop(); err != nil {
+				log.Printf("Warning: failed to stop running miner %s during uninstall: %v", name, err)
+			}
+			delete(m.miners, name)
+		}
+	}
+	m.mu.Unlock()
+
+	var miner Miner
+	switch strings.ToLower(minerType) {
+	case "xmrig":
+		miner = NewXMRigMiner()
+	default:
+		return fmt.Errorf("unsupported miner type: %s", minerType)
+	}
+
+	if err := miner.Uninstall(); err != nil {
+		return fmt.Errorf("failed to uninstall miner files: %w", err)
+	}
+
+	cfg, err := LoadMinersConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load miners config to update uninstall status: %w", err)
+	}
+
+	var updatedMiners []MinerAutostartConfig
+	for _, minerCfg := range cfg.Miners {
+		if !strings.EqualFold(minerCfg.MinerType, minerType) {
+			updatedMiners = append(updatedMiners, minerCfg)
+		}
+	}
+	cfg.Miners = updatedMiners
+
+	return SaveMinersConfig(cfg)
+}
+
+// updateMinerConfig saves the autostart and last-used config for a miner.
+func (m *Manager) updateMinerConfig(minerType string, autostart bool, config *Config) error {
+	cfg, err := LoadMinersConfig()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for i, minerCfg := range cfg.Miners {
+		if strings.EqualFold(minerCfg.MinerType, minerType) {
+			cfg.Miners[i].Autostart = autostart
+			cfg.Miners[i].Config = config
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		cfg.Miners = append(cfg.Miners, MinerAutostartConfig{
+			MinerType: minerType,
+			Autostart: autostart,
+			Config:    config,
+		})
+	}
+
+	return SaveMinersConfig(cfg)
 }
 
 // StopMiner stops a running miner.
@@ -138,7 +281,6 @@ func (m *Manager) StopMiner(name string) error {
 func (m *Manager) GetMiner(name string) (Miner, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	miner, exists := m.miners[name]
 	if !exists {
 		return nil, fmt.Errorf("miner not found: %s", name)
@@ -150,7 +292,6 @@ func (m *Manager) GetMiner(name string) (Miner, error) {
 func (m *Manager) ListMiners() []Miner {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	miners := make([]Miner, 0, len(m.miners))
 	for _, miner := range m.miners {
 		miners = append(miners, miner)
@@ -215,7 +356,6 @@ func (m *Manager) collectMinerStats() {
 func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	miner, exists := m.miners[name]
 	if !exists {
 		return nil, fmt.Errorf("miner not found: %s", name)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/Snider/Mining/docs"
+	"github.com/adrg/xdg"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/shirou/gopsutil/v4/mem" // Import mem for memory stats
@@ -37,23 +38,21 @@ type Service struct {
 // NewService creates a new mining service
 func NewService(manager ManagerInterface, listenAddr string, displayAddr string, swaggerNamespace string) *Service {
 	apiBasePath := "/" + strings.Trim(swaggerNamespace, "/")
-	swaggerUIPath := apiBasePath + "/swagger" // Serve Swagger UI under a distinct sub-path
+	swaggerUIPath := apiBasePath + "/swagger"
 
-	// Dynamically configure Swagger at runtime
 	docs.SwaggerInfo.Title = "Mining Module API"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = displayAddr // Use the displayable address for Swagger UI
+	docs.SwaggerInfo.Host = displayAddr
 	docs.SwaggerInfo.BasePath = apiBasePath
-	// Use a unique instance name to avoid conflicts in a multi-module environment
 	instanceName := "swagger_" + strings.ReplaceAll(strings.Trim(swaggerNamespace, "/"), "/", "_")
 	swag.Register(instanceName, docs.SwaggerInfo)
 
 	return &Service{
 		Manager: manager,
 		Server: &http.Server{
-			Addr: listenAddr, // Server listens on this address
+			Addr: listenAddr,
 		},
-		DisplayAddr:         displayAddr, // Store displayable address for messages
+		DisplayAddr:         displayAddr,
 		SwaggerInstanceName: instanceName,
 		APIBasePath:         apiBasePath,
 		SwaggerUIPath:       swaggerUIPath,
@@ -74,9 +73,7 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		// Stop the manager's background goroutines
 		s.Manager.Stop()
-
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.Server.Shutdown(ctxShutdown); err != nil {
@@ -88,10 +85,9 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 }
 
 func (s *Service) setupRoutes() {
-	// All API routes are now relative to the service's APIBasePath
 	apiGroup := s.Router.Group(s.APIBasePath)
 	{
-		apiGroup.GET("/info", s.handleGetInfo) // New GET endpoint for cached info
+		apiGroup.GET("/info", s.handleGetInfo)
 		apiGroup.POST("/doctor", s.handleDoctor)
 		apiGroup.POST("/update", s.handleUpdateCheck)
 
@@ -104,15 +100,12 @@ func (s *Service) setupRoutes() {
 			minersGroup.DELETE("/:miner_name/uninstall", s.handleUninstallMiner)
 			minersGroup.DELETE("/:miner_name", s.handleStopMiner)
 			minersGroup.GET("/:miner_name/stats", s.handleGetMinerStats)
-			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory) // New endpoint
+			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory)
 		}
 	}
 
-	// New route to serve the custom HTML element bundle
-	// This path now points to the output of the Angular project within the 'ui' directory
 	s.Router.StaticFile("/component/mining-dashboard.js", "./ui/dist/ui/mbe-mining-dashboard.js")
 
-	// Register Swagger UI route under a distinct sub-path to avoid conflicts
 	swaggerURL := ginSwagger.URL(fmt.Sprintf("http://%s%s/doc.json", s.DisplayAddr, s.SwaggerUIPath))
 	s.Router.GET(s.SwaggerUIPath+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL, ginSwagger.InstanceName(s.SwaggerInstanceName)))
 }
@@ -126,74 +119,40 @@ func (s *Service) setupRoutes() {
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Router /info [get]
 func (s *Service) handleGetInfo(c *gin.Context) {
-	systemInfo := SystemInfo{
-		Timestamp:         time.Now(),
-		OS:                runtime.GOOS,
-		Architecture:      runtime.GOARCH,
-		GoVersion:         runtime.Version(),
-		AvailableCPUCores: runtime.NumCPU(),
-	}
-
-	// Get total system RAM
-	vMem, err := mem.VirtualMemory()
+	configDir, err := xdg.ConfigFile("lethean-desktop/miners")
 	if err != nil {
-		log.Printf("Warning: Failed to get virtual memory info: %v", err)
-		systemInfo.TotalSystemRAMGB = 0.0 // Default to 0 on error
-	} else {
-		// Convert bytes to GB
-		systemInfo.TotalSystemRAMGB = float64(vMem.Total) / (1024 * 1024 * 1024)
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get home directory"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get config directory"})
 		return
 	}
-	signpostPath := filepath.Join(homeDir, ".installed-miners")
-
-	configPathBytes, err := os.ReadFile(signpostPath)
-	if err != nil {
-		// If signpost or cache doesn't exist, return SystemInfo with empty miner details
-		systemInfo.InstalledMinersInfo = []*InstallationDetails{}
-		c.JSON(http.StatusOK, systemInfo)
-		return
-	}
-	configPath := string(configPathBytes)
+	configPath := filepath.Join(configDir, "config.json")
 
 	cacheBytes, err := os.ReadFile(configPath)
 	if err != nil {
-		// If cache file is missing, return SystemInfo with empty miner details
-		systemInfo.InstalledMinersInfo = []*InstallationDetails{}
-		c.JSON(http.StatusOK, systemInfo)
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cache file not found, run setup"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not read cache file"})
 		return
 	}
 
-	var cachedDetails []*InstallationDetails
-	if err := json.Unmarshal(cacheBytes, &cachedDetails); err != nil {
+	var systemInfo SystemInfo
+	if err := json.Unmarshal(cacheBytes, &systemInfo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not parse cache file"})
 		return
 	}
 
-	// Filter for only installed miners
-	var installedOnly []*InstallationDetails
-	for _, detail := range cachedDetails {
-		if detail.IsInstalled {
-			installedOnly = append(installedOnly, detail)
-		}
+	systemInfo.Timestamp = time.Now()
+	vMem, err := mem.VirtualMemory()
+	if err == nil {
+		systemInfo.TotalSystemRAMGB = float64(vMem.Total) / (1024 * 1024 * 1024)
 	}
-	systemInfo.InstalledMinersInfo = installedOnly
 
 	c.JSON(http.StatusOK, systemInfo)
 }
 
-// handleDoctor godoc
-// @Summary Check miner installations
-// @Description Performs a live check on all available miners to verify their installation status, version, and path.
-// @Tags system
-// @Produce  json
-// @Success 200 {array} InstallationDetails
-// @Router /doctor [post]
-func (s *Service) handleDoctor(c *gin.Context) {
+// updateInstallationCache performs a live check and updates the cache file.
+func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 	var allDetails []*InstallationDetails
 	for _, availableMiner := range s.Manager.ListAvailableMiners() {
 		var miner Miner
@@ -203,14 +162,54 @@ func (s *Service) handleDoctor(c *gin.Context) {
 		default:
 			continue
 		}
-		details, err := miner.CheckInstallation()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check " + miner.GetName(), "details": err.Error()})
-			return
-		}
+		details, _ := miner.CheckInstallation()
 		allDetails = append(allDetails, details)
 	}
-	c.JSON(http.StatusOK, allDetails)
+
+	systemInfo := &SystemInfo{
+		Timestamp:           time.Now(),
+		OS:                  runtime.GOOS,
+		Architecture:        runtime.GOARCH,
+		GoVersion:           runtime.Version(),
+		AvailableCPUCores:   runtime.NumCPU(),
+		InstalledMinersInfo: allDetails,
+	}
+
+	configDir, err := xdg.ConfigFile("lethean-desktop/miners")
+	if err != nil {
+		return nil, fmt.Errorf("could not get config directory: %w", err)
+	}
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return nil, fmt.Errorf("could not create config directory: %w", err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+
+	data, err := json.MarshalIndent(systemInfo, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal cache data: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return nil, fmt.Errorf("could not write cache file: %w", err)
+	}
+
+	return systemInfo, nil
+}
+
+// handleDoctor godoc
+// @Summary Check miner installations
+// @Description Performs a live check on all available miners to verify their installation status, version, and path.
+// @Tags system
+// @Produce  json
+// @Success 200 {object} SystemInfo
+// @Router /doctor [post]
+func (s *Service) handleDoctor(c *gin.Context) {
+	systemInfo, err := s.updateInstallationCache()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update cache", "details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, systemInfo)
 }
 
 // handleUpdateCheck godoc
@@ -274,19 +273,14 @@ func (s *Service) handleUpdateCheck(c *gin.Context) {
 // @Router /miners/{miner_type}/uninstall [delete]
 func (s *Service) handleUninstallMiner(c *gin.Context) {
 	minerType := c.Param("miner_name")
-	var miner Miner
-	switch minerType {
-	case "xmrig":
-		miner = NewXMRigMiner()
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown miner type"})
-		return
-	}
-	if err := miner.Uninstall(); err != nil {
+	if err := s.Manager.UninstallMiner(minerType); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": miner.GetName() + " uninstalled successfully."})
+	if _, err := s.updateInstallationCache(); err != nil {
+		log.Printf("Warning: failed to update cache after uninstall: %v", err)
+	}
+	c.JSON(http.StatusOK, gin.H{"status": minerType + " uninstalled successfully."})
 }
 
 // handleListMiners godoc
@@ -335,6 +329,10 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 	if err := miner.Install(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	if _, err := s.updateInstallationCache(); err != nil {
+		log.Printf("Warning: failed to update cache after install: %v", err)
 	}
 
 	details, err := miner.CheckInstallation()

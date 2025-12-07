@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"runtime"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/Snider/Mining/pkg/mining"
@@ -89,7 +91,18 @@ func updateDoctorCache() error {
 		}
 		allDetails = append(allDetails, details)
 	}
-	return saveResultsToCache(allDetails)
+
+	// Create the SystemInfo struct that the /info endpoint expects
+	systemInfo := &mining.SystemInfo{
+		Timestamp:           time.Now(),
+		OS:                  runtime.GOOS,
+		Architecture:        runtime.GOARCH,
+		GoVersion:           runtime.Version(),
+		AvailableCPUCores:   runtime.NumCPU(),
+		InstalledMinersInfo: allDetails,
+	}
+
+	return saveResultsToCache(systemInfo)
 }
 
 func init() {

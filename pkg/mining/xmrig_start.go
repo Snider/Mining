@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/adrg/xdg"
 )
 
 // Start launches the XMRig miner with the specified configuration.
@@ -40,7 +38,8 @@ func (m *XMRigMiner) Start(config *Config) error {
 			return err
 		}
 	} else {
-		configPath, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
+		// Use the centralized helper to get the config path
+		configPath, err := getXMRigConfigPath()
 		if err != nil {
 			return fmt.Errorf("could not determine config file path: %w", err)
 		}
@@ -105,13 +104,10 @@ func addCliArgs(config *Config, args *[]string) {
 
 // createConfig creates a JSON configuration file for the XMRig miner.
 func (m *XMRigMiner) createConfig(config *Config) error {
-	configPath, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
+	// Use the centralized helper to get the config path
+	configPath, err := getXMRigConfigPath()
 	if err != nil {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configPath = filepath.Join(homeDir, ".config", "lethean-desktop", "xmrig.json")
+		return err
 	}
 	m.ConfigPath = configPath
 

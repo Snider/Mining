@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -125,7 +126,47 @@ func (b *BaseMiner) InstallFromURL(url string) error {
 	return nil
 }
 
+// parseVersion parses a version string (e.g., "6.24.0") into a slice of integers for comparison.
+func parseVersion(v string) []int {
+	parts := strings.Split(v, ".")
+	intParts := make([]int, len(parts))
+	for i, p := range parts {
+		val, err := strconv.Atoi(p)
+		if err != nil {
+			return []int{0} // Malformed version, treat as very old
+		}
+		intParts[i] = val
+	}
+	return intParts
+}
+
+// compareVersions compares two version slices. Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
+func compareVersions(v1, v2 []int) int {
+	minLen := len(v1)
+	if len(v2) < minLen {
+		minLen = len(v2)
+	}
+
+	for i := 0; i < minLen; i++ {
+		if v1[i] > v2[i] {
+			return 1
+		}
+		if v1[i] < v2[i] {
+			return -1
+		}
+	}
+
+	if len(v1) > len(v2) {
+		return 1
+	}
+	if len(v1) < len(v2) {
+		return -1
+	}
+	return 0
+}
+
 // findMinerBinary searches for the miner's executable file.
+// It returns the absolute path to the executable if found, prioritizing the highest versioned installation.
 func (b *BaseMiner) findMinerBinary() (string, error) {
 	executableName := b.ExecutableName
 	if runtime.GOOS == "windows" {
@@ -135,35 +176,40 @@ func (b *BaseMiner) findMinerBinary() (string, error) {
 	baseInstallPath := b.GetPath()
 	searchedPaths := []string{}
 
-	if _, err := os.Stat(baseInstallPath); err == nil {
-		var latestModTime time.Time
-		var latestDir string
+	var highestVersion []int
+	var highestVersionDir string
 
+	// 1. Check the standard installation directory first
+	if _, err := os.Stat(baseInstallPath); err == nil {
 		dirs, err := os.ReadDir(baseInstallPath)
 		if err == nil {
 			for _, d := range dirs {
 				if d.IsDir() && strings.HasPrefix(d.Name(), b.ExecutableName+"-") {
+					// Extract version string, e.g., "xmrig-6.24.0" -> "6.24.0"
+					versionStr := strings.TrimPrefix(d.Name(), b.ExecutableName+"-")
+					currentVersion := parseVersion(versionStr)
+
+					if highestVersionDir == "" || compareVersions(currentVersion, highestVersion) > 0 {
+						highestVersion = currentVersion
+						highestVersionDir = d.Name()
+					}
 					versionedPath := filepath.Join(baseInstallPath, d.Name())
 					fullPath := filepath.Join(versionedPath, executableName)
 					searchedPaths = append(searchedPaths, fullPath)
-					info, err := d.Info()
-					if err == nil && info.ModTime().After(latestModTime) {
-						latestModTime = info.ModTime()
-						latestDir = d.Name()
-					}
 				}
 			}
 		}
 
-		if latestDir != "" {
-			fullPath := filepath.Join(baseInstallPath, latestDir, executableName)
+		if highestVersionDir != "" {
+			fullPath := filepath.Join(baseInstallPath, highestVersionDir, executableName)
 			if _, err := os.Stat(fullPath); err == nil {
-				log.Printf("Found miner binary at standard path: %s", fullPath)
+				log.Printf("Found miner binary at highest versioned path: %s", fullPath)
 				return fullPath, nil
 			}
 		}
 	}
 
+	// 2. Fallback to searching the system PATH
 	path, err := exec.LookPath(executableName)
 	if err == nil {
 		absPath, err := filepath.Abs(path)
@@ -174,6 +220,7 @@ func (b *BaseMiner) findMinerBinary() (string, error) {
 		return absPath, nil
 	}
 
+	// If not found, return a detailed error
 	return "", fmt.Errorf("miner executable '%s' not found. Searched in: %s and system PATH", executableName, strings.Join(searchedPaths, ", "))
 }
 
