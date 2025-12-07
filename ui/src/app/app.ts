@@ -36,7 +36,7 @@ interface AvailableMiner {
 }
 
 @Component({
-  selector: 'mde-mining-dashboard',
+  selector: 'snider-mining-dashboard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [CommonModule, HttpClientModule, FormsModule],
@@ -52,7 +52,7 @@ export class MiningDashboardElementComponent implements OnInit {
   apiAvailable: boolean = true;
   error: string | null = null;
   showAdminPanel: boolean = false;
-  actionInProgress: string | null = null; // To track which miner action is running
+  actionInProgress: string | null = null;
 
   systemInfo: any = null;
   manageableMiners: any[] = [];
@@ -73,6 +73,7 @@ export class MiningDashboardElementComponent implements OnInit {
 
   private handleError(err: HttpErrorResponse, defaultMessage: string) {
     console.error(err);
+    this.actionInProgress = null;
     if (err.error && err.error.error) {
       this.error = `${defaultMessage}: ${err.error.error}`;
     } else if (typeof err.error === 'string' && err.error.length < 200) {

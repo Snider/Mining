@@ -11,7 +11,7 @@
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:browser",
+          "builder": "ngx-build-plus:browser",
           "options": {
             "outputPath": "dist",
             "index": "src/index.html",
@@ -32,7 +32,8 @@
             "scripts": [],
             "outputHashing": "none",
             "namedChunks": false,
-            "optimization": true
+            "optimization": true,
+            "singleBundle": true
           },
           "configurations": {
             "production": {
@@ -58,7 +59,7 @@
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular-devkit/build-angular:dev-server",
+          "builder": "ngx-build-plus:dev-server",
           "configurations": {
             "production": {
               "buildTarget": "ui:build:production"
