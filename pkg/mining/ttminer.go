@@ -2,30 +2,31 @@ package mining
 
 import (
 	"errors"
+	"time"
 )
 
-// TTMiner represents a TT-Miner
+// TTMiner represents a TT-Miner, embedding the BaseMiner for common functionality.
 type TTMiner struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	URL     string `json:"url"`
-	Path    string `json:"path"`
-	Running bool   `json:"running"`
-	Pid     int    `json:"pid"`
+	BaseMiner
 }
 
-// NewTTMiner creates a new TT-Miner
+// NewTTMiner creates a new TT-Miner instance with default settings.
 func NewTTMiner() *TTMiner {
 	return &TTMiner{
-		Name:    "TT-Miner",
-		Version: "latest",
-		URL:     "https://github.com/TrailingStop/TT-Miner-release",
+		BaseMiner: BaseMiner{
+			Name:           "tt-miner",
+			ExecutableName: "TT-Miner", // Or whatever the actual executable is named
+			Version:        "latest",
+			URL:            "https://github.com/TrailingStop/TT-Miner-release",
+			API: &API{
+				Enabled:    false, // Assuming no API for now
+				ListenHost: "127.0.0.1",
+			},
+			HashrateHistory:       make([]HashratePoint, 0),
+			LowResHashrateHistory: make([]HashratePoint, 0),
+			LastLowResAggregation: time.Now(),
+		},
 	}
-}
-
-// GetName returns the name of the miner
-func (m *TTMiner) GetName() string {
-	return m.Name
 }
 
 // Install the miner
@@ -38,12 +39,22 @@ func (m *TTMiner) Start(config *Config) error {
 	return errors.New("not implemented")
 }
 
-// Stop the miner
-func (m *TTMiner) Stop() error {
-	return errors.New("not implemented")
-}
-
 // GetStats returns the stats for the miner
 func (m *TTMiner) GetStats() (*PerformanceMetrics, error) {
 	return nil, errors.New("not implemented")
+}
+
+// CheckInstallation verifies if the TT-Miner is installed correctly.
+func (m *TTMiner) CheckInstallation() (*InstallationDetails, error) {
+	return nil, errors.New("not implemented")
+}
+
+// GetLatestVersion retrieves the latest available version of the TT-Miner.
+func (m *TTMiner) GetLatestVersion() (string, error) {
+	return "", errors.New("not implemented")
+}
+
+// Uninstall removes all files related to the TT-Miner.
+func (m *TTMiner) Uninstall() error {
+	return errors.New("not implemented")
 }

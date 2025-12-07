@@ -1,147 +1,170 @@
 import {
   Component,
   OnInit,
-  Input,
-  OnDestroy,
   ElementRef,
   ViewEncapsulation,
   CUSTOM_ELEMENTS_SCHEMA
 } from '@angular/core';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { interval, Subscription } from 'rxjs';
-import { switchMap, startWith } from 'rxjs/operators';
-import * as Highcharts from 'highcharts';
-import { HighchartsChartComponent } from 'highcharts-angular';
+import { FormsModule } from '@angular/forms';
+import { of } from 'rxjs';
+import { switchMap, catchError, map } from 'rxjs/operators';
 
-// Import Shoelace components
+// Import Web Awesome components
 import "@awesome.me/webawesome/dist/webawesome.js";
 import '@awesome.me/webawesome/dist/components/card/card.js';
 import '@awesome.me/webawesome/dist/components/button/button.js';
 import '@awesome.me/webawesome/dist/components/tooltip/tooltip.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
-
-interface HashratePoint {
-  timestamp: string; // ISO string
-  hashrate: number;
-}
+import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
+import '@awesome.me/webawesome/dist/components/input/input.js';
 
 @Component({
   selector: 'mde-mining-dashboard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [CommonModule, HttpClientModule, HighchartsChartComponent],
+  imports: [CommonModule, HttpClientModule, FormsModule],
   templateUrl: './app.html',
   styleUrls: ["app.css"],
   encapsulation: ViewEncapsulation.ShadowDom
 })
-export class MiningDashboardElementComponent implements OnInit, OnDestroy {
-  @Input() minerName: string = 'xmrig';
-  @Input() apiBaseUrl: string = 'http://localhost:9090/api/v1/mining';
+export class MiningDashboardElementComponent implements OnInit {
+  apiBaseUrl: string = 'http://localhost:9090/api/v1/mining';
 
-  hashrateHistory: HashratePoint[] = [];
-  currentHashrate: number = 0;
-  lastUpdated: Date | null = null;
-  loading: boolean = true;
+  // State management
+  apiAvailable: boolean = true;
   error: string | null = null;
-  showDetails: boolean = false;
 
-  private refreshSubscription: Subscription | undefined;
+  systemInfo: any = null;
+  availableMiners: any[] = [];
+  runningMiners: any[] = [];
+  installedMiners: any[] = [];
 
-  chartOptions: Highcharts.Options = {
-    chart: {
-      type: 'spline',
-    },
-    title: {
-      text: 'Live Hashrate'
-    },
-    xAxis: {
-      type: 'datetime',
-      title: {
-        text: 'Time'
-      }
-    },
-    yAxis: {
-      title: {
-        text: 'Hashrate (H/s)'
-      },
-      min: 0
-    },
-    series: [{
-      name: 'Hashrate',
-      type: 'line',
-      data: []
-    }],
-    credits: {
-      enabled: false
-    }
-  };
-  updateFlag = false;
+  // Form inputs
+  poolAddress: string = 'pool.hashvault.pro:80';
+  walletAddress: string = '888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H';
+  showStartOptionsFor: string | null = null;
 
   constructor(private http: HttpClient, private elementRef: ElementRef) {}
 
   ngOnInit(): void {
-    this.startAutoRefresh();
+    this.checkSystemState();
   }
 
-  ngOnDestroy(): void {
-    this.stopAutoRefresh();
-  }
-
-  startAutoRefresh(): void {
-    this.stopAutoRefresh();
-    this.refreshSubscription = interval(10000)
-      .pipe(startWith(0), switchMap(() => this.fetchHashrateObservable()))
-      .subscribe({
-        next: (history) => {
-          this.hashrateHistory = history;
-          if (history && history.length > 0) {
-            this.currentHashrate = history[history.length - 1].hashrate;
-            this.lastUpdated = new Date(history[history.length - 1].timestamp);
-
-            const chartData = history.map(point => [
-              new Date(point.timestamp).getTime(),
-              point.hashrate
-            ]);
-
-            // Safely update the chart data with type assertion
-            if (this.chartOptions.series && this.chartOptions.series[0]) {
-              (this.chartOptions.series[0] as Highcharts.SeriesLineOptions).data = chartData;
-              this.updateFlag = true; // Trigger chart update
-            }
-          } else {
-            this.currentHashrate = 0;
-            this.lastUpdated = null;
-            // Safely clear the chart data
-            if (this.chartOptions.series && this.chartOptions.series[0]) {
-               (this.chartOptions.series[0] as Highcharts.SeriesLineOptions).data = [];
-              this.updateFlag = true;
-            }
-          }
-          this.loading = false;
-          this.error = null;
-        },
-        error: (err) => {
-          console.error('Failed to fetch hashrate history:', err);
-          this.error = 'Failed to fetch hashrate history.';
-          this.loading = false;
-        }
-      });
-  }
-
-  stopAutoRefresh(): void {
-    if (this.refreshSubscription) {
-      this.refreshSubscription.unsubscribe();
-      this.refreshSubscription = undefined;
+  private handleError(err: HttpErrorResponse, defaultMessage: string) {
+    console.error(err);
+    if (err.error && err.error.error) {
+      // Handles { "error": "..." } from the backend
+      this.error = `${defaultMessage}: ${err.error.error}`;
+    } else if (typeof err.error === 'string' && err.error.length < 200) {
+      // Handles plain text errors
+      this.error = `${defaultMessage}: ${err.error}`;
+    } else {
+      this.error = `${defaultMessage}. Please check the console for details.`;
     }
   }
 
-  private fetchHashrateObservable() {
-    const url = `${this.apiBaseUrl}/miners/${this.minerName}/hashrate-history`;
-    return this.http.get<HashratePoint[]>(url);
+  checkSystemState() {
+    this.error = null;
+    this.http.get<any>(`${this.apiBaseUrl}/info`).pipe(
+      switchMap(info => {
+        this.apiAvailable = true;
+        this.systemInfo = info;
+
+        this.installedMiners = (info.installed_miners_info || [])
+          .filter((m: any) => m.is_installed)
+          .map((m: any) => ({ ...m, type: this.getMinerType(m) }));
+
+        if (this.installedMiners.length === 0) {
+          this.fetchAvailableMiners();
+        }
+
+        return this.fetchRunningMiners();
+      }),
+      catchError(err => {
+        this.apiAvailable = false;
+        this.error = 'Failed to connect to the mining API.';
+        this.systemInfo = {};
+        this.installedMiners = [];
+        this.runningMiners = [];
+        console.error('API not available:', err);
+        return of(null);
+      })
+    ).subscribe();
   }
 
-  toggleDetails(): void {
-    this.showDetails = !this.showDetails;
+  fetchAvailableMiners(): void {
+    this.http.get<any[]>(`${this.apiBaseUrl}/miners/available`).subscribe({
+      next: miners => { this.availableMiners = miners; },
+      error: err => { this.handleError(err, 'Could not fetch available miners'); }
+    });
+  }
+
+  fetchRunningMiners() {
+    return this.http.get<any[]>(`${this.apiBaseUrl}/miners`).pipe(
+      map(miners => { this.runningMiners = miners; }),
+      catchError(err => {
+        this.handleError(err, 'Could not fetch running miners');
+        this.runningMiners = [];
+        return of([]);
+      })
+    );
+  }
+
+  private performAction(action: any) {
+    action.subscribe({
+      next: () => {
+        setTimeout(() => this.checkSystemState(), 1000);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.handleError(err, 'Action failed');
+      }
+    });
+  }
+
+  installMiner(minerType: string): void {
+    this.performAction(this.http.post(`${this.apiBaseUrl}/miners/${minerType}/install`, {}));
+  }
+
+  startMiner(miner: any, useLastConfig: boolean = false): void {
+    let config = {};
+    if (!useLastConfig) {
+      config = {
+        pool: this.poolAddress,
+        wallet: this.walletAddress,
+        tls: true,
+        hugePages: true,
+      };
+    }
+    this.performAction(this.http.post(`${this.apiBaseUrl}/miners/${miner.type}`, config));
+    this.showStartOptionsFor = null;
+  }
+
+  stopMiner(miner: any): void {
+    const runningInstance = this.getRunningMinerInstance(miner);
+    if (!runningInstance) {
+      this.error = "Cannot stop a miner that is not running.";
+      return;
+    }
+    this.performAction(this.http.delete(`${this.apiBaseUrl}/miners/${runningInstance.name}`));
+  }
+
+  toggleStartOptions(minerType: string): void {
+    this.showStartOptionsFor = this.showStartOptionsFor === minerType ? null : minerType;
+  }
+
+  getMinerType(miner: any): string {
+    if (!miner.path) return 'unknown';
+    const parts = miner.path.split('/').filter((p: string) => p);
+    return parts.length > 1 ? parts[parts.length - 2] : parts[parts.length - 1] || 'unknown';
+  }
+
+  getRunningMinerInstance(miner: any): any {
+    return this.runningMiners.find(m => m.name.startsWith(miner.type));
+  }
+
+  isMinerRunning(miner: any): boolean {
+    return !!this.getRunningMinerInstance(miner);
   }
 }

@@ -171,9 +171,9 @@ var serveCmd = &cobra.Command{
 }
 
 func init() {
-	serveCmd.Flags().StringVar(&host, "host", "0.0.0.0", "Host to listen on")
-	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
-	serveCmd.Flags().StringVarP(&namespace, "namespace", "n", "/", "API namespace for the swagger UI")
+	serveCmd.Flags().StringVar(&host, "host", "127.0.0.1", "Host to listen on")
+	serveCmd.Flags().IntVarP(&port, "port", "p", 9090, "Port to listen on")
+	serveCmd.Flags().StringVarP(&namespace, "namespace", "n", "/api/v1/mining", "API namespace for the swagger UI")
 	rootCmd.AddCommand(serveCmd)
 }
 

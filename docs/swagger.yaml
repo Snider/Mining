@@ -19,12 +19,10 @@ definitions:
   mining.Config:
     properties:
       algo:
-        description: Network options
         type: string
       apiId:
         type: string
       apiWorkerId:
-        description: API options (can be overridden or supplemented here)
         type: string
       argon2Impl:
         type: string
@@ -33,7 +31,6 @@ definitions:
       av:
         type: integer
       background:
-        description: Misc options
         type: boolean
       bench:
         type: string
@@ -76,7 +73,6 @@ definitions:
       logFile:
         type: string
       logOutput:
-        description: New field to control stdout/stderr logging
         type: boolean
       miner:
         type: string
@@ -85,14 +81,12 @@ definitions:
       noColor:
         type: boolean
       noCpu:
-        description: CPU backend options
         type: boolean
       noDMI:
         type: boolean
       noTitle:
         type: boolean
       password:
-        description: Corresponds to -p, not --userpass
         type: string
       pauseOnActive:
         type: integer
@@ -131,7 +125,6 @@ definitions:
       submit:
         type: boolean
       syslog:
-        description: Logging options
         type: boolean
       threads:
         type: integer
@@ -144,7 +137,6 @@ definitions:
       userAgent:
         type: string
       userPass:
-        description: Corresponds to -O
         type: string
       verbose:
         type: boolean
@@ -215,24 +207,18 @@ definitions:
       configPath:
         type: string
       hashrateHistory:
-        description: High-resolution (10s)
         items:
           $ref: '#/definitions/mining.HashratePoint'
         type: array
-      lastHeartbeat:
-        type: integer
       lowResHashrateHistory:
-        description: Low-resolution (1m averages)
         items:
           $ref: '#/definitions/mining.HashratePoint'
         type: array
       miner_binary:
-        description: New field for the full path to the miner executable
         type: string
       name:
         type: string
       path:
-        description: This will now be the versioned folder path
         type: string
       running:
         type: boolean

@@ -365,14 +365,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "algo": {
-                    "description": "Network options",
                     "type": "string"
                 },
                 "apiId": {
                     "type": "string"
                 },
                 "apiWorkerId": {
-                    "description": "API options (can be overridden or supplemented here)",
                     "type": "string"
                 },
                 "argon2Impl": {
@@ -385,7 +383,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "background": {
-                    "description": "Misc options",
                     "type": "boolean"
                 },
                 "bench": {
@@ -449,7 +446,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "logOutput": {
-                    "description": "New field to control stdout/stderr logging",
                     "type": "boolean"
                 },
                 "miner": {
@@ -462,7 +458,6 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "noCpu": {
-                    "description": "CPU backend options",
                     "type": "boolean"
                 },
                 "noDMI": {
@@ -472,7 +467,6 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "password": {
-                    "description": "Corresponds to -p, not --userpass",
                     "type": "string"
                 },
                 "pauseOnActive": {
@@ -530,7 +524,6 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "syslog": {
-                    "description": "Logging options",
                     "type": "boolean"
                 },
                 "threads": {
@@ -549,7 +542,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "userPass": {
-                    "description": "Corresponds to -O",
                     "type": "string"
                 },
                 "verbose": {
@@ -657,31 +649,24 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "hashrateHistory": {
-                    "description": "High-resolution (10s)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/mining.HashratePoint"
                     }
                 },
-                "lastHeartbeat": {
-                    "type": "integer"
-                },
                 "lowResHashrateHistory": {
-                    "description": "Low-resolution (1m averages)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/mining.HashratePoint"
                     }
                 },
                 "miner_binary": {
-                    "description": "New field for the full path to the miner executable",
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
                 "path": {
-                    "description": "This will now be the versioned folder path",
                     "type": "string"
                 },
                 "running": {

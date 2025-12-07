@@ -1,51 +1,127 @@
-<wa-card class="card">
+<div class="mining-dashboard">
 
-  <div slot="header" class="header-container">
-    <h3 class="header-title">
-      <span class="title-quiet">Mining Dashboard:</span> {{ minerName }}
-    </h3>
-    <div *ngIf="!loading && !error" class="header-stats">
-      <div class="stat-item">
-        <wa-icon name="speedometer"></wa-icon>
-        <span>{{ currentHashrate.toFixed(2) }} H/s</span>
-      </div>
-      <div class="stat-item">
-        <wa-icon name="clock"></wa-icon>
-        <span>{{ lastUpdated | date:'mediumTime' }}</span>
-      </div>
+  <!-- Initial Loading State -->
+  @if (systemInfo === null) {
+    <div class="centered-container">
+      <wa-card class="card-overview">
+        <div slot="header">Loading...</div>
+        <wa-spinner style="font-size: 3rem; margin-top: 1rem;"></wa-spinner>
+      </wa-card>
     </div>
-    <wa-button appearance="plain" slot="header-actions" size="small" (click)="toggleDetails()">
-      <wa-icon name="cog" label="Toggle Details"></wa-icon>
-    </wa-button>
-  </div>
+  }
 
-  <div class="wa-stack wa-gap-sm">
-    <p *ngIf="loading">Loading hashrate data...</p>
-    <p *ngIf="error" class="error-message">Error: {{ error }}</p>
-
-    <div *ngIf="!loading && !error">
-      <highcharts-chart
-        [options]="chartOptions"
-        [(update)]="updateFlag"
-        class="chart"
-      ></highcharts-chart>
+  <!-- API Not Available State -->
+  @if (systemInfo !== null && !apiAvailable) {
+    <div class="centered-container">
+      <wa-card class="card-overview">
+        <div slot="header">
+          <wa-icon name="cloud-off" style="font-size: 2rem;"></wa-icon>
+          API Not Available
+        </div>
+        <div>
+          <p>{{ error }}</p>
+          <p>Please ensure the mining API server is running and accessible.</p>
+        </div>
+        <div slot="footer">
+          <wa-button (click)="checkSystemState()">
+            <wa-icon name="arrow-clockwise" slot="prefix"></wa-icon>
+            Retry
+          </wa-button>
+        </div>
+      </wa-card>
     </div>
+  }
 
-    <div *ngIf="showDetails" class="details-section">
-      <h4>Hashrate History ({{ hashrateHistory.length }} points)</h4>
-      <ul class="history-list">
-        <li *ngFor="let point of hashrateHistory | slice:0:5">
-          {{ point.timestamp | date:'mediumTime' }}: {{ point.hashrate }} H/s
-        </li>
-        <li *ngIf="hashrateHistory.length > 5">...</li>
-      </ul>
-      <h5>Raw History Data:</h5>
-      <pre>{{ hashrateHistory | json }}</pre>
+  <!-- Main Content -->
+  @if (systemInfo !== null && apiAvailable) {
+    <div>
+      @if (error) {
+        <wa-card class="card-error">
+          <div slot="header">
+            <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
+            An Error Occurred
+          </div>
+          <p>{{ error }}</p>
+        </wa-card>
+      }
+
+      <wa-card class="card-overview">
+        <div slot="header" class="card-header">
+          <div>
+            <wa-icon name="cpu" style="font-size: 1.5rem;"></wa-icon>
+            Mining Control
+          </div>
+        </div>
+
+        @if (installedMiners.length === 0) {
+          <div class="miner-list">
+            <div class="miner-item">
+              <span>No miners installed.</span>
+            </div>
+            @for (miner of availableMiners; track miner.name) {
+              <div class="miner-item">
+                <span>{{ miner.name }}</span>
+                <wa-button variant="success" (click)="installMiner(miner.name)">
+                  <wa-icon name="download" slot="prefix"></wa-icon>
+                  Install
+                </wa-button>
+              </div>
+            } @empty {
+              <div class="miner-item">
+                <span>Checking for available miners...</span>
+              </div>
+            }
+          </div>
+        }
+
+        @if (installedMiners.length > 0) {
+          <div class="miner-list">
+            @for (miner of installedMiners; track miner.path) {
+              <div class="miner-item-container">
+                <div class="miner-item">
+                  <span class="miner-name">
+                    {{ miner.type }}
+                    <wa-tooltip>
+                      <div slot="content">Version: {{ miner.version }}</div>
+                      <wa-icon name="info-circle"></wa-icon>
+                    </wa-tooltip>
+                  </span>
+
+                  @if (isMinerRunning(miner)) {
+                    <wa-button variant="danger" (click)="stopMiner(miner)">
+                      <wa-icon name="stop-circle" slot="prefix"></wa-icon>
+                      Stop
+                    </wa-button>
+                  } @else {
+                    <div class="start-buttons">
+                      <wa-button variant="secondary" (click)="startMiner(miner, true)">
+                        <wa-icon name="play-circle" slot="prefix"></wa-icon>
+                        Start Last Config
+                      </wa-button>
+                      <wa-button variant="primary" (click)="toggleStartOptions(miner.type)">
+                        <wa-icon name="gear" slot="prefix"></wa-icon>
+                        New Config
+                      </wa-button>
+                    </div>
+                  }
+                </div>
+
+                @if (showStartOptionsFor === miner.type) {
+                  <div class="start-options">
+                    <wa-input label="Pool Address" [(ngModel)]="poolAddress" name="poolAddress"></wa-input>
+                    <wa-input label="Wallet Address" [(ngModel)]="walletAddress" name="walletAddress"></wa-input>
+                    <wa-button variant="success" (click)="startMiner(miner)">
+                      <wa-icon name="rocket-launch" slot="prefix"></wa-icon>
+                      Confirm & Start
+                    </wa-button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </wa-card>
     </div>
-  </div>
+  }
 
-  <wa-divider></wa-divider>
-  <div slot="footer" class="card-footer">
-    <wa-button variant="neutral" (click)="toggleDetails()">{{ showDetails ? 'Hide Details' : 'Show Details' }}</wa-button>
-  </div>
-</wa-card>
+</div>

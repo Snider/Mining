@@ -359,14 +359,12 @@
             "type": "object",
             "properties": {
                 "algo": {
-                    "description": "Network options",
                     "type": "string"
                 },
                 "apiId": {
                     "type": "string"
                 },
                 "apiWorkerId": {
-                    "description": "API options (can be overridden or supplemented here)",
                     "type": "string"
                 },
                 "argon2Impl": {
@@ -379,7 +377,6 @@
                     "type": "integer"
                 },
                 "background": {
-                    "description": "Misc options",
                     "type": "boolean"
                 },
                 "bench": {
@@ -443,7 +440,6 @@
                     "type": "string"
                 },
                 "logOutput": {
-                    "description": "New field to control stdout/stderr logging",
                     "type": "boolean"
                 },
                 "miner": {
@@ -456,7 +452,6 @@
                     "type": "boolean"
                 },
                 "noCpu": {
-                    "description": "CPU backend options",
                     "type": "boolean"
                 },
                 "noDMI": {
@@ -466,7 +461,6 @@
                     "type": "boolean"
                 },
                 "password": {
-                    "description": "Corresponds to -p, not --userpass",
                     "type": "string"
                 },
                 "pauseOnActive": {
@@ -524,7 +518,6 @@
                     "type": "boolean"
                 },
                 "syslog": {
-                    "description": "Logging options",
                     "type": "boolean"
                 },
                 "threads": {
@@ -543,7 +536,6 @@
                     "type": "string"
                 },
                 "userPass": {
-                    "description": "Corresponds to -O",
                     "type": "string"
                 },
                 "verbose": {
@@ -651,31 +643,24 @@
                     "type": "string"
                 },
                 "hashrateHistory": {
-                    "description": "High-resolution (10s)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/mining.HashratePoint"
                     }
                 },
-                "lastHeartbeat": {
-                    "type": "integer"
-                },
                 "lowResHashrateHistory": {
-                    "description": "Low-resolution (1m averages)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/mining.HashratePoint"
                     }
                 },
                 "miner_binary": {
-                    "description": "New field for the full path to the miner executable",
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
                 "path": {
-                    "description": "This will now be the versioned folder path",
                     "type": "string"
                 },
                 "running": {
