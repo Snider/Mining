@@ -1,6 +1,0 @@
-Tidying dependencies...
-go mod tidy
-Generating Swagger documentation...
-swag init -g ./cmd/mining/main.go
-make: swag: No such file or directory
-make: *** [Makefile:93: docs] Error 127
