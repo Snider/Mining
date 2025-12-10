@@ -1,15 +1,11 @@
-<div class="admin-panel">
-  @if (error()) {
-    <wa-card class="card-error">
-      <div slot="header">
-        <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
-        An Error Occurred
-      </div>
-      <p>{{ error() }}</p>
-    </wa-card>
-  }
+<div class="setup-wizard">
+  <div class="header-title">
+    <wa-icon name="cpu" style="font-size: 1.5rem;"></wa-icon>
+    <span>Setup Required</span>
+  </div>
 
-  <h4>Manage Miners</h4>
+  <p>To begin, please install a miner from the list below.</p>
+  <h4>Available Miners</h4>
   <div class="miner-list">
     @for (miner of state().manageableMiners; track miner.name) {
       <div class="miner-item">
@@ -48,16 +44,13 @@
       </div>
     }
   </div>
-
-  <h4 class="section-title">Antivirus Whitelist Paths</h4>
-  <div class="path-list">
-    <p>To prevent antivirus software from interfering, please add the following paths to your exclusion list:</p>
-    <ul>
-      @for (path of whitelistPaths(); track path) {
-        <li><code>{{ path }}</code></li>
-      } @empty {
-          <li>No paths to display. Install a miner to see required paths.</li>
-      }
-    </ul>
-  </div>
+  @if (error()) {
+    <wa-card class="card-error">
+      <div slot="header">
+        <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
+        An Error Occurred
+      </div>
+      <p>{{ error() }}</p>
+    </wa-card>
+  }
 </div>

@@ -1,12 +1,36 @@
 package mining
 
-// MiningProfile represents a saved configuration for a specific mining setup.
-// This allows users to define and switch between different miners, pools,
-// and wallets without re-entering information.
+import (
+	"errors"
+)
+
+// RawConfig is a raw encoded JSON value.
+// It implements Marshaler and Unmarshaler and can be used to delay JSON decoding or precompute a JSON encoding.
+// We define it as []byte (like json.RawMessage) to avoid swagger parsing issues with the json package.
+type RawConfig []byte
+
+// MiningProfile represents a saved configuration for running a specific miner.
+// It decouples the UI from the underlying miner's specific config structure.
 type MiningProfile struct {
-	Name   string `json:"name"`   // A user-defined name for the profile, e.g., "My XMR Rig"
-	Pool   string `json:"pool"`   // The mining pool address
-	Wallet string `json:"wallet"` // The wallet address
-	Miner  string `json:"miner"`  // The type of miner, e.g., "xmrig"
-	// This can be expanded later to include the full *Config for advanced options
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	MinerType string    `json:"minerType"`                   // e.g., "xmrig", "ttminer"
+	Config    RawConfig `json:"config" swaggertype:"object"` // The raw JSON config for the specific miner
+}
+
+// MarshalJSON returns m as the JSON encoding of m.
+func (m RawConfig) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
+	return m, nil
+}
+
+// UnmarshalJSON sets *m to a copy of data.
+func (m *RawConfig) UnmarshalJSON(data []byte) error {
+	if m == nil {
+		return errors.New("RawConfig: UnmarshalJSON on nil pointer")
+	}
+	*m = append((*m)[0:0], data...)
+	return nil
 }

@@ -1,0 +1,31 @@
+<div class="profile-list">
+  <h5>Existing Profiles</h5>
+  @for(profile of state().profiles; track profile.id) {
+    <div class="profile-item">
+      @if(editingProfile && editingProfile.id === profile.id) {
+        <div class="profile-form">
+          <wa-input [(ngModel)]="editingProfile.name" label="Profile Name"></wa-input>
+          <wa-select [(ngModel)]="editingProfile.minerType" label="Miner Type">
+            @for(miner of state().manageableMiners; track miner.name) {
+              <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
+            }
+          </wa-select>
+          <wa-input [(ngModel)]="editingProfile.config.pool" label="Pool Address"></wa-input>
+          <wa-input [(ngModel)]="editingProfile.config.wallet" label="Wallet Address"></wa-input>
+          <wa-checkbox [(ngModel)]="editingProfile.config.tls">TLS</wa-checkbox>
+          <wa-checkbox [(ngModel)]="editingProfile.config.hugePages">Huge Pages</wa-checkbox>
+          <wa-button (click)="updateProfile()">Save</wa-button>
+          <wa-button variant="neutral" (click)="cancelEdit()">Cancel</wa-button>
+        </div>
+      } @else {
+        <span>{{ profile.name }} ({{ profile.minerType }})</span>
+        <div>
+          <wa-button size="small" (click)="editProfile(profile)">Edit</wa-button>
+          <wa-button size="small" variant="danger" (click)="deleteProfile(profile.id)">Delete</wa-button>
+        </div>
+      }
+    </div>
+  } @empty {
+    <p>No profiles created yet.</p>
+  }
+</div>

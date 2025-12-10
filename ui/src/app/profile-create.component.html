@@ -1,0 +1,39 @@
+<!--
+  Using ngForm and ngSubmit for a template-driven approach.
+  The form's state is now managed through the 'model' object in the component.
+-->
+<form class="profile-form" #profileForm="ngForm" (ngSubmit)="createProfile()">
+  <h5>Create New Profile</h5>
+
+  <!-- Error and success messages now use simple properties -->
+  @if (error) {
+    <wa-card class="card-error">
+      <p>{{ error }}</p>
+    </wa-card>
+  }
+  @if (success) {
+    <wa-card class="card-success">
+      <p>{{ success }}</p>
+    </wa-card>
+  }
+
+  <!-- Two-way data binding with [(ngModel)] -->
+  <wa-input name="name" label="Profile Name" [(ngModel)]="model.name" required></wa-input>
+
+  <wa-select name="minerType" label="Miner Type" [(ngModel)]="model.minerType" required>
+    @for(miner of state().manageableMiners; track miner.name) {
+      <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
+    }
+  </wa-select>
+
+  <!-- ngModelGroup to group related form controls into a nested object -->
+  <fieldset ngModelGroup="config">
+    <legend>Configuration</legend>
+    <wa-input name="pool" label="Pool Address" [(ngModel)]="model.config.pool" required></wa-input>
+    <wa-input name="wallet" label="Wallet Address" [(ngModel)]="model.config.wallet" required></wa-input>
+    <wa-checkbox name="tls" [(ngModel)]="model.config.tls">TLS</wa-checkbox>
+    <wa-checkbox name="hugePages" [(ngModel)]="model.config.hugePages">Huge Pages</wa-checkbox>
+  </fieldset>
+
+  <wa-button type="submit">Create Profile</wa-button>
+</form>

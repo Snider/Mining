@@ -49,7 +49,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 		}
 	}
 
-	args := []string{"-c", m.ConfigPath}
+	args := []string{"-c", "\"" + m.ConfigPath + "\""}
 
 	if m.API != nil && m.API.Enabled {
 		args = append(args, "--http-host", m.API.ListenHost, "--http-port", fmt.Sprintf("%d", m.API.ListenPort))

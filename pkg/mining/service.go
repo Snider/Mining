@@ -27,6 +27,7 @@ import (
 // Service encapsulates the gin-gonic router and the mining manager.
 type Service struct {
 	Manager             ManagerInterface
+	ProfileManager      *ProfileManager
 	Router              *gin.Engine
 	Server              *http.Server
 	DisplayAddr         string
@@ -36,7 +37,7 @@ type Service struct {
 }
 
 // NewService creates a new mining service
-func NewService(manager ManagerInterface, listenAddr string, displayAddr string, swaggerNamespace string) *Service {
+func NewService(manager ManagerInterface, listenAddr string, displayAddr string, swaggerNamespace string) (*Service, error) {
 	apiBasePath := "/" + strings.Trim(swaggerNamespace, "/")
 	swaggerUIPath := apiBasePath + "/swagger"
 
@@ -47,8 +48,14 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 	instanceName := "swagger_" + strings.ReplaceAll(strings.Trim(swaggerNamespace, "/"), "/", "_")
 	swag.Register(instanceName, docs.SwaggerInfo)
 
+	profileManager, err := NewProfileManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize profile manager: %w", err)
+	}
+
 	return &Service{
-		Manager: manager,
+		Manager:        manager,
+		ProfileManager: profileManager,
 		Server: &http.Server{
 			Addr: listenAddr,
 		},
@@ -56,7 +63,7 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		SwaggerInstanceName: instanceName,
 		APIBasePath:         apiBasePath,
 		SwaggerUIPath:       swaggerUIPath,
-	}
+	}, nil
 }
 
 func (s *Service) ServiceStartup(ctx context.Context) error {
@@ -95,12 +102,21 @@ func (s *Service) setupRoutes() {
 		{
 			minersGroup.GET("", s.handleListMiners)
 			minersGroup.GET("/available", s.handleListAvailableMiners)
-			minersGroup.POST("/:miner_name", s.handleStartMiner)
 			minersGroup.POST("/:miner_name/install", s.handleInstallMiner)
 			minersGroup.DELETE("/:miner_name/uninstall", s.handleUninstallMiner)
 			minersGroup.DELETE("/:miner_name", s.handleStopMiner)
 			minersGroup.GET("/:miner_name/stats", s.handleGetMinerStats)
 			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory)
+		}
+
+		profilesGroup := apiGroup.Group("/profiles")
+		{
+			profilesGroup.GET("", s.handleListProfiles)
+			profilesGroup.POST("", s.handleCreateProfile)
+			profilesGroup.GET("/:id", s.handleGetProfile)
+			profilesGroup.PUT("/:id", s.handleUpdateProfile)
+			profilesGroup.DELETE("/:id", s.handleDeleteProfile)
+			profilesGroup.POST("/:id/start", s.handleStartMinerWithProfile)
 		}
 	}
 
@@ -111,37 +127,19 @@ func (s *Service) setupRoutes() {
 }
 
 // handleGetInfo godoc
-// @Summary Get cached miner installation information
-// @Description Retrieves the last cached installation details for all miners, along with system information.
+// @Summary Get live miner installation information
+// @Description Retrieves live installation details for all miners, along with system information.
 // @Tags system
 // @Produce  json
 // @Success 200 {object} SystemInfo
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Router /info [get]
 func (s *Service) handleGetInfo(c *gin.Context) {
-	configDir, err := xdg.ConfigFile("lethean-desktop/miners")
+	systemInfo, err := s.updateInstallationCache()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get config directory"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get system info", "details": err.Error()})
 		return
 	}
-	configPath := filepath.Join(configDir, "config.json")
-
-	cacheBytes, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "cache file not found, run setup"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not read cache file"})
-		return
-	}
-
-	var systemInfo SystemInfo
-	if err := json.Unmarshal(cacheBytes, &systemInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not parse cache file"})
-		return
-	}
-
 	c.JSON(http.StatusOK, systemInfo)
 }
 
@@ -343,24 +341,29 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "installed", "version": details.Version, "path": details.Path})
 }
 
-// handleStartMiner godoc
-// @Summary Start a new miner
-// @Description Start a new miner with the given configuration
-// @Tags miners
-// @Accept  json
+// handleStartMinerWithProfile godoc
+// @Summary Start a new miner using a profile
+// @Description Start a new miner with the configuration from a saved profile
+// @Tags profiles
 // @Produce  json
-// @Param miner_type path string true "Miner Type"
-// @Param config body Config true "Miner Configuration"
+// @Param id path string true "Profile ID"
 // @Success 200 {object} XMRigMiner
-// @Router /miners/{miner_type} [post]
-func (s *Service) handleStartMiner(c *gin.Context) {
-	minerType := c.Param("miner_name")
-	var config Config
-	if err := c.ShouldBindJSON(&config); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// @Router /profiles/{id}/start [post]
+func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
+	profileID := c.Param("id")
+	profile, exists := s.ProfileManager.GetProfile(profileID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "profile not found"})
 		return
 	}
-	miner, err := s.Manager.StartMiner(minerType, &config)
+
+	var config Config
+	if err := json.Unmarshal(profile.Config, &config); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse profile config", "details": err.Error()})
+		return
+	}
+
+	miner, err := s.Manager.StartMiner(profile.MinerType, &config)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -424,4 +427,102 @@ func (s *Service) handleGetMinerHashrateHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, history)
+}
+
+// handleListProfiles godoc
+// @Summary List all mining profiles
+// @Description Get a list of all saved mining profiles
+// @Tags profiles
+// @Produce  json
+// @Success 200 {array} MiningProfile
+// @Router /profiles [get]
+func (s *Service) handleListProfiles(c *gin.Context) {
+	profiles := s.ProfileManager.GetAllProfiles()
+	c.JSON(http.StatusOK, profiles)
+}
+
+// handleCreateProfile godoc
+// @Summary Create a new mining profile
+// @Description Create and save a new mining profile
+// @Tags profiles
+// @Accept  json
+// @Produce  json
+// @Param profile body MiningProfile true "Mining Profile"
+// @Success 201 {object} MiningProfile
+// @Router /profiles [post]
+func (s *Service) handleCreateProfile(c *gin.Context) {
+	var profile MiningProfile
+	if err := c.ShouldBindJSON(&profile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	createdProfile, err := s.ProfileManager.CreateProfile(&profile)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create profile", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, createdProfile)
+}
+
+// handleGetProfile godoc
+// @Summary Get a specific mining profile
+// @Description Get a mining profile by its ID
+// @Tags profiles
+// @Produce  json
+// @Param id path string true "Profile ID"
+// @Success 200 {object} MiningProfile
+// @Router /profiles/{id} [get]
+func (s *Service) handleGetProfile(c *gin.Context) {
+	profileID := c.Param("id")
+	profile, exists := s.ProfileManager.GetProfile(profileID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "profile not found"})
+		return
+	}
+	c.JSON(http.StatusOK, profile)
+}
+
+// handleUpdateProfile godoc
+// @Summary Update a mining profile
+// @Description Update an existing mining profile
+// @Tags profiles
+// @Accept  json
+// @Produce  json
+// @Param id path string true "Profile ID"
+// @Param profile body MiningProfile true "Updated Mining Profile"
+// @Success 200 {object} MiningProfile
+// @Router /profiles/{id} [put]
+func (s *Service) handleUpdateProfile(c *gin.Context) {
+	profileID := c.Param("id")
+	var profile MiningProfile
+	if err := c.ShouldBindJSON(&profile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	profile.ID = profileID
+
+	if err := s.ProfileManager.UpdateProfile(&profile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile", "details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, profile)
+}
+
+// handleDeleteProfile godoc
+// @Summary Delete a mining profile
+// @Description Delete a mining profile by its ID
+// @Tags profiles
+// @Produce  json
+// @Param id path string true "Profile ID"
+// @Success 200 {object} map[string]string
+// @Router /profiles/{id} [delete]
+func (s *Service) handleDeleteProfile(c *gin.Context) {
+	profileID := c.Param("id")
+	if err := s.ProfileManager.DeleteProfile(profileID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete profile", "details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "profile deleted"})
 }

@@ -16,135 +16,6 @@ definitions:
       name:
         type: string
     type: object
-  mining.Config:
-    properties:
-      algo:
-        type: string
-      apiId:
-        type: string
-      apiWorkerId:
-        type: string
-      argon2Impl:
-        type: string
-      asm:
-        type: string
-      av:
-        type: integer
-      background:
-        type: boolean
-      bench:
-        type: string
-      coin:
-        type: string
-      cpuAffinity:
-        type: string
-      cpuMaxThreadsHint:
-        type: integer
-      cpuMemoryPool:
-        type: integer
-      cpuNoYield:
-        type: boolean
-      cpuPriority:
-        type: integer
-      donateLevel:
-        type: integer
-      donateOverProxy:
-        type: boolean
-      hash:
-        type: string
-      healthPrintTime:
-        type: integer
-      httpAccessToken:
-        type: string
-      httpHost:
-        type: string
-      httpNoRestricted:
-        type: boolean
-      httpPort:
-        type: integer
-      hugePages:
-        type: boolean
-      hugePagesJIT:
-        type: boolean
-      hugepageSize:
-        type: integer
-      keepalive:
-        type: boolean
-      logFile:
-        type: string
-      logOutput:
-        type: boolean
-      miner:
-        type: string
-      nicehash:
-        type: boolean
-      noColor:
-        type: boolean
-      noCpu:
-        type: boolean
-      noDMI:
-        type: boolean
-      noTitle:
-        type: boolean
-      password:
-        type: string
-      pauseOnActive:
-        type: integer
-      pauseOnBattery:
-        type: boolean
-      pool:
-        type: string
-      printTime:
-        type: integer
-      proxy:
-        type: string
-      randomX1GBPages:
-        type: boolean
-      randomXCacheQoS:
-        type: boolean
-      randomXInit:
-        type: integer
-      randomXMode:
-        type: string
-      randomXNoNuma:
-        type: boolean
-      randomXNoRdmsr:
-        type: boolean
-      randomXWrmsr:
-        type: string
-      retries:
-        type: integer
-      retryPause:
-        type: integer
-      rigId:
-        type: string
-      seed:
-        type: string
-      stress:
-        type: boolean
-      submit:
-        type: boolean
-      syslog:
-        type: boolean
-      threads:
-        type: integer
-      title:
-        type: string
-      tls:
-        type: boolean
-      tlsFingerprint:
-        type: string
-      userAgent:
-        type: string
-      userPass:
-        type: string
-      verbose:
-        type: boolean
-      verify:
-        type: string
-      wallet:
-        type: string
-    type: object
   mining.HashratePoint:
     properties:
       hashrate:
@@ -164,6 +35,19 @@ definitions:
       path:
         type: string
       version:
+        type: string
+    type: object
+  mining.MiningProfile:
+    properties:
+      config:
+        description: The raw JSON config for the specific miner
+        type: object
+      id:
+        type: string
+      minerType:
+        description: e.g., "xmrig", "ttminer"
+        type: string
+      name:
         type: string
     type: object
   mining.PerformanceMetrics:
@@ -253,8 +137,8 @@ paths:
       - system
   /info:
     get:
-      description: Retrieves the last cached installation details for all miners,
-        along with system information.
+      description: Retrieves live installation details for all miners, along with
+        system information.
       produces:
       - application/json
       responses:
@@ -268,7 +152,7 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Get cached miner installation information
+      summary: Get live miner installation information
       tags:
       - system
   /miners:
@@ -347,33 +231,6 @@ paths:
       summary: Get miner stats
       tags:
       - miners
-  /miners/{miner_type}:
-    post:
-      consumes:
-      - application/json
-      description: Start a new miner with the given configuration
-      parameters:
-      - description: Miner Type
-        in: path
-        name: miner_type
-        required: true
-        type: string
-      - description: Miner Configuration
-        in: body
-        name: config
-        required: true
-        schema:
-          $ref: '#/definitions/mining.Config'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/mining.XMRigMiner'
-      summary: Start a new miner
-      tags:
-      - miners
   /miners/{miner_type}/install:
     post:
       description: Install a new miner or update an existing one.
@@ -431,6 +288,126 @@ paths:
       summary: List all available miners
       tags:
       - miners
+  /profiles:
+    get:
+      description: Get a list of all saved mining profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/mining.MiningProfile'
+            type: array
+      summary: List all mining profiles
+      tags:
+      - profiles
+    post:
+      consumes:
+      - application/json
+      description: Create and save a new mining profile
+      parameters:
+      - description: Mining Profile
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/mining.MiningProfile'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/mining.MiningProfile'
+      summary: Create a new mining profile
+      tags:
+      - profiles
+  /profiles/{id}:
+    delete:
+      description: Delete a mining profile by its ID
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a mining profile
+      tags:
+      - profiles
+    get:
+      description: Get a mining profile by its ID
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.MiningProfile'
+      summary: Get a specific mining profile
+      tags:
+      - profiles
+    put:
+      consumes:
+      - application/json
+      description: Update an existing mining profile
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated Mining Profile
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/mining.MiningProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.MiningProfile'
+      summary: Update a mining profile
+      tags:
+      - profiles
+  /profiles/{id}/start:
+    post:
+      description: Start a new miner with the configuration from a saved profile
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/mining.XMRigMiner'
+      summary: Start a new miner using a profile
+      tags:
+      - profiles
   /update:
     post:
       description: Checks if any installed miners have a new version available for

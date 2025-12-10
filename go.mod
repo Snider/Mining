@@ -7,6 +7,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
+	github.com/google/uuid v1.6.0
 	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/spf13/cobra v1.8.1
 	github.com/swaggo/files v1.0.1

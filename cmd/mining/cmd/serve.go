@@ -43,7 +43,10 @@ var serveCmd = &cobra.Command{
 		// Use the global manager instance
 		mgr := getManager() // This ensures we get the manager initialized by initManager
 
-		service := mining.NewService(mgr, listenAddr, displayAddr, namespace) // Pass the global manager
+		service, err := mining.NewService(mgr, listenAddr, displayAddr, namespace) // Pass the global manager
+		if err != nil {
+			return fmt.Errorf("failed to create new service: %w", err)
+		}
 
 		// Start the server in a goroutine
 		go func() {

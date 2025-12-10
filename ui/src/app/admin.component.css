@@ -47,6 +47,7 @@
     font-family: monospace;
     border-radius: 0.25rem;
     border: 1px solid #e0e0e0;
+    font-size: 0.749rem; /* Smaller font for easier selection */
 }
 
 .path-list li {

@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, computed } from '@angular/core';
+import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MinerService } from './miner.service';
@@ -11,30 +11,18 @@ import '@awesome.me/webawesome/dist/components/card/card.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
 
 @Component({
-  selector: 'snider-mining-admin',
+  selector: 'snider-mining-setup-wizard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [CommonModule],
-  templateUrl: './admin.component.html',
-  styleUrls: ['./admin.component.css'],
+  templateUrl: './setup-wizard.component.html',
+  styleUrls: ['./setup-wizard.component.css']
 })
-export class MiningAdminComponent {
+export class SetupWizardComponent {
   minerService = inject(MinerService);
   state = this.minerService.state;
   actionInProgress = signal<string | null>(null);
   error = signal<string | null>(null);
-
-  whitelistPaths = computed(() => {
-    const paths = new Set<string>();
-    this.state().installedMiners.forEach(miner => {
-      if (miner.miner_binary) paths.add(miner.miner_binary);
-      if (miner.config_path) paths.add(miner.config_path);
-    });
-    this.state().runningMiners.forEach(miner => {
-      if ((miner as any).configPath) paths.add((miner as any).configPath);
-    });
-    return Array.from(paths);
-  });
 
   installMiner(minerType: string): void {
     this.actionInProgress.set(`install-${minerType}`);

@@ -31,14 +31,14 @@
         },
         "/info": {
             "get": {
-                "description": "Retrieves the last cached installation details for all miners, along with system information.",
+                "description": "Retrieves live installation details for all miners, along with system information.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "system"
                 ],
-                "summary": "Get cached miner installation information",
+                "summary": "Get live miner installation information",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -197,47 +197,6 @@
                 }
             }
         },
-        "/miners/{miner_type}": {
-            "post": {
-                "description": "Start a new miner with the given configuration",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "miners"
-                ],
-                "summary": "Start a new miner",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Miner Type",
-                        "name": "miner_type",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Miner Configuration",
-                        "name": "config",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/mining.Config"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/mining.XMRigMiner"
-                        }
-                    }
-                }
-            }
-        },
         "/miners/{miner_type}/install": {
             "post": {
                 "description": "Install a new miner or update an existing one.",
@@ -302,6 +261,188 @@
                 }
             }
         },
+        "/profiles": {
+            "get": {
+                "description": "Get a list of all saved mining profiles",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "List all mining profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/mining.MiningProfile"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create and save a new mining profile",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "Create a new mining profile",
+                "parameters": [
+                    {
+                        "description": "Mining Profile",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/mining.MiningProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/mining.MiningProfile"
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles/{id}": {
+            "get": {
+                "description": "Get a mining profile by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "Get a specific mining profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/mining.MiningProfile"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update an existing mining profile",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "Update a mining profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated Mining Profile",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/mining.MiningProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/mining.MiningProfile"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a mining profile by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "Delete a mining profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles/{id}/start": {
+            "post": {
+                "description": "Start a new miner with the configuration from a saved profile",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profiles"
+                ],
+                "summary": "Start a new miner using a profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/mining.XMRigMiner"
+                        }
+                    }
+                }
+            }
+        },
         "/update": {
             "post": {
                 "description": "Checks if any installed miners have a new version available for download.",
@@ -352,200 +493,6 @@
                 }
             }
         },
-        "mining.Config": {
-            "type": "object",
-            "properties": {
-                "algo": {
-                    "type": "string"
-                },
-                "apiId": {
-                    "type": "string"
-                },
-                "apiWorkerId": {
-                    "type": "string"
-                },
-                "argon2Impl": {
-                    "type": "string"
-                },
-                "asm": {
-                    "type": "string"
-                },
-                "av": {
-                    "type": "integer"
-                },
-                "background": {
-                    "type": "boolean"
-                },
-                "bench": {
-                    "type": "string"
-                },
-                "coin": {
-                    "type": "string"
-                },
-                "cpuAffinity": {
-                    "type": "string"
-                },
-                "cpuMaxThreadsHint": {
-                    "type": "integer"
-                },
-                "cpuMemoryPool": {
-                    "type": "integer"
-                },
-                "cpuNoYield": {
-                    "type": "boolean"
-                },
-                "cpuPriority": {
-                    "type": "integer"
-                },
-                "donateLevel": {
-                    "type": "integer"
-                },
-                "donateOverProxy": {
-                    "type": "boolean"
-                },
-                "hash": {
-                    "type": "string"
-                },
-                "healthPrintTime": {
-                    "type": "integer"
-                },
-                "httpAccessToken": {
-                    "type": "string"
-                },
-                "httpHost": {
-                    "type": "string"
-                },
-                "httpNoRestricted": {
-                    "type": "boolean"
-                },
-                "httpPort": {
-                    "type": "integer"
-                },
-                "hugePages": {
-                    "type": "boolean"
-                },
-                "hugePagesJIT": {
-                    "type": "boolean"
-                },
-                "hugepageSize": {
-                    "type": "integer"
-                },
-                "keepalive": {
-                    "type": "boolean"
-                },
-                "logFile": {
-                    "type": "string"
-                },
-                "logOutput": {
-                    "type": "boolean"
-                },
-                "miner": {
-                    "type": "string"
-                },
-                "nicehash": {
-                    "type": "boolean"
-                },
-                "noColor": {
-                    "type": "boolean"
-                },
-                "noCpu": {
-                    "type": "boolean"
-                },
-                "noDMI": {
-                    "type": "boolean"
-                },
-                "noTitle": {
-                    "type": "boolean"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "pauseOnActive": {
-                    "type": "integer"
-                },
-                "pauseOnBattery": {
-                    "type": "boolean"
-                },
-                "pool": {
-                    "type": "string"
-                },
-                "printTime": {
-                    "type": "integer"
-                },
-                "proxy": {
-                    "type": "string"
-                },
-                "randomX1GBPages": {
-                    "type": "boolean"
-                },
-                "randomXCacheQoS": {
-                    "type": "boolean"
-                },
-                "randomXInit": {
-                    "type": "integer"
-                },
-                "randomXMode": {
-                    "type": "string"
-                },
-                "randomXNoNuma": {
-                    "type": "boolean"
-                },
-                "randomXNoRdmsr": {
-                    "type": "boolean"
-                },
-                "randomXWrmsr": {
-                    "type": "string"
-                },
-                "retries": {
-                    "type": "integer"
-                },
-                "retryPause": {
-                    "type": "integer"
-                },
-                "rigId": {
-                    "type": "string"
-                },
-                "seed": {
-                    "type": "string"
-                },
-                "stress": {
-                    "type": "boolean"
-                },
-                "submit": {
-                    "type": "boolean"
-                },
-                "syslog": {
-                    "type": "boolean"
-                },
-                "threads": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "tls": {
-                    "type": "boolean"
-                },
-                "tlsFingerprint": {
-                    "type": "string"
-                },
-                "userAgent": {
-                    "type": "string"
-                },
-                "userPass": {
-                    "type": "string"
-                },
-                "verbose": {
-                    "type": "boolean"
-                },
-                "verify": {
-                    "type": "string"
-                },
-                "wallet": {
-                    "type": "string"
-                }
-            }
-        },
         "mining.HashratePoint": {
             "type": "object",
             "properties": {
@@ -574,6 +521,25 @@
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "mining.MiningProfile": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "The raw JSON config for the specific miner",
+                    "type": "object"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "minerType": {
+                    "description": "e.g., \"xmrig\", \"ttminer\"",
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }

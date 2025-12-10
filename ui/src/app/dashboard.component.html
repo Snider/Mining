@@ -1,0 +1,87 @@
+<div class="dashboard-view">
+  <div class="header-title">
+    <wa-icon name="cpu" style="font-size: 1.5rem;"></wa-icon>
+    <span>Mining Control</span>
+    <wa-button variant="neutral" appearance="plain" (click)="toggleProfileManager()">
+      <wa-icon name="list-alt" label="Profile Manager"></wa-icon>
+    </wa-button>
+  </div>
+
+  @if (error()) {
+    <wa-card class="card-error">
+      <div slot="header">
+        <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
+        An Error Occurred
+      </div>
+      <p>{{ error() }}</p>
+    </wa-card>
+  }
+
+  @if(showProfileManager()) {
+    <div class="profile-manager-view">
+      <snider-mining-profile-list></snider-mining-profile-list>
+      <snider-mining-profile-create></snider-mining-profile-create>
+    </div>
+  } @else {
+    <!-- Miner Summary and Controls -->
+    @if (state().installedMiners.length > 0) {
+      <div class="dashboard-summary">
+        @for (miner of state().installedMiners; track miner.path) {
+          <div class="miner-summary-item">
+            <span class="miner-name">
+              {{ miner.type }}
+              <wa-tooltip>
+                <div slot="content">Version: {{ miner.version }}</div>
+                <wa-icon name="info-circle"></wa-icon>
+              </wa-tooltip>
+            </span>
+
+            @if (isMinerRunning(miner)) {
+              <wa-button
+                variant="danger"
+                [disabled]="actionInProgress() === 'stop-' + miner.type"
+                (click)="stopMiner(miner)">
+                @if (actionInProgress() === 'stop-' + miner.type) {
+                  <wa-spinner class="button-spinner"></wa-spinner>
+                } @else {
+                  <wa-icon name="stop-circle" slot="prefix"></wa-icon>
+                  Stop
+                }
+              </wa-button>
+            } @else {
+              <div class="start-buttons">
+                <wa-select [value]="selectedProfileId()" (waSelect)="handleProfileSelection($event)">
+                  <span slot="label">Profile</span>
+                  @for(profile of state().profiles; track profile.id) {
+                    @if(profile.minerType === miner.type) {
+                      <wa-option [value]="profile.id">{{ profile.name }}</wa-option>
+                    }
+                  }
+                </wa-select>
+                <wa-button
+                  variant="primary"
+                  [disabled]="!selectedProfileId() || actionInProgress()?.startsWith('start-')"
+                  (click)="startMiner()">
+                  <wa-icon name="play-circle" slot="prefix"></wa-icon>
+                  Start
+                </wa-button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Consolidated Chart for All Running Miners -->
+      @if (state().runningMiners.length > 0) {
+        <div class="dashboard-charts">
+          <snider-mining-chart></snider-mining-chart>
+        </div>
+      }
+
+    } @else {
+      <div class="centered-container">
+        <p>No miners installed. Open the Admin Panel to install one.</p>
+      </div>
+    }
+  }
+</div>
