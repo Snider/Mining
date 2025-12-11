@@ -17,12 +17,50 @@ export class ProfileListComponent {
 
   editingProfile: (MiningProfile & { config: any }) | null = null;
 
+  // --- Event Handlers for Custom Elements in Edit Form ---
+  onNameInput(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.name = (event.target as HTMLInputElement).value;
+    }
+  }
+
+  onMinerTypeChange(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.minerType = (event.target as HTMLSelectElement).value;
+    }
+  }
+
+  onPoolInput(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.config.pool = (event.target as HTMLInputElement).value;
+    }
+  }
+
+  onWalletInput(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.config.wallet = (event.target as HTMLInputElement).value;
+    }
+  }
+
+  onTlsChange(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.config.tls = (event.target as HTMLInputElement).checked;
+    }
+  }
+
+  onHugePagesChange(event: Event) {
+    if (this.editingProfile) {
+      this.editingProfile.config.hugePages = (event.target as HTMLInputElement).checked;
+    }
+  }
+
   deleteProfile(profileId: string) {
     this.minerService.deleteProfile(profileId).subscribe();
   }
 
   editProfile(profile: MiningProfile) {
-    this.editingProfile = { ...profile, config: { ...profile.config } };
+    // Create a deep copy to avoid mutating the original profile object during editing
+    this.editingProfile = JSON.parse(JSON.stringify(profile));
   }
 
   updateProfile() {

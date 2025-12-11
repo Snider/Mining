@@ -4,22 +4,51 @@
     <div class="profile-item">
       @if(editingProfile && editingProfile.id === profile.id) {
         <div class="profile-form">
-          <wa-input [(ngModel)]="editingProfile.name" label="Profile Name"></wa-input>
-          <wa-select [(ngModel)]="editingProfile.minerType" label="Miner Type">
+          <wa-input
+            label="Profile Name"
+            [value]="editingProfile.name"
+            (input)="onNameInput($event)">
+          </wa-input>
+          <wa-select
+            label="Miner Type"
+            [value]="editingProfile.minerType"
+            (change)="onMinerTypeChange($event)">
             @for(miner of state().manageableMiners; track miner.name) {
-              <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
+              <wa-option [value]="miner.name" [selected]="miner.name === editingProfile.minerType">
+                {{ miner.name }}
+              </wa-option>
             }
           </wa-select>
-          <wa-input [(ngModel)]="editingProfile.config.pool" label="Pool Address"></wa-input>
-          <wa-input [(ngModel)]="editingProfile.config.wallet" label="Wallet Address"></wa-input>
-          <wa-checkbox [(ngModel)]="editingProfile.config.tls">TLS</wa-checkbox>
-          <wa-checkbox [(ngModel)]="editingProfile.config.hugePages">Huge Pages</wa-checkbox>
-          <wa-button (click)="updateProfile()">Save</wa-button>
-          <wa-button variant="neutral" (click)="cancelEdit()">Cancel</wa-button>
+          <wa-input
+            label="Pool Address"
+            [value]="editingProfile.config.pool"
+            (input)="onPoolInput($event)">
+          </wa-input>
+          <wa-input
+            label="Wallet Address"
+            [value]="editingProfile.config.wallet"
+            (input)="onWalletInput($event)">
+          </wa-input>
+          <div class="checkbox-group">
+            <wa-checkbox
+              [checked]="editingProfile.config.tls"
+              (change)="onTlsChange($event)">
+              TLS
+            </wa-checkbox>
+            <wa-checkbox
+              [checked]="editingProfile.config.hugePages"
+              (change)="onHugePagesChange($event)">
+              Huge Pages
+            </wa-checkbox>
+          </div>
+          <div class="button-group">
+            <wa-button (click)="updateProfile()">Save</wa-button>
+            <wa-button variant="neutral" (click)="cancelEdit()">Cancel</wa-button>
+          </div>
         </div>
       } @else {
         <span>{{ profile.name }} ({{ profile.minerType }})</span>
-        <div>
+        <div class="button-group">
           <wa-button size="small" (click)="editProfile(profile)">Edit</wa-button>
           <wa-button size="small" variant="danger" (click)="deleteProfile(profile.id)">Delete</wa-button>
         </div>
