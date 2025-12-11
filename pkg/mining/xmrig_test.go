@@ -127,6 +127,7 @@ func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
 
 	miner := NewXMRigMiner()
 	miner.MinerBinary = dummyExePath
+	miner.API.ListenPort = 12345 // Set a port for testing
 
 	config := &Config{
 		Pool:   "test:1234",
@@ -177,14 +178,20 @@ func TestXMRigMiner_GetStats_Good(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		summary := XMRigSummary{
 			Hashrate: struct {
-				Total []float64 `json:"total"`
+				Total   []float64 `json:"total"`
+				Highest float64   `json:"highest"`
 			}{Total: []float64{123.45}},
 			Results: struct {
-				SharesGood  uint64 `json:"shares_good"`
-				SharesTotal uint64 `json:"shares_total"`
+				DiffCurrent int   `json:"diff_current"`
+				SharesGood  int   `json:"shares_good"`
+				SharesTotal int   `json:"shares_total"`
+				AvgTime     int   `json:"avg_time"`
+				AvgTimeMS   int   `json:"avg_time_ms"`
+				HashesTotal int   `json:"hashes_total"`
+				Best        []int `json:"best"`
 			}{SharesGood: 10, SharesTotal: 12},
-			Uptime:    600,
-			Algorithm: "rx/0",
+			Uptime: 600,
+			Algo:   "rx/0",
 		}
 		json.NewEncoder(w).Encode(summary)
 	}))
@@ -256,10 +263,10 @@ func TestXMRigMiner_HashrateHistory_Good(t *testing.T) {
 	miner.ReduceHashrateHistory(future)
 
 	// After reduction, high-res history should be smaller
-	if miner.GetHighResHistoryLength() >= 10 {
-		t.Errorf("High-res history not reduced, size: %d", miner.GetHighResHistoryLength())
+	if len(miner.HashrateHistory) >= 10 {
+		t.Errorf("High-res history not reduced, size: %d", len(miner.HashrateHistory))
 	}
-	if miner.GetLowResHistoryLength() == 0 {
+	if len(miner.LowResHashrateHistory) == 0 {
 		t.Error("Low-res history not populated")
 	}
 

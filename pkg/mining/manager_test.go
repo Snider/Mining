@@ -5,11 +5,33 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/adrg/xdg"
 )
 
 // setupTestManager creates a new Manager and a dummy executable for tests.
 // It also temporarily modifies the PATH to include the dummy executable's directory.
 func setupTestManager(t *testing.T) *Manager {
+	// Isolate config directory for this test
+	tempConfigDir := t.TempDir()
+
+	// Backup original xdg paths
+	origConfigHome := xdg.ConfigHome
+	origDataHome := xdg.DataHome
+	origConfigDirs := xdg.ConfigDirs
+
+	// Set new paths
+	xdg.ConfigHome = tempConfigDir
+	xdg.DataHome = tempConfigDir
+	xdg.ConfigDirs = []string{tempConfigDir}
+
+	// Restore on cleanup
+	t.Cleanup(func() {
+		xdg.ConfigHome = origConfigHome
+		xdg.DataHome = origDataHome
+		xdg.ConfigDirs = origConfigDirs
+	})
+
 	dummyDir := t.TempDir()
 	executableName := "xmrig"
 	if runtime.GOOS == "windows" {
@@ -36,7 +58,16 @@ func setupTestManager(t *testing.T) *Manager {
 	})
 	os.Setenv("PATH", dummyDir+string(os.PathListSeparator)+originalPath)
 
-	return NewManager()
+	m := NewManager()
+	// Clear any autostarted miners to ensure clean state
+	m.mu.Lock()
+	for name, miner := range m.miners {
+		_ = miner.Stop()
+		delete(m.miners, name)
+	}
+	m.mu.Unlock()
+
+	return m
 }
 
 // TestStartMiner tests the StartMiner function
@@ -46,6 +77,7 @@ func TestStartMiner_Good(t *testing.T) {
 
 	config := &Config{
 		HTTPPort: 9001, // Use a different port to avoid conflict
+		Algo:     "rx/0", // Use Algo to ensure deterministic naming for duplicate check
 		Pool:     "test:1234",
 		Wallet:   "testwallet",
 	}
@@ -86,6 +118,7 @@ func TestStartMiner_Ugly(t *testing.T) {
 
 	config := &Config{
 		HTTPPort: 9001, // Use a different port to avoid conflict
+		Algo:     "rx/0", // Use Algo to ensure deterministic naming for duplicate check
 		Pool:     "test:1234",
 		Wallet:   "testwallet",
 	}
