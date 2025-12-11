@@ -49,23 +49,27 @@
                 }
               </wa-button>
             } @else {
-              <div class="start-buttons">
-                <wa-select [value]="selectedProfileId()" (waSelect)="handleProfileSelection($event)">
-                  <span slot="label">Profile</span>
-                  @for(profile of state().profiles; track profile.id) {
-                    @if(profile.minerType === miner.type) {
-                      <wa-option [value]="profile.id">{{ profile.name }}</wa-option>
+              @if(miner.type) {
+                <div class="start-buttons">
+                  <wa-select
+                    [value]="selectedProfileIds().get(miner.type) ?? ''"
+                    (change)="handleProfileSelection(miner.type, $event)">
+                    <span slot="label">Profile</span>
+                    @for(profile of state().profiles; track profile.id) {
+                      @if(profile.minerType === miner.type) {
+                        <wa-option [value]="profile.id">{{ profile.name }}</wa-option>
+                      }
                     }
-                  }
-                </wa-select>
-                <wa-button
-                  variant="primary"
-                  [disabled]="!selectedProfileId() || actionInProgress()?.startsWith('start-')"
-                  (click)="startMiner()">
-                  <wa-icon name="play-circle" slot="prefix"></wa-icon>
-                  Start
-                </wa-button>
-              </div>
+                  </wa-select>
+                  <wa-button
+                    variant="primary"
+                    [disabled]="!selectedProfileIds().get(miner.type) || actionInProgress()?.startsWith('start-')"
+                    (click)="startMiner(miner.type)">
+                    <wa-icon name="play-circle" slot="prefix"></wa-icon>
+                    Start
+                  </wa-button>
+                </div>
+              }
             }
           </div>
         }

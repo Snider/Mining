@@ -33,11 +33,12 @@ export class MiningDashboardComponent {
   error = signal<string | null>(null);
 
   showProfileManager = signal(false);
-  selectedProfileId = signal<string | null>(null);
+  // Use a map to track the selected profile for each miner type
+  selectedProfileIds = signal<Map<string, string>>(new Map());
 
-  handleProfileSelection(event: any) {
-    // The value is in the detail property of the custom event
-    this.selectedProfileId.set(event.detail.value);
+  handleProfileSelection(minerType: string, event: Event) {
+    const selectedValue = (event.target as HTMLSelectElement).value;
+    this.selectedProfileIds.update(m => m.set(minerType, selectedValue));
   }
 
   private handleError(err: HttpErrorResponse, defaultMessage: string) {
@@ -52,8 +53,8 @@ export class MiningDashboardComponent {
     }
   }
 
-  startMiner(): void {
-    const profileId = this.selectedProfileId();
+  startMiner(minerType: string): void {
+    const profileId = this.selectedProfileIds().get(minerType);
     if (!profileId) {
       this.error.set('Please select a profile to start.');
       return;
