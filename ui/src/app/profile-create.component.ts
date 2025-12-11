@@ -40,6 +40,34 @@ export class ProfileCreateComponent {
   error: string | null = null;
   success: string | null = null;
 
+  // --- Event Handlers for Custom Elements ---
+  // By handling events here, we can safely cast the event target
+  // to the correct type, satisfying TypeScript's strict checking.
+
+  onNameInput(event: Event) {
+    this.model.name = (event.target as HTMLInputElement).value;
+  }
+
+  onMinerTypeChange(event: Event) {
+    this.model.minerType = (event.target as HTMLSelectElement).value;
+  }
+
+  onPoolInput(event: Event) {
+    this.model.config.pool = (event.target as HTMLInputElement).value;
+  }
+
+  onWalletInput(event: Event) {
+    this.model.config.wallet = (event.target as HTMLInputElement).value;
+  }
+
+  onTlsChange(event: Event) {
+    this.model.config.tls = (event.target as HTMLInputElement).checked;
+  }
+
+  onHugePagesChange(event: Event) {
+    this.model.config.hugePages = (event.target as HTMLInputElement).checked;
+  }
+
   createProfile() {
     this.error = null;
     this.success = null;

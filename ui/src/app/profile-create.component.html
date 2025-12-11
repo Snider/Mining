@@ -1,53 +1,109 @@
-<form class="wa-stack" id="profile-create-form">
+<!--
+  This file has been updated to correctly bind to Web Awesome/Shoelace custom element events
+  and includes styling to improve the form's layout.
+-->
+<style>
+  .profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem; /* Use a gap for consistent spacing */
+  }
+
+  fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border: 1px solid var(--wa-color-neutral-300);
+    border-radius: var(--wa-border-radius-medium);
+    padding: 1rem;
+  }
+
+  legend {
+    padding: 0 0.5rem;
+    font-weight: bold;
+    color: var(--wa-color-neutral-700);
+  }
+
+  /* Style for checkboxes to align them nicely */
+  .checkbox-group {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+</style>
+
+<form class="profile-form" id="profile-create-form" (submit)="createProfile(); $event.preventDefault()">
   <h5>Create New Profile</h5>
 
-  <!-- Error and success messages now use simple properties -->
   @if (error) {
-    <div class="card card-error">
+    <wa-card class="card-error">
       <p>{{ error }}</p>
-    </div>
+    </wa-card>
   }
   @if (success) {
-    <div class="card card-success">
+    <wa-card class="card-success">
       <p>{{ success }}</p>
-    </div>
+    </wa-card>
   }
 
-  <!-- Two-way data binding with [(ngModel)] -->
-  <div>
-    <label for="name">Profile Name</label>
-    <input id="name" name="name" [(ngModel)]="model.name" required>
-  </div>
+  <!--
+    We use standard (input) and (change) events.
+    These events bubble up from the custom elements (or are dispatched by them),
+    and event.target will refer to the custom element itself, allowing us to read 'value'.
+  -->
+  <wa-input
+    name="name"
+    label="Profile Name"
+    required
+    [value]="model.name"
+    (input)="onNameInput($event)">
+  </wa-input>
 
-  <div>
-    <label for="minerType">Miner Type</label>
-    <select id="minerType" name="minerType" [(ngModel)]="model.minerType" required>
-      @for(miner of state().manageableMiners; track miner.name) {
-        <option [value]="miner.name">{{ miner.name }}</option>
-      }
-    </select>
-  </div>
+  <wa-select
+    name="minerType"
+    label="Miner Type"
+    required
+    [value]="model.minerType"
+    (change)="onMinerTypeChange($event)">
+    @for(miner of state().manageableMiners; track miner.name) {
+      <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
+    }
+  </wa-select>
 
-  <!-- ngModelGroup to group related form controls into a nested object -->
   <fieldset name="config">
     <legend>Configuration</legend>
-    <div>
-      <label for="pool">Pool Address</label>
-      <input id="pool" name="pool" [(ngModel)]="model.config.pool" required>
-    </div>
-    <div>
-      <label for="wallet">Wallet Address</label>
-      <input id="wallet" name="wallet" [(ngModel)]="model.config.wallet" required>
-    </div>
-    <div>
-      <input class="" type="checkbox" id="tls" name="tls" [(ngModel)]="model.config.tls">
-      <label for="tls">TLS</label>
-    </div>
-    <div>
-      <input type="checkbox" id="hugePages" name="hugePages" [(ngModel)]="model.config.hugePages">
-      <label for="hugePages">Huge Pages</label>
+    <wa-input
+      name="pool"
+      label="Pool Address"
+      required
+      [value]="model.config.pool"
+      (input)="onPoolInput($event)">
+    </wa-input>
+
+    <wa-input
+      name="wallet"
+      label="Wallet Address"
+      required
+      [value]="model.config.wallet"
+      (input)="onWalletInput($event)">
+    </wa-input>
+
+    <div class="checkbox-group">
+      <wa-checkbox
+        name="tls"
+        [checked]="model.config.tls"
+        (change)="onTlsChange($event)">
+        TLS
+      </wa-checkbox>
+
+      <wa-checkbox
+        name="hugePages"
+        [checked]="model.config.hugePages"
+        (change)="onHugePagesChange($event)">
+        Huge Pages
+      </wa-checkbox>
     </div>
   </fieldset>
 
-  <button type="submit" (click)="createProfile()">Create Profile</button>
+  <wa-button type="submit">Create Profile</wa-button>
 </form>
