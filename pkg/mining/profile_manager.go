@@ -66,10 +66,8 @@ func (pm *ProfileManager) loadProfiles() error {
 }
 
 // saveProfiles writes the current profiles from memory to the JSON file.
+// This is an internal method and assumes the caller holds the appropriate lock.
 func (pm *ProfileManager) saveProfiles() error {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-
 	profileList := make([]*MiningProfile, 0, len(pm.profiles))
 	for _, p := range pm.profiles {
 		profileList = append(profileList, p)
