@@ -28,7 +28,7 @@ export class SniderMining {
   minerService = inject(MinerService);
   state = this.minerService.state;
 
-  checkSystemState() {
-    this.minerService.checkSystemState();
+  forceRefreshState() {
+    this.minerService.forceRefreshState();
   }
 }

@@ -1,9 +1,9 @@
 import { Injectable, OnDestroy, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { of, forkJoin, Subscription, interval } from 'rxjs';
-import { switchMap, catchError, map, startWith, tap } from 'rxjs/operators';
+import { switchMap, catchError, map, tap } from 'rxjs/operators';
 
-// Define interfaces
+// --- Interfaces ---
 export interface InstallationDetails {
   is_installed: boolean;
   version: string;
@@ -46,8 +46,9 @@ export interface SystemState {
 })
 export class MinerService implements OnDestroy {
   private apiBaseUrl = 'http://localhost:9090/api/v1/mining';
+  private pollingSubscription?: Subscription;
 
-  // State Signals
+  // --- State Signals ---
   public state = signal<SystemState>({
     needsSetup: false,
     apiAvailable: true,
@@ -59,178 +60,192 @@ export class MinerService implements OnDestroy {
     profiles: []
   });
 
+  // Separate signal for hashrate history as it updates frequently
   public hashrateHistory = signal<Map<string, HashratePoint[]>>(new Map());
 
-  // Computed signals for convenience (optional, but helpful for components)
+  // --- Computed Signals for easy access in components ---
   public runningMiners = computed(() => this.state().runningMiners);
   public installedMiners = computed(() => this.state().installedMiners);
   public apiAvailable = computed(() => this.state().apiAvailable);
   public profiles = computed(() => this.state().profiles);
 
-  private pollingSubscription: Subscription | undefined;
-
   constructor(private http: HttpClient) {
-    // Initial check
-    this.checkSystemState();
-    // Start polling for system state every 5 seconds for chart updates
-    this.pollingSubscription = interval(5000).subscribe(() => this.checkSystemState());
+    this.forceRefreshState();
+    this.startPollingLive_Data();
   }
 
   ngOnDestroy(): void {
-    if (this.pollingSubscription) {
-      this.pollingSubscription.unsubscribe();
-    }
+    this.stopPolling();
   }
 
-  checkSystemState() {
+  // --- Data Loading and Polling Logic ---
+
+  /**
+   * Loads all system data. Can be called to force a full refresh.
+   */
+  public forceRefreshState() {
     forkJoin({
       available: this.getAvailableMiners().pipe(catchError(() => of([]))),
       info: this.getSystemInfo().pipe(catchError(() => of({ installed_miners_info: [] }))),
-      running: this.getRunningMiners().pipe(catchError(() => of([]))), // This endpoint contains the history
+      running: this.getRunningMiners().pipe(catchError(() => of([]))),
       profiles: this.getProfiles().pipe(catchError(() => of([])))
     }).pipe(
-      map(({ available, info, running, profiles }) => {
-        const installedMap = new Map<string, InstallationDetails>();
-
-        (info.installed_miners_info || []).forEach((m: InstallationDetails) => {
-          if (m.is_installed) {
-            const type = this.getMinerType(m);
-            installedMap.set(type, { ...m, type });
-          }
-        });
-
-        running.forEach((miner: any) => {
-          const type = miner.name.split('-')[0];
-          if (!installedMap.has(type)) {
-            installedMap.set(type, {
-              is_installed: true,
-              version: 'unknown (running)',
-              path: 'unknown (running)',
-              miner_binary: 'unknown (running)',
-              type: type,
-            } as InstallationDetails);
-          }
-        });
-
-        const allInstalledMiners = Array.from(installedMap.values());
-
-        // Populate hashrate history directly from the running miners data
-        const newHistory = new Map<string, HashratePoint[]>();
-        running.forEach((miner: any) => {
-          if (miner.hashrateHistory) {
-            newHistory.set(miner.name, miner.hashrateHistory);
-          }
-        });
-        this.hashrateHistory.set(newHistory);
-
-        if (allInstalledMiners.length === 0) {
-          this.state.set({
-            needsSetup: true,
-            apiAvailable: true,
-            error: null,
-            systemInfo: info,
-            manageableMiners: available.map(availMiner => ({ ...availMiner, is_installed: false })),
-            installedMiners: [],
-            runningMiners: [],
-            profiles: profiles
-          });
-          return;
-        }
-
-        const manageableMiners = available.map(availMiner => ({
-          ...availMiner,
-          is_installed: installedMap.has(availMiner.name),
-        }));
-
-        this.state.set({
-          needsSetup: false,
-          apiAvailable: true,
-          error: null,
-          systemInfo: info,
-          manageableMiners,
-          installedMiners: allInstalledMiners,
-          runningMiners: running,
-          profiles: profiles
-        });
-      }),
-      catchError(err => {
-        console.error('API not available or needs setup:', err);
-        this.hashrateHistory.set(new Map()); // Clear history on error
-        this.state.set({
-          needsSetup: false,
-          apiAvailable: false,
-          error: 'Failed to connect to the mining API.',
-          systemInfo: {},
-          manageableMiners: [],
-          installedMiners: [],
-          runningMiners: [],
-          profiles: []
-        });
-        return of(null);
-      })
-    ).subscribe();
+      map(({ available, info, running, profiles }) => this.processSystemState(available, info, running, profiles)),
+      catchError(err => this.handleApiError(err))
+    ).subscribe(initialState => {
+      if (initialState) {
+        this.state.set(initialState);
+        this.updateHashrateHistory(initialState.runningMiners);
+      }
+    });
   }
 
-  getAvailableMiners() {
-    return this.http.get<AvailableMiner[]>(`${this.apiBaseUrl}/miners/available`);
+  /**
+   * Starts a polling interval to fetch only live data (running miners and hashrates).
+   */
+  private startPollingLive_Data() {
+    this.pollingSubscription = interval(5000).pipe(
+      switchMap(() => this.getRunningMiners().pipe(catchError(() => of([]))))
+    ).subscribe(runningMiners => {
+      this.state.update(s => ({ ...s, runningMiners }));
+      this.updateHashrateHistory(runningMiners);
+    });
   }
 
-  getSystemInfo() {
-    return this.http.get<any>(`${this.apiBaseUrl}/info`);
+  private stopPolling() {
+    this.pollingSubscription?.unsubscribe();
   }
 
-  getRunningMiners() {
-    return this.http.get<any[]>(`${this.apiBaseUrl}/miners`);
+  /**
+   * Refreshes only the list of profiles. Called after create, update, or delete.
+   */
+  private refreshProfiles() {
+    this.getProfiles().pipe(catchError(() => of(this.state().profiles))).subscribe(profiles => {
+      this.state.update(s => ({ ...s, profiles }));
+    });
   }
 
-  getMinerHashrateHistory(minerName: string) {
-    return this.http.get<HashratePoint[]>(`${this.apiBaseUrl}/miners/${minerName}/hashrate-history`);
+  /**
+   * Refreshes system information, typically after installing or uninstalling a miner.
+   */
+  private refreshSystemInfo() {
+    forkJoin({
+      available: this.getAvailableMiners().pipe(catchError(() => of([]))),
+      info: this.getSystemInfo().pipe(catchError(() => of({ installed_miners_info: [] })))
+    }).subscribe(({ available, info }) => {
+      const { manageableMiners, installedMiners: allInstalledMiners } = this.processStaticMinerInfo(available, info);
+      this.state.update(s => ({ ...s, manageableMiners, installedMiners: allInstalledMiners, systemInfo: info }));
+    });
   }
+
+  // --- Public API Methods for Components ---
 
   installMiner(minerType: string) {
     return this.http.post(`${this.apiBaseUrl}/miners/${minerType}/install`, {}).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      tap(() => setTimeout(() => this.refreshSystemInfo(), 1000))
     );
   }
 
   uninstallMiner(minerType: string) {
     return this.http.delete(`${this.apiBaseUrl}/miners/${minerType}/uninstall`).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      tap(() => setTimeout(() => this.refreshSystemInfo(), 1000))
     );
   }
 
   startMiner(profileId: string) {
     return this.http.post(`${this.apiBaseUrl}/profiles/${profileId}/start`, {}).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      // An immediate poll for running miners will be triggered by the interval soon enough
     );
   }
 
   stopMiner(minerName: string) {
     return this.http.delete(`${this.apiBaseUrl}/miners/${minerName}`).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      // An immediate poll for running miners will be triggered by the interval soon enough
     );
-  }
-
-  getProfiles() {
-    return this.http.get<MiningProfile[]>(`${this.apiBaseUrl}/profiles`);
   }
 
   createProfile(profile: MiningProfile) {
     return this.http.post(`${this.apiBaseUrl}/profiles`, profile).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      tap(() => this.refreshProfiles())
     );
   }
 
   updateProfile(profile: MiningProfile) {
     return this.http.put(`${this.apiBaseUrl}/profiles/${profile.id}`, profile).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      tap(() => this.refreshProfiles())
     );
   }
 
   deleteProfile(profileId: string) {
     return this.http.delete(`${this.apiBaseUrl}/profiles/${profileId}`).pipe(
-      tap(() => setTimeout(() => this.checkSystemState(), 1000))
+      tap(() => this.refreshProfiles())
     );
+  }
+
+  // --- Private Endpoints and Helpers ---
+
+  private getAvailableMiners = () => this.http.get<AvailableMiner[]>(`${this.apiBaseUrl}/miners/available`);
+  private getSystemInfo = () => this.http.get<any>(`${this.apiBaseUrl}/info`);
+  private getRunningMiners = () => this.http.get<any[]>(`${this.apiBaseUrl}/miners`);
+  private getProfiles = () => this.http.get<MiningProfile[]>(`${this.apiBaseUrl}/profiles`);
+
+  private updateHashrateHistory(runningMiners: any[]) {
+    const newHistory = new Map<string, HashratePoint[]>();
+    runningMiners.forEach(miner => {
+      if (miner.hashrateHistory) {
+        newHistory.set(miner.name, miner.hashrateHistory);
+      }
+    });
+    this.hashrateHistory.set(newHistory);
+  }
+
+  private processStaticMinerInfo(available: AvailableMiner[], info: any) {
+    const installedMap = new Map<string, InstallationDetails>();
+    (info.installed_miners_info || []).forEach((m: InstallationDetails) => {
+      if (m.is_installed) {
+        const type = this.getMinerType(m);
+        installedMap.set(type, { ...m, type });
+      }
+    });
+
+    const allInstalledMiners = Array.from(installedMap.values());
+    const manageableMiners = available.map(availMiner => ({
+      ...availMiner,
+      is_installed: installedMap.has(availMiner.name),
+    }));
+
+    return { manageableMiners, installedMiners: allInstalledMiners };
+  }
+
+  private processSystemState(available: AvailableMiner[], info: any, running: any[], profiles: MiningProfile[]): SystemState {
+    const { manageableMiners, installedMiners } = this.processStaticMinerInfo(available, info);
+
+    return {
+      needsSetup: installedMiners.length === 0,
+      apiAvailable: true,
+      error: null,
+      systemInfo: info,
+      manageableMiners,
+      installedMiners,
+      runningMiners: running,
+      profiles
+    };
+  }
+
+  private handleApiError(err: any) {
+    console.error('API not available or needs setup:', err);
+    this.hashrateHistory.set(new Map()); // Clear history on error
+    this.state.set({
+      needsSetup: false,
+      apiAvailable: false,
+      error: 'Failed to connect to the mining API.',
+      systemInfo: {},
+      manageableMiners: [],
+      installedMiners: [],
+      runningMiners: [],
+      profiles: []
+    });
+    return of(null);
   }
 
   private getMinerType(miner: any): string {

@@ -7,7 +7,7 @@
     } @else if (!state().apiAvailable) {
       <div class="centered-container">
           <p>API Not Available. Please ensure the mining service is running.</p>
-          <wa-button (click)="checkSystemState()">
+          <wa-button (click)="forceRefreshState()">
               <wa-icon name="arrow-clockwise" slot="prefix"></wa-icon>
               Retry
           </wa-button>
