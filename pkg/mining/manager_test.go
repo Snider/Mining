@@ -40,11 +40,12 @@ func setupTestManager(t *testing.T) *Manager {
 	dummyPath := filepath.Join(dummyDir, executableName)
 
 	// Create a script that does nothing but exit, to simulate the miner executable
+	// Add a delay to ensure it stays running long enough for tests to check status
 	var script []byte
 	if runtime.GOOS == "windows" {
-		script = []byte("@echo off\r\nexit 0")
+		script = []byte("@echo off\r\nping 127.0.0.1 -n 2 > nul\r\nexit 0")
 	} else {
-		script = []byte("#!/bin/sh\nexit 0")
+		script = []byte("#!/bin/sh\nsleep 1\nexit 0")
 	}
 
 	if err := os.WriteFile(dummyPath, script, 0755); err != nil {

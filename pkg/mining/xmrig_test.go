@@ -114,13 +114,13 @@ func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
 	dummyExePath := filepath.Join(tmpDir, "xmrig")
 	if runtime.GOOS == "windows" {
 		dummyExePath += ".bat"
-		// Create a dummy batch file for Windows
-		if err := os.WriteFile(dummyExePath, []byte("@echo off\n"), 0755); err != nil {
+		// Create a dummy batch file for Windows with a delay to simulate a running process
+		if err := os.WriteFile(dummyExePath, []byte("@echo off\nping 127.0.0.1 -n 2 > nul\nexit 0"), 0755); err != nil {
 			t.Fatalf("failed to create dummy executable: %v", err)
 		}
 	} else {
-		// Create a dummy shell script for other OSes
-		if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		// Create a dummy shell script for other OSes with a delay
+		if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\nsleep 1\nexit 0"), 0755); err != nil {
 			t.Fatalf("failed to create dummy executable: %v", err)
 		}
 	}
@@ -138,7 +138,12 @@ func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start() returned an error: %v", err)
 	}
-	if !miner.Running {
+
+	miner.mu.RLock()
+	isRunning := miner.Running
+	miner.mu.RUnlock()
+
+	if !isRunning {
 		t.Fatal("Miner is not running after Start()")
 	}
 
