@@ -147,8 +147,11 @@ func TestStopMiner_Good(t *testing.T) {
 	}
 
 	// Case 1: Stop a running miner
-	miner, _ := m.StartMiner("xmrig", config)
-	err := m.StopMiner(miner.GetName())
+	miner, err := m.StartMiner("xmrig", config)
+	if err != nil {
+		t.Fatalf("Failed to start miner: %v", err)
+	}
+	err = m.StopMiner(miner.GetName())
 	if err != nil {
 		t.Fatalf("Expected to stop miner, but got error: %v", err)
 	}
@@ -180,7 +183,10 @@ func TestGetMiner_Good(t *testing.T) {
 	}
 
 	// Case 1: Get an existing miner
-	startedMiner, _ := m.StartMiner("xmrig", config)
+	startedMiner, err := m.StartMiner("xmrig", config)
+	if err != nil {
+		t.Fatalf("Failed to start miner: %v", err)
+	}
 	retrievedMiner, err := m.GetMiner(startedMiner.GetName())
 	if err != nil {
 		t.Fatalf("Expected to get miner, but got error: %v", err)
