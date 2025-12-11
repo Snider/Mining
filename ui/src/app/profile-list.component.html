@@ -49,6 +49,7 @@
       } @else {
         <span>{{ profile.name }} ({{ profile.minerType }})</span>
         <div class="button-group">
+          <wa-button size="small" variant="primary" (click)="startMiner(profile.id)">Start</wa-button>
           <wa-button size="small" (click)="editProfile(profile)">Edit</wa-button>
           <wa-button size="small" variant="danger" (click)="deleteProfile(profile.id)">Delete</wa-button>
         </div>

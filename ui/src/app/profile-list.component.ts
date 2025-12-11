@@ -54,6 +54,10 @@ export class ProfileListComponent {
     }
   }
 
+  startMiner(profileId: string) {
+    this.minerService.startMiner(profileId).subscribe();
+  }
+
   deleteProfile(profileId: string) {
     this.minerService.deleteProfile(profileId).subscribe();
   }
