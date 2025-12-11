@@ -1,39 +1,53 @@
-<!--
-  Using ngForm and ngSubmit for a template-driven approach.
-  The form's state is now managed through the 'model' object in the component.
--->
-<form class="profile-form" #profileForm="ngForm" (ngSubmit)="createProfile()">
+<form class="wa-stack" id="profile-create-form">
   <h5>Create New Profile</h5>
 
   <!-- Error and success messages now use simple properties -->
   @if (error) {
-    <wa-card class="card-error">
+    <div class="card card-error">
       <p>{{ error }}</p>
-    </wa-card>
+    </div>
   }
   @if (success) {
-    <wa-card class="card-success">
+    <div class="card card-success">
       <p>{{ success }}</p>
-    </wa-card>
+    </div>
   }
 
   <!-- Two-way data binding with [(ngModel)] -->
-  <wa-input name="name" label="Profile Name" [(ngModel)]="model.name" required></wa-input>
+  <div>
+    <label for="name">Profile Name</label>
+    <input id="name" name="name" [(ngModel)]="model.name" required>
+  </div>
 
-  <wa-select name="minerType" label="Miner Type" [(ngModel)]="model.minerType" required>
-    @for(miner of state().manageableMiners; track miner.name) {
-      <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
-    }
-  </wa-select>
+  <div>
+    <label for="minerType">Miner Type</label>
+    <select id="minerType" name="minerType" [(ngModel)]="model.minerType" required>
+      @for(miner of state().manageableMiners; track miner.name) {
+        <option [value]="miner.name">{{ miner.name }}</option>
+      }
+    </select>
+  </div>
 
   <!-- ngModelGroup to group related form controls into a nested object -->
-  <fieldset ngModelGroup="config">
+  <fieldset name="config">
     <legend>Configuration</legend>
-    <wa-input name="pool" label="Pool Address" [(ngModel)]="model.config.pool" required></wa-input>
-    <wa-input name="wallet" label="Wallet Address" [(ngModel)]="model.config.wallet" required></wa-input>
-    <wa-checkbox name="tls" [(ngModel)]="model.config.tls">TLS</wa-checkbox>
-    <wa-checkbox name="hugePages" [(ngModel)]="model.config.hugePages">Huge Pages</wa-checkbox>
+    <div>
+      <label for="pool">Pool Address</label>
+      <input id="pool" name="pool" [(ngModel)]="model.config.pool" required>
+    </div>
+    <div>
+      <label for="wallet">Wallet Address</label>
+      <input id="wallet" name="wallet" [(ngModel)]="model.config.wallet" required>
+    </div>
+    <div>
+      <input class="" type="checkbox" id="tls" name="tls" [(ngModel)]="model.config.tls">
+      <label for="tls">TLS</label>
+    </div>
+    <div>
+      <input type="checkbox" id="hugePages" name="hugePages" [(ngModel)]="model.config.hugePages">
+      <label for="hugePages">Huge Pages</label>
+    </div>
   </fieldset>
 
-  <wa-button type="submit">Create Profile</wa-button>
+  <button type="submit" (click)="createProfile()">Create Profile</button>
 </form>

@@ -17,8 +17,7 @@ import '@awesome.me/webawesome/dist/components/card/card.js';
   standalone: true,
   imports: [CommonModule, FormsModule],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  templateUrl: './profile-create.component.html',
-  styleUrls: ['./profile-create.component.css']
+  templateUrl: './profile-create.component.html'
 })
 export class ProfileCreateComponent {
   minerService = inject(MinerService);
