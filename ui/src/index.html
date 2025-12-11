@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="utf-8">
   <title>Snider Mining</title>
@@ -8,10 +8,10 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-100 text-gray-800 h-full">
   <div class="flex flex-col h-screen">
     <!-- Top Bar -->
-    <header class="flex items-center justify-between h-16 px-6 bg-white border-b">
+    <header class="flex items-center justify-between h-16 px-6 bg-white border-b flex-shrink-0">
       <div>
         <h2 class="text-xl font-semibold">Mining Dashboard (Dev View)</h2>
       </div>
@@ -22,10 +22,23 @@
 
     <!-- Main Content Area -->
     <main class="flex-1 p-6 overflow-y-auto">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div class="bg-white shadow-md rounded-lg p-4">
-          <snider-mining-dashboard></snider-mining-dashboard>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-full">
+        <!-- Wide Dashboard Instance -->
+        <div class="bg-white shadow-md rounded-lg p-4 lg:col-span-2 flex flex-col">
+          <h3 class="font-bold mb-2 flex-shrink-0">Wide Dashboard</h3>
+          <div class="flex-grow">
+            <snider-mining-dashboard></snider-mining-dashboard>
+          </div>
         </div>
+
+        <!-- Standard Dashboard Instance -->
+        <div class="bg-white shadow-md rounded-lg p-4 flex flex-col">
+          <h3 class="font-bold mb-2 flex-shrink-0">Standard Dashboard</h3>
+          <div class="flex-grow">
+            <snider-mining-dashboard></snider-mining-dashboard>
+          </div>
+        </div>
+
         <div class="bg-white shadow-md rounded-lg p-4">
           <snider-mining-admin></snider-mining-admin>
         </div>
@@ -36,9 +49,6 @@
           <snider-mining-setup-wizard></snider-mining-setup-wizard>
         </div>
         <div class="bg-white shadow-md rounded-lg p-4">
-          <snider-mining-chart></snider-mining-chart>
-        </div>
-        <div class="bg-white shadow-md rounded-lg p-4">
           <snider-mining-profile-list></snider-mining-profile-list>
         </div>
 
@@ -46,7 +56,7 @@
     </main>
 
     <!-- Sticky Footer -->
-    <footer class="h-12 px-6 bg-white border-t flex items-center">
+    <footer class="h-12 px-6 bg-white border-t flex items-center flex-shrink-0">
       <p class="text-sm text-gray-600">&copy; 2025 Snider. All rights reserved.</p>
     </footer>
   </div>

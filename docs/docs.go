@@ -66,7 +66,7 @@ const docTemplate = `{
         },
         "/miners": {
             "get": {
-                "description": "Get a list of all running miners",
+                "description": "Get a list of all running miners, including their full stats.",
                 "produces": [
                     "application/json"
                 ],
@@ -79,9 +79,7 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/mining.XMRigMiner"
-                            }
+                            "items": {}
                         }
                     }
                 }

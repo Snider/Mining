@@ -9,11 +9,22 @@
     </wa-card>
   }
 
-  <!-- Consolidated Chart for All Running Miners -->
   @if (state().runningMiners.length > 0) {
-    <div class="dashboard-charts">
-      <snider-mining-stats-bar [stats]="state().runningMiners[0]?.full_stats"></snider-mining-stats-bar>
-      <snider-mining-chart></snider-mining-chart>
+    <div class="dashboard-content">
+      <!-- Stats Bar for small containers -->
+      <div class="stats-bar-container">
+        <snider-mining-stats-bar [stats]="state().runningMiners[0]?.full_stats" mode="bar"></snider-mining-stats-bar>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-container">
+        <snider-mining-chart></snider-mining-chart>
+      </div>
+
+      <!-- Stats List for large containers -->
+      <div class="stats-list-container">
+        <snider-mining-stats-bar [stats]="state().runningMiners[0]?.full_stats" mode="list"></snider-mining-stats-bar>
+      </div>
     </div>
   } @else {
     <div class="centered-container">

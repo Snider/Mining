@@ -318,15 +318,14 @@ paths:
       - system
   /miners:
     get:
-      description: Get a list of all running miners
+      description: Get a list of all running miners, including their full stats.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/mining.XMRigMiner'
+            items: {}
             type: array
       summary: List all running miners
       tags:
