@@ -34,6 +34,9 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 		return nil, err
 	}
 
+	// Store the full summary in the miner struct
+	m.FullStats = &summary
+
 	var hashrate int
 	if len(summary.Hashrate.Total) > 0 {
 		hashrate = int(summary.Hashrate.Total[0])
@@ -41,9 +44,9 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 
 	return &PerformanceMetrics{
 		Hashrate:  hashrate,
-		Shares:    int(summary.Results.SharesGood),
-		Rejected:  int(summary.Results.SharesTotal - summary.Results.SharesGood),
-		Uptime:    int(summary.Uptime),
-		Algorithm: summary.Algorithm,
+		Shares:    summary.Results.SharesGood,
+		Rejected:  summary.Results.SharesTotal - summary.Results.SharesGood,
+		Uptime:    summary.Uptime,
+		Algorithm: summary.Algo,
 	}, nil
 }

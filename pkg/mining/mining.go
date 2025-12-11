@@ -139,17 +139,82 @@ type API struct {
 	ListenPort int    `json:"listenPort"`
 }
 
-// XMRigSummary represents the summary of an XMRig miner's performance.
+// XMRigSummary represents the full JSON response from the XMRig API.
 type XMRigSummary struct {
-	Hashrate struct {
-		Total []float64 `json:"total"`
-	} `json:"hashrate"`
-	Results struct {
-		SharesGood  uint64 `json:"shares_good"`
-		SharesTotal uint64 `json:"shares_total"`
+	ID         string `json:"id"`
+	WorkerID   string `json:"worker_id"`
+	Uptime     int    `json:"uptime"`
+	Restricted bool   `json:"restricted"`
+	Resources  struct {
+		Memory struct {
+			Free              int64 `json:"free"`
+			Total             int64 `json:"total"`
+			ResidentSetMemory int64 `json:"resident_set_memory"`
+		} `json:"memory"`
+		LoadAverage         []float64 `json:"load_average"`
+		HardwareConcurrency int       `json:"hardware_concurrency"`
+	} `json:"resources"`
+	Features []string `json:"features"`
+	Results  struct {
+		DiffCurrent int   `json:"diff_current"`
+		SharesGood  int   `json:"shares_good"`
+		SharesTotal int   `json:"shares_total"`
+		AvgTime     int   `json:"avg_time"`
+		AvgTimeMS   int   `json:"avg_time_ms"`
+		HashesTotal int   `json:"hashes_total"`
+		Best        []int `json:"best"`
 	} `json:"results"`
-	Uptime    uint64 `json:"uptime"`
-	Algorithm string `json:"algorithm"`
+	Algo       string `json:"algo"`
+	Connection struct {
+		Pool           string `json:"pool"`
+		IP             string `json:"ip"`
+		Uptime         int    `json:"uptime"`
+		UptimeMS       int    `json:"uptime_ms"`
+		Ping           int    `json:"ping"`
+		Failures       int    `json:"failures"`
+		TLS            string `json:"tls"`
+		TLSFingerprint string `json:"tls-fingerprint"`
+		Algo           string `json:"algo"`
+		Diff           int    `json:"diff"`
+		Accepted       int    `json:"accepted"`
+		Rejected       int    `json:"rejected"`
+		AvgTime        int    `json:"avg_time"`
+		AvgTimeMS      int    `json:"avg_time_ms"`
+		HashesTotal    int    `json:"hashes_total"`
+	} `json:"connection"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+	UA      string `json:"ua"`
+	CPU     struct {
+		Brand    string   `json:"brand"`
+		Family   int      `json:"family"`
+		Model    int      `json:"model"`
+		Stepping int      `json:"stepping"`
+		ProcInfo int      `json:"proc_info"`
+		AES      bool     `json:"aes"`
+		AVX2     bool     `json:"avx2"`
+		X64      bool     `json:"x64"`
+		Is64Bit  bool     `json:"64_bit"`
+		L2       int      `json:"l2"`
+		L3       int      `json:"l3"`
+		Cores    int      `json:"cores"`
+		Threads  int      `json:"threads"`
+		Packages int      `json:"packages"`
+		Nodes    int      `json:"nodes"`
+		Backend  string   `json:"backend"`
+		MSR      string   `json:"msr"`
+		Assembly string   `json:"assembly"`
+		Arch     string   `json:"arch"`
+		Flags    []string `json:"flags"`
+	} `json:"cpu"`
+	DonateLevel int      `json:"donate_level"`
+	Paused      bool     `json:"paused"`
+	Algorithms  []string `json:"algorithms"`
+	Hashrate    struct {
+		Total   []float64 `json:"total"`
+		Highest float64   `json:"highest"`
+	} `json:"hashrate"`
+	Hugepages []int `json:"hugepages"`
 }
 
 // AvailableMiner represents a miner that is available for use.

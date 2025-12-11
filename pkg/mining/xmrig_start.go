@@ -100,6 +100,7 @@ func addCliArgs(config *Config, args *[]string) {
 	if config.TLS {
 		*args = append(*args, "--tls")
 	}
+	*args = append(*args, "--donate-level", "1")
 }
 
 // createConfig creates a JSON configuration file for the XMRig miner.

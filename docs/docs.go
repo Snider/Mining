@@ -615,6 +615,9 @@ const docTemplate = `{
                 "configPath": {
                     "type": "string"
                 },
+                "full_stats": {
+                    "$ref": "#/definitions/mining.XMRigSummary"
+                },
                 "hashrateHistory": {
                     "type": "array",
                     "items": {
@@ -643,6 +646,248 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "mining.XMRigSummary": {
+            "type": "object",
+            "properties": {
+                "algo": {
+                    "type": "string"
+                },
+                "algorithms": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "connection": {
+                    "type": "object",
+                    "properties": {
+                        "accepted": {
+                            "type": "integer"
+                        },
+                        "algo": {
+                            "type": "string"
+                        },
+                        "avg_time": {
+                            "type": "integer"
+                        },
+                        "avg_time_ms": {
+                            "type": "integer"
+                        },
+                        "diff": {
+                            "type": "integer"
+                        },
+                        "failures": {
+                            "type": "integer"
+                        },
+                        "hashes_total": {
+                            "type": "integer"
+                        },
+                        "ip": {
+                            "type": "string"
+                        },
+                        "ping": {
+                            "type": "integer"
+                        },
+                        "pool": {
+                            "type": "string"
+                        },
+                        "rejected": {
+                            "type": "integer"
+                        },
+                        "tls": {
+                            "type": "string"
+                        },
+                        "tls-fingerprint": {
+                            "type": "string"
+                        },
+                        "uptime": {
+                            "type": "integer"
+                        },
+                        "uptime_ms": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "cpu": {
+                    "type": "object",
+                    "properties": {
+                        "64_bit": {
+                            "type": "boolean"
+                        },
+                        "aes": {
+                            "type": "boolean"
+                        },
+                        "arch": {
+                            "type": "string"
+                        },
+                        "assembly": {
+                            "type": "string"
+                        },
+                        "avx2": {
+                            "type": "boolean"
+                        },
+                        "backend": {
+                            "type": "string"
+                        },
+                        "brand": {
+                            "type": "string"
+                        },
+                        "cores": {
+                            "type": "integer"
+                        },
+                        "family": {
+                            "type": "integer"
+                        },
+                        "flags": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "l2": {
+                            "type": "integer"
+                        },
+                        "l3": {
+                            "type": "integer"
+                        },
+                        "model": {
+                            "type": "integer"
+                        },
+                        "msr": {
+                            "type": "string"
+                        },
+                        "nodes": {
+                            "type": "integer"
+                        },
+                        "packages": {
+                            "type": "integer"
+                        },
+                        "proc_info": {
+                            "type": "integer"
+                        },
+                        "stepping": {
+                            "type": "integer"
+                        },
+                        "threads": {
+                            "type": "integer"
+                        },
+                        "x64": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "donate_level": {
+                    "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "hashrate": {
+                    "type": "object",
+                    "properties": {
+                        "highest": {
+                            "type": "number"
+                        },
+                        "total": {
+                            "type": "array",
+                            "items": {
+                                "type": "number"
+                            }
+                        }
+                    }
+                },
+                "hugepages": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "resources": {
+                    "type": "object",
+                    "properties": {
+                        "hardware_concurrency": {
+                            "type": "integer"
+                        },
+                        "load_average": {
+                            "type": "array",
+                            "items": {
+                                "type": "number"
+                            }
+                        },
+                        "memory": {
+                            "type": "object",
+                            "properties": {
+                                "free": {
+                                    "type": "integer"
+                                },
+                                "resident_set_memory": {
+                                    "type": "integer"
+                                },
+                                "total": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                },
+                "restricted": {
+                    "type": "boolean"
+                },
+                "results": {
+                    "type": "object",
+                    "properties": {
+                        "avg_time": {
+                            "type": "integer"
+                        },
+                        "avg_time_ms": {
+                            "type": "integer"
+                        },
+                        "best": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        },
+                        "diff_current": {
+                            "type": "integer"
+                        },
+                        "hashes_total": {
+                            "type": "integer"
+                        },
+                        "shares_good": {
+                            "type": "integer"
+                        },
+                        "shares_total": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "ua": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "worker_id": {
                     "type": "string"
                 }
             }

@@ -6,6 +6,7 @@ import { MinerService } from './miner.service';
 import { ChartComponent } from './chart.component';
 import { ProfileListComponent } from './profile-list.component';
 import { ProfileCreateComponent } from './profile-create.component';
+import { StatsBarComponent } from './stats-bar.component';
 
 // Import Web Awesome components
 import "@awesome.me/webawesome/dist/webawesome.js";
@@ -21,7 +22,7 @@ import '@awesome.me/webawesome/dist/components/select/select.js';
   selector: 'snider-mining-dashboard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [CommonModule, FormsModule, ChartComponent, ProfileListComponent, ProfileCreateComponent],
+  imports: [CommonModule, FormsModule, ChartComponent, ProfileListComponent, ProfileCreateComponent, StatsBarComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
