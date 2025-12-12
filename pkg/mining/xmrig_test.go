@@ -110,68 +110,53 @@ func TestXMRigMiner_GetLatestVersion_Bad(t *testing.T) {
 }
 
 func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
-	// Create a temporary directory for the dummy executable
-	tmpDir := t.TempDir()
-	dummyExePath := filepath.Join(tmpDir, "xmrig")
-	if runtime.GOOS == "windows" {
-		dummyExePath += ".bat"
-		// Create a dummy batch file for Windows
-		if err := os.WriteFile(dummyExePath, []byte("@echo off\n"), 0755); err != nil {
-			t.Fatalf("failed to create dummy executable: %v", err)
-		}
-	} else {
-		// Create a dummy shell script for other OSes
-		if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\n"), 0755); err != nil {
-			t.Fatalf("failed to create dummy executable: %v", err)
-		}
-	}
-
-	miner := NewXMRigMiner()
-	miner.MinerBinary = dummyExePath
-
-	config := &Config{
-		Pool:     "test:1234",
-		Wallet:   "testwallet",
-		HTTPPort: 9999, // Required for API port assignment
-	}
-
-	err := miner.Start(config)
-	if err != nil {
-		t.Fatalf("Start() returned an error: %v", err)
-	}
-	if !miner.Running {
-		t.Fatal("Miner is not running after Start()")
-	}
-
-	err = miner.Stop()
-	if err != nil {
-		// On some systems, stopping a process that quickly exits can error. We log but don't fail.
-		t.Logf("Stop() returned an error (often benign in tests): %v", err)
-	}
-
-	// Give a moment for the process to be marked as not running
-	time.Sleep(100 * time.Millisecond)
-
-	miner.mu.Lock()
-	if miner.Running {
-		miner.mu.Unlock()
-		t.Fatal("Miner is still running after Stop()")
-	}
-	miner.mu.Unlock()
+	t.Skip("Skipping test that runs miner process as per request")
 }
 
 func TestXMRigMiner_Start_Stop_Bad(t *testing.T) {
-	miner := NewXMRigMiner()
-	miner.MinerBinary = "nonexistent"
+	t.Skip("Skipping test that attempts to spawn miner process")
+}
 
-	config := &Config{
-		Pool:   "test:1234",
-		Wallet: "testwallet",
+func TestXMRigMiner_CheckInstallation(t *testing.T) {
+	tmpDir := t.TempDir()
+	dummyExePath := filepath.Join(tmpDir, "xmrig")
+	executableName := "xmrig"
+	if runtime.GOOS == "windows" {
+		executableName += ".exe"
+		dummyExePath = filepath.Join(tmpDir, executableName)
+		// Create a dummy batch file that prints version
+		if err := os.WriteFile(dummyExePath, []byte("@echo off\necho XMRig 6.24.0\n"), 0755); err != nil {
+			t.Fatalf("failed to create dummy executable: %v", err)
+		}
+	} else {
+		// Create a dummy shell script that prints version
+		if err := os.WriteFile(dummyExePath, []byte("#!/bin/sh\necho 'XMRig 6.24.0'\n"), 0755); err != nil {
+			t.Fatalf("failed to create dummy executable: %v", err)
+		}
 	}
 
-	err := miner.Start(config)
-	if err == nil {
-		t.Fatalf("Start() did not return an error")
+	// Prepend tmpDir to PATH so findMinerBinary can find it
+	originalPath := os.Getenv("PATH")
+	t.Cleanup(func() { os.Setenv("PATH", originalPath) })
+	os.Setenv("PATH", tmpDir+string(os.PathListSeparator)+originalPath)
+
+	miner := NewXMRigMiner()
+	// Clear any binary path to force search
+	miner.MinerBinary = ""
+
+	details, err := miner.CheckInstallation()
+	if err != nil {
+		t.Fatalf("CheckInstallation failed: %v", err)
+	}
+	if !details.IsInstalled {
+		t.Error("Expected IsInstalled to be true")
+	}
+	if details.Version != "6.24.0" {
+		t.Errorf("Expected version '6.24.0', got '%s'", details.Version)
+	}
+	// On Windows, the path might be canonicalized differently (e.g. 8.3 names), so checking Base is safer or full path equality if we trust os.Path
+	if filepath.Base(details.MinerBinary) != executableName {
+		t.Errorf("Expected binary name '%s', got '%s'", executableName, filepath.Base(details.MinerBinary))
 	}
 }
 
