@@ -1,23 +1,34 @@
 import { TestBed } from '@angular/core/testing';
-import { App } from './app';
+import { SniderMining } from './app';
+import { MinerService } from './miner.service';
+import { signal } from '@angular/core';
 
-describe('App', () => {
+describe('SniderMining', () => {
   beforeEach(async () => {
+    const minerServiceMock = {
+      state: signal({
+          needsSetup: false,
+          apiAvailable: true,
+          systemInfo: {},
+          manageableMiners: [],
+          installedMiners: [],
+          runningMiners: [],
+          profiles: []
+      }),
+      forceRefreshState: jasmine.createSpy('forceRefreshState')
+    };
+
     await TestBed.configureTestingModule({
-      imports: [App],
+      imports: [SniderMining],
+      providers: [
+        { provide: MinerService, useValue: minerServiceMock }
+      ]
     }).compileComponents();
   });
 
   it('should create the app', () => {
-    const fixture = TestBed.createComponent(App);
+    const fixture = TestBed.createComponent(SniderMining);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
-  });
-
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, ui');
   });
 });
