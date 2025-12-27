@@ -1,4 +1,123 @@
-/* You can add global styles to this file, and also import other style files */
+/* Web Awesome Core Styles */
 @import "@awesome.me/webawesome/dist/styles/webawesome.css";
 @import "@awesome.me/webawesome/dist/styles/themes/awesome.css";
 @import "@awesome.me/webawesome/dist/styles/native.css";
+
+/* Mining Dashboard Theme */
+:root {
+  /* Custom semantic colors for mining context */
+  --mining-hashrate-color: var(--wa-color-primary-600);
+  --mining-success-color: var(--wa-color-success-600);
+  --mining-warning-color: var(--wa-color-warning-600);
+  --mining-danger-color: var(--wa-color-danger-600);
+
+  /* Card and surface colors */
+  --surface-color: var(--wa-color-neutral-50);
+  --surface-border: var(--wa-color-neutral-200);
+  --surface-hover: var(--wa-color-neutral-100);
+
+  /* Typography */
+  --heading-color: var(--wa-color-neutral-900);
+  --text-color: var(--wa-color-neutral-700);
+  --text-muted: var(--wa-color-neutral-500);
+
+  /* Monospace for stats */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-color: var(--wa-color-neutral-800);
+    --surface-border: var(--wa-color-neutral-700);
+    --surface-hover: var(--wa-color-neutral-700);
+    --heading-color: var(--wa-color-neutral-100);
+    --text-color: var(--wa-color-neutral-300);
+    --text-muted: var(--wa-color-neutral-500);
+  }
+}
+
+/* Base styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--wa-font-sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  background: var(--wa-color-neutral-100);
+  color: var(--text-color);
+}
+
+@media (prefers-color-scheme: dark) {
+  html, body {
+    background: var(--wa-color-neutral-900);
+  }
+}
+
+/* Tabular numbers for stats */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Monospace for technical values */
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Common card styling */
+.card-surface {
+  background: var(--surface-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Disable transitions for elements that shouldn't animate */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--wa-color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--wa-color-neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wa-color-neutral-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wa-color-neutral-500);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: var(--wa-color-neutral-800);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--wa-color-neutral-600);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--wa-color-neutral-500);
+  }
+}

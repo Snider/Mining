@@ -125,8 +125,79 @@ export class ChartComponent {
 
   createBaseChartOptions(): Highcharts.Options {
     return {
-      xAxis: { type: 'datetime', title: { text: 'Time' } },
-      yAxis: { title: { text: 'Hashrate (H/s)' } }, // Remove min: 0 to allow dynamic scaling
+      chart: {
+        backgroundColor: 'transparent',
+        style: {
+          fontFamily: 'var(--wa-font-sans, system-ui, sans-serif)'
+        },
+        spacing: [10, 10, 10, 10]
+      },
+      title: { text: '' },
+      xAxis: {
+        type: 'datetime',
+        title: { text: '' },
+        lineColor: 'var(--wa-color-neutral-300)',
+        tickColor: 'var(--wa-color-neutral-300)',
+        labels: {
+          style: {
+            color: 'var(--wa-color-neutral-600)',
+            fontSize: '11px'
+          }
+        },
+        gridLineWidth: 0
+      },
+      yAxis: {
+        title: { text: '' },
+        labels: {
+          style: {
+            color: 'var(--wa-color-neutral-600)',
+            fontSize: '11px'
+          },
+          formatter: function() {
+            const val = this.value as number;
+            if (val >= 1000000) return (val / 1000000).toFixed(1) + ' MH/s';
+            if (val >= 1000) return (val / 1000).toFixed(1) + ' kH/s';
+            return val + ' H/s';
+          }
+        },
+        gridLineColor: 'var(--wa-color-neutral-200)',
+        gridLineDashStyle: 'Dash'
+      },
+      legend: {
+        enabled: false
+      },
+      tooltip: {
+        backgroundColor: 'var(--wa-color-neutral-900)',
+        borderColor: 'var(--wa-color-neutral-700)',
+        borderRadius: 8,
+        style: {
+          color: '#fff',
+          fontSize: '12px'
+        },
+        xDateFormat: '%H:%M:%S',
+        headerFormat: '<span style="font-size: 10px; opacity: 0.8">{point.key}</span><br/>',
+        pointFormatter: function() {
+          const val = this.y as number;
+          let formatted: string;
+          if (val >= 1000000) formatted = (val / 1000000).toFixed(2) + ' MH/s';
+          else if (val >= 1000) formatted = (val / 1000).toFixed(2) + ' kH/s';
+          else formatted = val.toFixed(0) + ' H/s';
+          return `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${formatted}</b>`;
+        }
+      },
+      plotOptions: {
+        area: {
+          fillOpacity: 0.3,
+          lineWidth: 2,
+          marker: { enabled: false },
+          color: 'var(--wa-color-primary-600)'
+        },
+        spline: {
+          lineWidth: 2.5,
+          marker: { enabled: false },
+          color: 'var(--wa-color-primary-600)'
+        }
+      },
       series: [],
       credits: { enabled: false },
       accessibility: { enabled: false }

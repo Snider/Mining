@@ -92,9 +92,9 @@ func (m *XMRigMiner) Install() error {
 	var url string
 	switch runtime.GOOS {
 	case "windows":
-		url = fmt.Sprintf("https://github.com/xmrig/xmrig/releases/download/%s/xmrig-%s-msvc-win64.zip", version, strings.TrimPrefix(version, "v"))
+		url = fmt.Sprintf("https://github.com/xmrig/xmrig/releases/download/%s/xmrig-%s-windows-x64.zip", version, strings.TrimPrefix(version, "v"))
 	case "linux":
-		url = fmt.Sprintf("https://github.com/xmrig/xmrig/releases/download/%s/xmrig-%s-linux-x64.tar.gz", version, strings.TrimPrefix(version, "v"))
+		url = fmt.Sprintf("https://github.com/xmrig/xmrig/releases/download/%s/xmrig-%s-linux-static-x64.tar.gz", version, strings.TrimPrefix(version, "v"))
 	case "darwin":
 		url = fmt.Sprintf("https://github.com/xmrig/xmrig/releases/download/%s/xmrig-%s-macos-x64.tar.gz", version, strings.TrimPrefix(version, "v"))
 	default:

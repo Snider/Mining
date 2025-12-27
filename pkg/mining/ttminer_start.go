@@ -1,0 +1,122 @@
+package mining
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
+)
+
+// Start launches the TT-Miner with the given configuration.
+func (m *TTMiner) Start(config *Config) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.Running {
+		return errors.New("miner is already running")
+	}
+
+	// If the binary path isn't set, run CheckInstallation to find it.
+	if m.MinerBinary == "" {
+		if _, err := m.CheckInstallation(); err != nil {
+			return err // Propagate the detailed error from CheckInstallation
+		}
+	}
+
+	if m.API != nil && config.HTTPPort != 0 {
+		m.API.ListenPort = config.HTTPPort
+	} else if m.API != nil && m.API.ListenPort == 0 {
+		return errors.New("miner API port not assigned")
+	}
+
+	// Build command line arguments for TT-Miner
+	args := m.buildArgs(config)
+
+	log.Printf("Executing TT-Miner command: %s %s", m.MinerBinary, strings.Join(args, " "))
+
+	m.cmd = exec.Command(m.MinerBinary, args...)
+
+	if config.LogOutput {
+		m.cmd.Stdout = os.Stdout
+		m.cmd.Stderr = os.Stderr
+	}
+
+	if err := m.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start TT-Miner: %w", err)
+	}
+
+	m.Running = true
+
+	// Monitor the process in a goroutine
+	go func() {
+		err := m.cmd.Wait()
+		m.mu.Lock()
+		m.Running = false
+		m.mu.Unlock()
+		if err != nil {
+			log.Printf("TT-Miner exited with error: %v", err)
+		} else {
+			log.Printf("TT-Miner exited normally")
+		}
+	}()
+
+	return nil
+}
+
+// buildArgs constructs the command line arguments for TT-Miner
+func (m *TTMiner) buildArgs(config *Config) []string {
+	var args []string
+
+	// Pool configuration
+	if config.Pool != "" {
+		args = append(args, "-P", config.Pool)
+	}
+
+	// Wallet/user configuration
+	if config.Wallet != "" {
+		args = append(args, "-u", config.Wallet)
+	}
+
+	// Password
+	if config.Password != "" {
+		args = append(args, "-p", config.Password)
+	} else {
+		args = append(args, "-p", "x")
+	}
+
+	// Algorithm selection
+	if config.Algo != "" {
+		args = append(args, "-a", config.Algo)
+	}
+
+	// API binding for stats collection
+	if m.API != nil && m.API.Enabled {
+		args = append(args, "-b", fmt.Sprintf("%s:%d", m.API.ListenHost, m.API.ListenPort))
+	}
+
+	// GPU device selection (if specified)
+	if config.Devices != "" {
+		args = append(args, "-d", config.Devices)
+	}
+
+	// Intensity (if specified)
+	if config.Intensity > 0 {
+		args = append(args, "-i", fmt.Sprintf("%d", config.Intensity))
+	}
+
+	// Additional CLI arguments
+	addTTMinerCliArgs(config, &args)
+
+	return args
+}
+
+// addTTMinerCliArgs adds any additional CLI arguments from config
+func addTTMinerCliArgs(config *Config, args *[]string) {
+	// Add any extra arguments passed via CLIArgs
+	if config.CLIArgs != "" {
+		extraArgs := strings.Fields(config.CLIArgs)
+		*args = append(*args, extraArgs...)
+	}
+}

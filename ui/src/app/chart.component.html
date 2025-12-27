@@ -1,12 +1,17 @@
-@if (chartOptions()) {
-  <highcharts-chart
-    [Highcharts]="Highcharts"
-    [constructorType]="chartConstructor"
-    [options]="chartOptions()"
-    [update]="updateFlag()"
-    [oneToOne]="true"
-    style="width: 100%; height: 400px; display: block;"
-  ></highcharts-chart>
-} @else {
-  <p>Loading chart...</p>
-}
+<div class="chart-container">
+  @if (chartOptions()) {
+    <highcharts-chart
+      class="hashrate-chart"
+      [Highcharts]="Highcharts"
+      [constructorType]="chartConstructor"
+      [options]="chartOptions()"
+      [update]="updateFlag()"
+      [oneToOne]="true"
+    ></highcharts-chart>
+  } @else {
+    <div class="chart-loading">
+      <wa-spinner></wa-spinner>
+      <span>Loading chart...</span>
+    </div>
+  }
+</div>

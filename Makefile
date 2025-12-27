@@ -1,4 +1,4 @@
-.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package
+.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package e2e e2e-ui e2e-api
 
 # Variables
 BINARY_NAME=miner-cli
@@ -111,6 +111,21 @@ dev: tidy docs build
 	@echo "Starting development server..."
 	./$(BINARY_NAME) serve --host localhost --port 9090 --namespace /api/v1/mining
 
+# E2E Tests
+e2e: build
+	@echo "Running E2E tests..."
+	cd ui && npm run e2e
+
+# E2E Tests with Playwright UI
+e2e-ui:
+	@echo "Opening Playwright UI..."
+	cd ui && npm run e2e:ui
+
+# API-only E2E Tests
+e2e-api: build
+	@echo "Running API tests..."
+	cd ui && npm run e2e:api
+
 # Help
 help:
 	@echo "Available targets:"
@@ -132,4 +147,7 @@ help:
 	@echo "  install-swag- Install the swag CLI"
 	@echo "  package     - Create local distribution packages using GoReleaser"
 	@echo "  dev         - Start the development server with docs and build"
+	@echo "  e2e         - Run E2E tests with Playwright"
+	@echo "  e2e-ui      - Open Playwright UI for interactive testing"
+	@echo "  e2e-api     - Run API-only E2E tests"
 	@echo "  help        - Show this help message"

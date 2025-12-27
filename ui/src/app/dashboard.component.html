@@ -1,34 +1,220 @@
-<div class="dashboard-view">
+<div class="mining-dashboard">
   @if (error()) {
-    <wa-card class="card-error">
+    <wa-card class="error-card">
       <div slot="header">
-        <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
-        An Error Occurred
+        <wa-icon name="exclamation-triangle"></wa-icon>
+        Error
       </div>
       <p>{{ error() }}</p>
     </wa-card>
   }
 
   @if (state().runningMiners.length > 0) {
-    <div class="dashboard-content">
-      <!-- Stats Bar for small containers -->
-      <div class="stats-bar-container">
-        <snider-mining-stats-bar [stats]="state().runningMiners[0]?.full_stats" mode="bar"></snider-mining-stats-bar>
+    <!-- Hero Stats Section -->
+    <div class="hero-stats">
+      <div class="hashrate-hero">
+        <div class="hashrate-value">
+          <span class="number">{{ formatHashrate(currentHashrate()) }}</span>
+          <span class="unit">{{ getHashrateUnit(currentHashrate()) }}</span>
+        </div>
+        <div class="hashrate-label">
+          @if (minerCount() > 1) {
+            Total Hashrate ({{ minerCount() }} workers)
+          } @else {
+            Current Hashrate
+          }
+        </div>
+        <div class="hashrate-peak">
+          Peak: {{ formatHashrate(peakHashrate()) }} {{ getHashrateUnit(peakHashrate()) }}
+        </div>
       </div>
 
-      <!-- Chart -->
-      <div class="chart-container">
-        <snider-mining-chart></snider-mining-chart>
-      </div>
-
-      <!-- Stats List for large containers -->
-      <div class="stats-list-container">
-        <snider-mining-stats-bar [stats]="state().runningMiners[0]?.full_stats" mode="list"></snider-mining-stats-bar>
+      <div class="quick-stats">
+        <div class="stat-card accepted">
+          <wa-icon name="check-circle"></wa-icon>
+          <div class="stat-value">{{ acceptedShares() }}</div>
+          <div class="stat-label">Accepted</div>
+        </div>
+        <div class="stat-card rejected" [class.has-rejected]="rejectedShares() > 0">
+          <wa-icon name="x-circle"></wa-icon>
+          <div class="stat-value">{{ rejectedShares() }}</div>
+          <div class="stat-label">Rejected</div>
+        </div>
+        <div class="stat-card uptime">
+          <wa-icon name="clock"></wa-icon>
+          <div class="stat-value">{{ formatUptime(uptime()) }}</div>
+          <div class="stat-label">Uptime</div>
+        </div>
+        <div class="stat-card pool">
+          <wa-icon name="globe"></wa-icon>
+          <div class="stat-value pool-name">{{ poolName() }}</div>
+          <div class="stat-label">Pool ({{ poolPing() }}ms)</div>
+        </div>
       </div>
     </div>
+
+    <!-- Workers Table (shown when multiple miners are running) -->
+    @if (minerCount() > 1) {
+      <div class="workers-section">
+        <div class="workers-header">
+          <h3>
+            <wa-icon name="server"></wa-icon>
+            Workers
+          </h3>
+          <wa-button variant="danger" size="small" (click)="stopAllWorkers()">
+            <wa-icon name="stop-circle" slot="prefix"></wa-icon>
+            Stop All
+          </wa-button>
+        </div>
+        <div class="workers-table-container">
+          <table class="workers-table">
+            <thead>
+              <tr>
+                <th>Worker</th>
+                <th>Hashrate</th>
+                <th>Shares</th>
+                <th>Efficiency</th>
+                <th>Pool</th>
+                <th>Uptime</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (worker of workers(); track worker.name) {
+                <tr class="worker-row">
+                  <td class="worker-name">
+                    <wa-icon name="cpu"></wa-icon>
+                    <div class="worker-details">
+                      <span class="name">{{ worker.name }}</span>
+                      <span class="algo">{{ worker.algorithm }}</span>
+                    </div>
+                  </td>
+                  <td class="worker-hashrate">
+                    <div class="hashrate-bar-container">
+                      <div class="hashrate-bar" [style.width.%]="getHashratePercent(worker)"></div>
+                      <span class="hashrate-text">
+                        {{ formatHashrate(worker.hashrate) }} {{ getHashrateUnit(worker.hashrate) }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="worker-shares">
+                    <span class="accepted">{{ worker.shares }}</span>
+                    @if (worker.rejected > 0) {
+                      <span class="rejected">({{ worker.rejected }} rej)</span>
+                    }
+                  </td>
+                  <td class="worker-efficiency">
+                    <span [class.good]="getEfficiency(worker) >= 99"
+                          [class.warning]="getEfficiency(worker) < 99 && getEfficiency(worker) >= 95"
+                          [class.bad]="getEfficiency(worker) < 95">
+                      {{ getEfficiency(worker) | number:'1.1-1' }}%
+                    </span>
+                  </td>
+                  <td class="worker-pool">{{ worker.pool }}</td>
+                  <td class="worker-uptime">{{ formatUptime(worker.uptime) }}</td>
+                  <td class="worker-actions">
+                    <wa-button variant="text" size="small" (click)="stopWorker(worker.name)">
+                      <wa-icon name="stop-circle"></wa-icon>
+                    </wa-button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- Chart Section -->
+    <div class="chart-section">
+      <snider-mining-chart></snider-mining-chart>
+    </div>
+
+    <!-- Controls & Details -->
+    <div class="controls-section">
+      <div class="miner-info">
+        <wa-badge variant="success" pulse>
+          <wa-icon name="cpu" slot="prefix"></wa-icon>
+          {{ minerName() }}
+        </wa-badge>
+        <span class="algo-badge">{{ algorithm() }}</span>
+        <span class="diff-badge">Diff: {{ difficulty() | number }}</span>
+      </div>
+      <div class="control-buttons">
+        @if (minerCount() === 1) {
+          <wa-button variant="danger" size="small" (click)="stopMiner()">
+            <wa-icon name="stop-circle" slot="prefix"></wa-icon>
+            Stop Mining
+          </wa-button>
+        }
+      </div>
+    </div>
+
+    <!-- Detailed Stats (collapsible) -->
+    <wa-details summary="Detailed Statistics" class="details-section">
+      <div class="detailed-stats">
+        <div class="stat-group">
+          <h4>Hashrate</h4>
+          <dl>
+            <dt>10s Average</dt><dd>{{ stats()?.hashrate?.total[0] | number:'1.0-2' }} H/s</dd>
+            <dt>60s Average</dt><dd>{{ stats()?.hashrate?.total[1] | number:'1.0-2' }} H/s</dd>
+            <dt>15m Average</dt><dd>{{ stats()?.hashrate?.total[2] | number:'1.0-2' }} H/s</dd>
+          </dl>
+        </div>
+        <div class="stat-group">
+          <h4>Shares</h4>
+          <dl>
+            <dt>Good Shares</dt><dd>{{ stats()?.results?.shares_good }}</dd>
+            <dt>Total Shares</dt><dd>{{ stats()?.results?.shares_total }}</dd>
+            <dt>Avg Time</dt><dd>{{ stats()?.results?.avg_time }}s</dd>
+            <dt>Total Hashes</dt><dd>{{ stats()?.results?.hashes_total | number }}</dd>
+          </dl>
+        </div>
+        <div class="stat-group">
+          <h4>Connection</h4>
+          <dl>
+            <dt>Pool</dt><dd>{{ stats()?.connection?.pool }}</dd>
+            <dt>IP</dt><dd>{{ stats()?.connection?.ip }}</dd>
+            <dt>Ping</dt><dd>{{ stats()?.connection?.ping }}ms</dd>
+            <dt>Difficulty</dt><dd>{{ stats()?.connection?.diff | number }}</dd>
+          </dl>
+        </div>
+        <div class="stat-group">
+          <h4>System</h4>
+          <dl>
+            <dt>CPU</dt><dd>{{ stats()?.cpu?.brand }}</dd>
+            <dt>Threads</dt><dd>{{ stats()?.cpu?.threads }}</dd>
+            <dt>Algorithm</dt><dd>{{ stats()?.algo }}</dd>
+            <dt>Version</dt><dd>{{ stats()?.version }}</dd>
+          </dl>
+        </div>
+      </div>
+    </wa-details>
+
   } @else {
-    <div class="centered-container">
-      <p>No miners running.</p>
+    <!-- Idle State -->
+    <div class="idle-state">
+      <div class="idle-icon">
+        <wa-icon name="cpu"></wa-icon>
+      </div>
+      <h3>No Miners Running</h3>
+      <p>Select a profile and start mining to see real-time statistics.</p>
+
+      @if (state().profiles.length > 0) {
+        <div class="profile-select">
+          <wa-select label="Select Profile" (change)="onProfileSelect($event)">
+            @for (profile of state().profiles; track profile.id) {
+              <wa-option [value]="profile.id">{{ profile.name }} ({{ profile.minerType }})</wa-option>
+            }
+          </wa-select>
+          <wa-button variant="success" [disabled]="!selectedProfileId()" (click)="startMining()">
+            <wa-icon name="play-circle" slot="prefix"></wa-icon>
+            Start Mining
+          </wa-button>
+        </div>
+      } @else {
+        <p class="no-profiles">No profiles configured. Create one in the Profiles section.</p>
+      }
     </div>
   }
 </div>

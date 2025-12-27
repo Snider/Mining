@@ -127,6 +127,8 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 	switch strings.ToLower(minerType) {
 	case "xmrig":
 		miner = NewXMRigMiner()
+	case "tt-miner", "ttminer":
+		miner = NewTTMiner()
 	default:
 		return nil, fmt.Errorf("unsupported miner type: %s", minerType)
 	}
@@ -154,6 +156,12 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 		xmrigMiner.Name = instanceName
 		if xmrigMiner.API != nil {
 			xmrigMiner.API.ListenPort = apiPort
+		}
+	}
+	if ttMiner, ok := miner.(*TTMiner); ok {
+		ttMiner.Name = instanceName
+		if ttMiner.API != nil {
+			ttMiner.API.ListenPort = apiPort
 		}
 	}
 
@@ -196,6 +204,8 @@ func (m *Manager) UninstallMiner(minerType string) error {
 	switch strings.ToLower(minerType) {
 	case "xmrig":
 		miner = NewXMRigMiner()
+	case "tt-miner", "ttminer":
+		miner = NewTTMiner()
 	default:
 		return fmt.Errorf("unsupported miner type: %s", minerType)
 	}
@@ -305,6 +315,10 @@ func (m *Manager) ListAvailableMiners() []AvailableMiner {
 		{
 			Name:        "xmrig",
 			Description: "XMRig is a high performance, open source, cross platform RandomX, KawPow, CryptoNight and AstroBWT CPU/GPU miner and RandomX benchmark.",
+		},
+		{
+			Name:        "tt-miner",
+			Description: "TT-Miner is a high performance NVIDIA GPU miner for various algorithms including Ethash, KawPow, ProgPow, and more. Requires CUDA.",
 		},
 	}
 }
