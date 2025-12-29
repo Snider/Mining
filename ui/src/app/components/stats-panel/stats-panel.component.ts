@@ -60,6 +60,18 @@ import { MinerService } from '../../miner.service';
 
       <div class="stat-divider"></div>
 
+      <div class="stat-item">
+        <svg class="stat-icon text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <div class="stat-content">
+          <span class="stat-value tabular-nums">{{ formatDifficulty(avgDifficulty()) }}</span>
+        </div>
+        <span class="stat-label">Avg Diff</span>
+      </div>
+
+      <div class="stat-divider"></div>
+
       <div class="stat-item workers">
         <svg class="stat-icon" [class.text-success-500]="minerCount() > 0" [class.text-slate-500]="minerCount() === 0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
@@ -149,6 +161,10 @@ import { MinerService } from '../../miner.service';
       background: rgb(37 37 66 / 0.3);
     }
 
+    .text-purple-500 {
+      color: #a855f7;
+    }
+
     @media (max-width: 768px) {
       .stats-panel {
         gap: 0.75rem;
@@ -202,6 +218,17 @@ export class StatsPanelComponent {
 
   minerCount = computed(() => this.miners().length);
 
+  // Calculate average difficulty per accepted share (HashesTotal / SharesGood)
+  avgDifficulty = computed(() => {
+    let totalHashes = 0;
+    let totalShares = 0;
+    this.miners().forEach(m => {
+      totalHashes += m.full_stats?.results?.hashes_total || 0;
+      totalShares += m.full_stats?.results?.shares_good || 0;
+    });
+    return totalShares > 0 ? Math.floor(totalHashes / totalShares) : 0;
+  });
+
   formatHashrate(hashrate: number): string {
     if (hashrate >= 1000000000) return (hashrate / 1000000000).toFixed(2);
     if (hashrate >= 1000000) return (hashrate / 1000000).toFixed(2);
@@ -226,5 +253,14 @@ export class StatsPanelComponent {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${mins}m`;
+  }
+
+  formatDifficulty(diff: number): string {
+    if (diff === 0) return '-';
+    if (diff >= 1000000000000) return (diff / 1000000000000).toFixed(2) + 'T';
+    if (diff >= 1000000000) return (diff / 1000000000).toFixed(2) + 'G';
+    if (diff >= 1000000) return (diff / 1000000).toFixed(2) + 'M';
+    if (diff >= 1000) return (diff / 1000).toFixed(2) + 'k';
+    return diff.toString();
   }
 }

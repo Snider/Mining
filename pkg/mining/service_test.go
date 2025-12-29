@@ -25,6 +25,7 @@ type MockMiner struct {
 	AddHashratePointFunc      func(point HashratePoint)
 	ReduceHashrateHistoryFunc func(now time.Time)
 	GetLogsFunc               func() []string
+	WriteStdinFunc            func(input string) error
 }
 
 func (m *MockMiner) Install() error                         { return m.InstallFunc() }
@@ -43,6 +44,7 @@ func (m *MockMiner) GetHashrateHistory() []HashratePoint  { return m.GetHashrate
 func (m *MockMiner) AddHashratePoint(point HashratePoint) { m.AddHashratePointFunc(point) }
 func (m *MockMiner) ReduceHashrateHistory(now time.Time)  { m.ReduceHashrateHistoryFunc(now) }
 func (m *MockMiner) GetLogs() []string                    { return m.GetLogsFunc() }
+func (m *MockMiner) WriteStdin(input string) error        { return m.WriteStdinFunc(input) }
 
 // MockManager is a mock implementation of the Manager for testing.
 type MockManager struct {

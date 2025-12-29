@@ -123,13 +123,15 @@ type Config struct {
 
 // PerformanceMetrics represents the performance metrics for a miner.
 type PerformanceMetrics struct {
-	Hashrate  int                    `json:"hashrate"`
-	Shares    int                    `json:"shares"`
-	Rejected  int                    `json:"rejected"`
-	Uptime    int                    `json:"uptime"`
-	LastShare int64                  `json:"lastShare"`
-	Algorithm string                 `json:"algorithm"`
-	ExtraData map[string]interface{} `json:"extraData,omitempty"`
+	Hashrate      int                    `json:"hashrate"`
+	Shares        int                    `json:"shares"`
+	Rejected      int                    `json:"rejected"`
+	Uptime        int                    `json:"uptime"`
+	LastShare     int64                  `json:"lastShare"`
+	Algorithm     string                 `json:"algorithm"`
+	AvgDifficulty int                    `json:"avgDifficulty"` // Average difficulty per accepted share (HashesTotal/SharesGood)
+	DiffCurrent   int                    `json:"diffCurrent"`   // Current job difficulty from pool
+	ExtraData     map[string]interface{} `json:"extraData,omitempty"`
 }
 
 // HashratePoint represents a single hashrate measurement at a specific time.

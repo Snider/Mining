@@ -49,11 +49,17 @@ func (m *TTMiner) GetStats() (*PerformanceMetrics, error) {
 		}
 	}
 
+	// For TT-Miner, we use the connection difficulty as both current and avg
+	// since TT-Miner doesn't expose per-share difficulty data
+	diffCurrent := summary.Connection.Diff
+
 	return &PerformanceMetrics{
-		Hashrate:  int(totalHashrate),
-		Shares:    summary.Results.SharesGood,
-		Rejected:  summary.Results.SharesTotal - summary.Results.SharesGood,
-		Uptime:    summary.Uptime,
-		Algorithm: summary.Algo,
+		Hashrate:      int(totalHashrate),
+		Shares:        summary.Results.SharesGood,
+		Rejected:      summary.Results.SharesTotal - summary.Results.SharesGood,
+		Uptime:        summary.Uptime,
+		Algorithm:     summary.Algo,
+		AvgDifficulty: diffCurrent, // Use pool diff as approximation
+		DiffCurrent:   diffCurrent,
 	}, nil
 }

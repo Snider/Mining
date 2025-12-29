@@ -42,11 +42,19 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 		hashrate = int(summary.Hashrate.Total[0])
 	}
 
+	// Calculate average difficulty per accepted share
+	var avgDifficulty int
+	if summary.Results.SharesGood > 0 {
+		avgDifficulty = summary.Results.HashesTotal / summary.Results.SharesGood
+	}
+
 	return &PerformanceMetrics{
-		Hashrate:  hashrate,
-		Shares:    summary.Results.SharesGood,
-		Rejected:  summary.Results.SharesTotal - summary.Results.SharesGood,
-		Uptime:    summary.Uptime,
-		Algorithm: summary.Algo,
+		Hashrate:      hashrate,
+		Shares:        summary.Results.SharesGood,
+		Rejected:      summary.Results.SharesTotal - summary.Results.SharesGood,
+		Uptime:        summary.Uptime,
+		Algorithm:     summary.Algo,
+		AvgDifficulty: avgDifficulty,
+		DiffCurrent:   summary.Results.DiffCurrent,
 	}, nil
 }
