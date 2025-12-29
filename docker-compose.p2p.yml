@@ -1,0 +1,85 @@
+# Docker Compose for P2P testing with multiple nodes
+# Usage:
+#   docker-compose -f docker-compose.p2p.yml build
+#   docker-compose -f docker-compose.p2p.yml up -d
+#
+# Then in another terminal:
+#   docker exec -it mining-controller miner-cli node info
+#   docker exec -it mining-worker1 miner-cli node info
+#   docker exec -it mining-controller miner-cli peer add --address mining-worker1:9091 --name worker1
+
+version: '3.8'
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: mining-controller
+    hostname: mining-controller
+    command: ["node", "serve", "--listen", ":9091"]
+    ports:
+      - "9091:9091"
+    volumes:
+      - controller-config:/root/.config/lethean-desktop
+      - controller-data:/root/.local/share/lethean-desktop
+    networks:
+      - mining-p2p
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        miner-cli node init --name controller --role controller
+        miner-cli node serve --listen :9091
+
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: mining-worker1
+    hostname: mining-worker1
+    volumes:
+      - worker1-config:/root/.config/lethean-desktop
+      - worker1-data:/root/.local/share/lethean-desktop
+    networks:
+      - mining-p2p
+    depends_on:
+      - controller
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        miner-cli node init --name worker1 --role worker
+        miner-cli node serve --listen :9091
+
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: mining-worker2
+    hostname: mining-worker2
+    volumes:
+      - worker2-config:/root/.config/lethean-desktop
+      - worker2-data:/root/.local/share/lethean-desktop
+    networks:
+      - mining-p2p
+    depends_on:
+      - controller
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        miner-cli node init --name worker2 --role worker
+        miner-cli node serve --listen :9091
+
+networks:
+  mining-p2p:
+    driver: bridge
+
+volumes:
+  controller-config:
+  controller-data:
+  worker1-config:
+  worker1-data:
+  worker2-config:
+  worker2-data:

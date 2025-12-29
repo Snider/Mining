@@ -28,6 +28,7 @@ import (
 type Service struct {
 	Manager             ManagerInterface
 	ProfileManager      *ProfileManager
+	NodeService         *NodeService
 	Router              *gin.Engine
 	Server              *http.Server
 	DisplayAddr         string
@@ -53,9 +54,17 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		return nil, fmt.Errorf("failed to initialize profile manager: %w", err)
 	}
 
+	// Initialize node service (optional - only fails if XDG paths are broken)
+	nodeService, err := NewNodeService()
+	if err != nil {
+		log.Printf("Warning: failed to initialize node service: %v", err)
+		// Continue without node service - P2P features will be unavailable
+	}
+
 	return &Service{
 		Manager:        manager,
 		ProfileManager: profileManager,
+		NodeService:    nodeService,
 		Server: &http.Server{
 			Addr: listenAddr,
 		},
@@ -66,10 +75,19 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 	}, nil
 }
 
-func (s *Service) ServiceStartup(ctx context.Context) error {
+// InitRouter initializes the Gin router and sets up all routes without starting an HTTP server.
+// Use this when embedding the mining service in another application (e.g., Wails).
+// After calling InitRouter, you can use the Router field directly as an http.Handler.
+func (s *Service) InitRouter() {
 	s.Router = gin.Default()
 	s.Router.Use(cors.Default())
-	s.setupRoutes()
+	s.SetupRoutes()
+}
+
+// ServiceStartup initializes the router and starts the HTTP server.
+// For embedding without a standalone server, use InitRouter() instead.
+func (s *Service) ServiceStartup(ctx context.Context) error {
+	s.InitRouter()
 	s.Server.Handler = s.Router
 
 	go func() {
@@ -91,7 +109,10 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) setupRoutes() {
+// SetupRoutes configures all API routes on the Gin router.
+// This is called automatically by ServiceStartup, but can also be called
+// manually after InitRouter for embedding in other applications.
+func (s *Service) SetupRoutes() {
 	apiGroup := s.Router.Group(s.APIBasePath)
 	{
 		apiGroup.GET("/info", s.handleGetInfo)
@@ -107,6 +128,7 @@ func (s *Service) setupRoutes() {
 			minersGroup.DELETE("/:miner_name", s.handleStopMiner)
 			minersGroup.GET("/:miner_name/stats", s.handleGetMinerStats)
 			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory)
+			minersGroup.GET("/:miner_name/logs", s.handleGetMinerLogs)
 		}
 
 		profilesGroup := apiGroup.Group("/profiles")
@@ -118,9 +140,18 @@ func (s *Service) setupRoutes() {
 			profilesGroup.DELETE("/:id", s.handleDeleteProfile)
 			profilesGroup.POST("/:id/start", s.handleStartMinerWithProfile)
 		}
+
+		// Add P2P node endpoints if node service is available
+		if s.NodeService != nil {
+			s.NodeService.SetupRoutes(apiGroup)
+		}
 	}
 
-	s.Router.StaticFile("/component/mining-dashboard.js", "./ui/dist/ui/mbe-mining-dashboard.js")
+	// Serve the embedded web component
+	componentFS, err := GetComponentFS()
+	if err == nil {
+		s.Router.StaticFS("/component", componentFS)
+	}
 
 	swaggerURL := ginSwagger.URL(fmt.Sprintf("http://%s%s/doc.json", s.DisplayAddr, s.SwaggerUIPath))
 	s.Router.GET(s.SwaggerUIPath+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL, ginSwagger.InstanceName(s.SwaggerInstanceName)))
@@ -427,6 +458,25 @@ func (s *Service) handleGetMinerHashrateHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, history)
+}
+
+// handleGetMinerLogs godoc
+// @Summary Get miner log output
+// @Description Get the captured stdout/stderr output from a running miner
+// @Tags miners
+// @Produce  json
+// @Param miner_name path string true "Miner Name"
+// @Success 200 {array} string
+// @Router /miners/{miner_name}/logs [get]
+func (s *Service) handleGetMinerLogs(c *gin.Context) {
+	minerName := c.Param("miner_name")
+	miner, err := s.Manager.GetMiner(minerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
+		return
+	}
+	logs := miner.GetLogs()
+	c.JSON(http.StatusOK, logs)
 }
 
 // handleListProfiles godoc

@@ -1,0 +1,42 @@
+# Dockerfile for testing P2P node functionality
+# Build: docker build -f Dockerfile.node -t mining-node .
+# Run:   docker run -it --name node1 mining-node node serve
+#        docker run -it --name node2 mining-node node serve
+
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Copy go mod files first for caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the CLI
+RUN CGO_ENABLED=0 go build -o miner-cli ./cmd/mining
+
+# Runtime image
+FROM alpine:3.19
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates
+
+# Copy the binary
+COPY --from=builder /app/miner-cli /usr/local/bin/miner-cli
+
+# Create config directories
+RUN mkdir -p /root/.config/lethean-desktop /root/.local/share/lethean-desktop
+
+# Expose the P2P port
+EXPOSE 9091
+
+# Default command shows help
+ENTRYPOINT ["miner-cli"]
+CMD ["--help"]
