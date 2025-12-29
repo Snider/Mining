@@ -16,6 +16,7 @@ export class ProfileListComponent {
   state = this.minerService.state;
 
   editingProfile: (MiningProfile & { config: any }) | null = null;
+  actionInProgress = signal<string | null>(null);
 
   // --- Event Handlers for Custom Elements in Edit Form ---
   onNameInput(event: Event) {
@@ -55,11 +56,19 @@ export class ProfileListComponent {
   }
 
   startMiner(profileId: string) {
-    this.minerService.startMiner(profileId).subscribe();
+    this.actionInProgress.set(`start-${profileId}`);
+    this.minerService.startMiner(profileId).subscribe({
+      next: () => this.actionInProgress.set(null),
+      error: () => this.actionInProgress.set(null)
+    });
   }
 
   deleteProfile(profileId: string) {
-    this.minerService.deleteProfile(profileId).subscribe();
+    this.actionInProgress.set(`delete-${profileId}`);
+    this.minerService.deleteProfile(profileId).subscribe({
+      next: () => this.actionInProgress.set(null),
+      error: () => this.actionInProgress.set(null)
+    });
   }
 
   editProfile(profile: MiningProfile) {
@@ -69,8 +78,13 @@ export class ProfileListComponent {
 
   updateProfile() {
     if (!this.editingProfile) return;
-    this.minerService.updateProfile(this.editingProfile).subscribe(() => {
-      this.editingProfile = null;
+    this.actionInProgress.set(`save-${this.editingProfile.id}`);
+    this.minerService.updateProfile(this.editingProfile).subscribe({
+      next: () => {
+        this.actionInProgress.set(null);
+        this.editingProfile = null;
+      },
+      error: () => this.actionInProgress.set(null)
     });
   }
 

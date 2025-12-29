@@ -1,61 +1,117 @@
-<div class="profile-list">
-  <h5>Existing Profiles</h5>
+<div class="flex flex-col gap-4">
+  <h5 class="text-lg font-semibold">Existing Profiles</h5>
   @for(profile of state().profiles; track profile.id) {
-    <div class="profile-item">
+    <div class="card p-4">
       @if(editingProfile && editingProfile.id === profile.id) {
-        <div class="profile-form">
-          <wa-input
-            label="Profile Name"
-            [value]="editingProfile.name"
-            (input)="onNameInput($event)">
-          </wa-input>
-          <wa-select
-            label="Miner Type"
-            [value]="editingProfile.minerType"
-            (change)="onMinerTypeChange($event)">
-            @for(miner of state().manageableMiners; track miner.name) {
-              <wa-option [value]="miner.name" [selected]="miner.name === editingProfile.minerType">
-                {{ miner.name }}
-              </wa-option>
-            }
-          </wa-select>
-          <wa-input
-            label="Pool Address"
-            [value]="editingProfile.config.pool"
-            (input)="onPoolInput($event)">
-          </wa-input>
-          <wa-input
-            label="Wallet Address"
-            [value]="editingProfile.config.wallet"
-            (input)="onWalletInput($event)">
-          </wa-input>
-          <div class="checkbox-group">
-            <wa-checkbox
-              [checked]="editingProfile.config.tls"
-              (change)="onTlsChange($event)">
-              TLS
-            </wa-checkbox>
-            <wa-checkbox
-              [checked]="editingProfile.config.hugePages"
-              (change)="onHugePagesChange($event)">
-              Huge Pages
-            </wa-checkbox>
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-slate-300">Profile Name</label>
+            <input
+              type="text"
+              class="input"
+              [value]="editingProfile.name"
+              (input)="onNameInput($event)">
           </div>
-          <div class="button-group">
-            <wa-button (click)="updateProfile()">Save</wa-button>
-            <wa-button variant="neutral" (click)="cancelEdit()">Cancel</wa-button>
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-slate-300">Miner Type</label>
+            <select
+              class="select"
+              [value]="editingProfile.minerType"
+              (change)="onMinerTypeChange($event)">
+              @for(miner of state().manageableMiners; track miner.name) {
+                <option [value]="miner.name" [selected]="miner.name === editingProfile.minerType">
+                  {{ miner.name }}
+                </option>
+              }
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-slate-300">Pool Address</label>
+            <input
+              type="text"
+              class="input"
+              [value]="editingProfile.config.pool"
+              (input)="onPoolInput($event)">
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-sm font-medium text-slate-300">Wallet Address</label>
+            <input
+              type="text"
+              class="input"
+              [value]="editingProfile.config.wallet"
+              (input)="onWalletInput($event)">
+          </div>
+          <div class="flex gap-6 items-center">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                class="w-4 h-4 rounded border-surface-50 text-accent-500 focus:ring-accent-500"
+                [checked]="editingProfile.config.tls"
+                (change)="onTlsChange($event)">
+              <span class="text-sm">TLS</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                class="w-4 h-4 rounded border-surface-50 text-accent-500 focus:ring-accent-500"
+                [checked]="editingProfile.config.hugePages"
+                (change)="onHugePagesChange($event)">
+              <span class="text-sm">Huge Pages</span>
+            </label>
+          </div>
+          <div class="flex gap-2">
+            <button
+              class="btn btn-primary btn-sm"
+              [disabled]="actionInProgress() === 'save-' + editingProfile.id"
+              (click)="updateProfile()">
+              @if (actionInProgress() === 'save-' + editingProfile.id) {
+                <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                Saving...
+              } @else {
+                Save
+              }
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              [disabled]="actionInProgress() === 'save-' + editingProfile.id"
+              (click)="cancelEdit()">Cancel</button>
           </div>
         </div>
       } @else {
-        <span>{{ profile.name }} ({{ profile.minerType }})</span>
-        <div class="button-group">
-          <wa-button size="small" variant="primary" (click)="startMiner(profile.id)">Start</wa-button>
-          <wa-button size="small" (click)="editProfile(profile)">Edit</wa-button>
-          <wa-button size="small" variant="danger" (click)="deleteProfile(profile.id)">Delete</wa-button>
+        <div class="flex justify-between items-center">
+          <span class="font-medium">{{ profile.name }} <span class="text-slate-400">({{ profile.minerType }})</span></span>
+          <div class="flex gap-2">
+            <button
+              class="btn btn-primary btn-xs"
+              [disabled]="actionInProgress() === 'start-' + profile.id"
+              (click)="startMiner(profile.id)">
+              @if (actionInProgress() === 'start-' + profile.id) {
+                <div class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                Starting...
+              } @else {
+                Start
+              }
+            </button>
+            <button
+              class="btn btn-secondary btn-xs"
+              [disabled]="actionInProgress() !== null"
+              (click)="editProfile(profile)">Edit</button>
+            <button
+              class="btn btn-danger btn-xs"
+              [disabled]="actionInProgress() === 'delete-' + profile.id"
+              (click)="deleteProfile(profile.id)">
+              @if (actionInProgress() === 'delete-' + profile.id) {
+                <div class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                Deleting...
+              } @else {
+                Delete
+              }
+            </button>
+          </div>
         </div>
       }
     </div>
   } @empty {
-    <p>No profiles created yet.</p>
+    <p class="text-slate-400 italic">No profiles created yet.</p>
   }
 </div>

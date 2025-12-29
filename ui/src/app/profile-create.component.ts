@@ -1,16 +1,9 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MinerService, MiningProfile } from './miner.service';
 
-// Import Web Awesome components
-import "@awesome.me/webawesome/dist/webawesome.js";
-import '@awesome.me/webawesome/dist/components/input/input.js';
-import '@awesome.me/webawesome/dist/components/select/select.js';
-import '@awesome.me/webawesome/dist/components/checkbox/checkbox.js';
-import '@awesome.me/webawesome/dist/components/button/button.js';
-import '@awesome.me/webawesome/dist/components/card/card.js';
 
 @Component({
   selector: 'snider-mining-profile-create',
@@ -39,6 +32,7 @@ export class ProfileCreateComponent {
   // Simple properties instead of signals
   error: string | null = null;
   success: string | null = null;
+  isCreating = signal(false);
 
   // --- Event Handlers for Custom Elements ---
   // By handling events here, we can safely cast the event target
@@ -78,8 +72,10 @@ export class ProfileCreateComponent {
       return;
     }
 
+    this.isCreating.set(true);
     this.minerService.createProfile(this.model).subscribe({
       next: () => {
+        this.isCreating.set(false);
         this.success = 'Profile created successfully!';
         // Reset form to defaults
         this.model = {
@@ -96,6 +92,7 @@ export class ProfileCreateComponent {
         setTimeout(() => this.success = null, 3000);
       },
       error: (err: HttpErrorResponse) => {
+        this.isCreating.set(false);
         console.error(err);
         if (err.error && err.error.error) {
           this.error = `Failed to create profile: ${err.error.error}`;

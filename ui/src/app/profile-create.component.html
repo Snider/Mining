@@ -1,109 +1,99 @@
-<!--
-  This file has been updated to correctly bind to Web Awesome/Shoelace custom element events
-  and includes styling to improve the form's layout.
--->
-<style>
-  .profile-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem; /* Use a gap for consistent spacing */
-  }
-
-  fieldset {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    border: 1px solid var(--wa-color-neutral-300);
-    border-radius: var(--wa-border-radius-medium);
-    padding: 1rem;
-  }
-
-  legend {
-    padding: 0 0.5rem;
-    font-weight: bold;
-    color: var(--wa-color-neutral-700);
-  }
-
-  /* Style for checkboxes to align them nicely */
-  .checkbox-group {
-    display: flex;
-    gap: 2rem;
-    align-items: center;
-  }
-</style>
-
-<form class="profile-form" id="profile-create-form" (submit)="createProfile(); $event.preventDefault()">
-  <h5>Create New Profile</h5>
+<form class="flex flex-col gap-4" id="profile-create-form" (submit)="createProfile(); $event.preventDefault()">
+  <h5 class="text-lg font-semibold">Create New Profile</h5>
 
   @if (error) {
-    <wa-card class="card-error">
+    <div class="card bg-danger-50 border-danger-500 p-3 text-danger-600 text-sm">
       <p>{{ error }}</p>
-    </wa-card>
+    </div>
   }
   @if (success) {
-    <wa-card class="card-success">
+    <div class="card bg-success-50 border-success-500 p-3 text-success-600 text-sm">
       <p>{{ success }}</p>
-    </wa-card>
+    </div>
   }
 
-  <!--
-    We use standard (input) and (change) events.
-    These events bubble up from the custom elements (or are dispatched by them),
-    and event.target will refer to the custom element itself, allowing us to read 'value'.
-  -->
-  <wa-input
-    name="name"
-    label="Profile Name"
-    required
-    [value]="model.name"
-    (input)="onNameInput($event)">
-  </wa-input>
-
-  <wa-select
-    name="minerType"
-    label="Miner Type"
-    required
-    [value]="model.minerType"
-    (change)="onMinerTypeChange($event)">
-    @for(miner of state().manageableMiners; track miner.name) {
-      <wa-option [value]="miner.name">{{ miner.name }}</wa-option>
-    }
-  </wa-select>
-
-  <fieldset name="config">
-    <legend>Configuration</legend>
-    <wa-input
-      name="pool"
-      label="Pool Address"
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-medium text-slate-300">Profile Name</label>
+    <input
+      type="text"
+      class="input"
+      name="name"
       required
-      [value]="model.config.pool"
-      (input)="onPoolInput($event)">
-    </wa-input>
+      [value]="model.name"
+      (input)="onNameInput($event)">
+  </div>
 
-    <wa-input
-      name="wallet"
-      label="Wallet Address"
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-medium text-slate-300">Miner Type</label>
+    <select
+      class="select"
+      name="minerType"
       required
-      [value]="model.config.wallet"
-      (input)="onWalletInput($event)">
-    </wa-input>
+      [value]="model.minerType"
+      (change)="onMinerTypeChange($event)">
+      <option value="" disabled selected>Select Miner</option>
+      @for(miner of state().manageableMiners; track miner.name) {
+        <option [value]="miner.name">{{ miner.name }}</option>
+      }
+    </select>
+  </div>
 
-    <div class="checkbox-group">
-      <wa-checkbox
-        name="tls"
-        [checked]="model.config.tls"
-        (change)="onTlsChange($event)">
-        TLS
-      </wa-checkbox>
+  <fieldset class="card p-4">
+    <legend class="px-2 font-semibold text-slate-300">Configuration</legend>
 
-      <wa-checkbox
-        name="hugePages"
-        [checked]="model.config.hugePages"
-        (change)="onHugePagesChange($event)">
-        Huge Pages
-      </wa-checkbox>
+    <div class="flex flex-col gap-4 mt-3">
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-300">Pool Address</label>
+        <input
+          type="text"
+          class="input"
+          name="pool"
+          required
+          [value]="model.config.pool"
+          (input)="onPoolInput($event)">
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-300">Wallet Address</label>
+        <input
+          type="text"
+          class="input"
+          name="wallet"
+          required
+          [value]="model.config.wallet"
+          (input)="onWalletInput($event)">
+      </div>
+
+      <div class="flex gap-6 items-center">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            class="w-4 h-4 rounded border-surface-50 text-accent-500 focus:ring-accent-500"
+            name="tls"
+            [checked]="model.config.tls"
+            (change)="onTlsChange($event)">
+          <span class="text-sm">TLS</span>
+        </label>
+
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            class="w-4 h-4 rounded border-surface-50 text-accent-500 focus:ring-accent-500"
+            name="hugePages"
+            [checked]="model.config.hugePages"
+            (change)="onHugePagesChange($event)">
+          <span class="text-sm">Huge Pages</span>
+        </label>
+      </div>
     </div>
   </fieldset>
 
-  <wa-button type="submit">Create Profile</wa-button>
+  <button type="submit" class="btn btn-primary" [disabled]="isCreating()">
+    @if (isCreating()) {
+      <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+      Creating...
+    } @else {
+      Create Profile
+    }
+  </button>
 </form>
