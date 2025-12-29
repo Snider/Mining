@@ -131,6 +131,15 @@ func (s *Service) SetupRoutes() {
 			minersGroup.GET("/:miner_name/logs", s.handleGetMinerLogs)
 		}
 
+		// Historical data endpoints (database-backed)
+		historyGroup := apiGroup.Group("/history")
+		{
+			historyGroup.GET("/status", s.handleHistoryStatus)
+			historyGroup.GET("/miners", s.handleAllMinersHistoricalStats)
+			historyGroup.GET("/miners/:miner_name", s.handleMinerHistoricalStats)
+			historyGroup.GET("/miners/:miner_name/hashrate", s.handleMinerHistoricalHashrate)
+		}
+
 		profilesGroup := apiGroup.Group("/profiles")
 		{
 			profilesGroup.GET("", s.handleListProfiles)
@@ -575,4 +584,117 @@ func (s *Service) handleDeleteProfile(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "profile deleted"})
+}
+
+// handleHistoryStatus godoc
+// @Summary Get database history status
+// @Description Get the status of database persistence for historical data
+// @Tags history
+// @Produce  json
+// @Success 200 {object} map[string]interface{}
+// @Router /history/status [get]
+func (s *Service) handleHistoryStatus(c *gin.Context) {
+	if manager, ok := s.Manager.(*Manager); ok {
+		c.JSON(http.StatusOK, gin.H{
+			"enabled":       manager.IsDatabaseEnabled(),
+			"retentionDays": manager.dbRetention,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"enabled": false, "error": "manager type not supported"})
+}
+
+// handleAllMinersHistoricalStats godoc
+// @Summary Get historical stats for all miners
+// @Description Get aggregated historical statistics for all miners from the database
+// @Tags history
+// @Produce  json
+// @Success 200 {array} database.HashrateStats
+// @Router /history/miners [get]
+func (s *Service) handleAllMinersHistoricalStats(c *gin.Context) {
+	manager, ok := s.Manager.(*Manager)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		return
+	}
+
+	stats, err := manager.GetAllMinerHistoricalStats()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// handleMinerHistoricalStats godoc
+// @Summary Get historical stats for a specific miner
+// @Description Get aggregated historical statistics for a specific miner from the database
+// @Tags history
+// @Produce  json
+// @Param miner_name path string true "Miner Name"
+// @Success 200 {object} database.HashrateStats
+// @Router /history/miners/{miner_name} [get]
+func (s *Service) handleMinerHistoricalStats(c *gin.Context) {
+	minerName := c.Param("miner_name")
+	manager, ok := s.Manager.(*Manager)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		return
+	}
+
+	stats, err := manager.GetMinerHistoricalStats(minerName)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+
+	if stats == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no historical data found for miner"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// handleMinerHistoricalHashrate godoc
+// @Summary Get historical hashrate data for a specific miner
+// @Description Get detailed historical hashrate data for a specific miner from the database
+// @Tags history
+// @Produce  json
+// @Param miner_name path string true "Miner Name"
+// @Param since query string false "Start time (RFC3339 format)"
+// @Param until query string false "End time (RFC3339 format)"
+// @Success 200 {array} HashratePoint
+// @Router /history/miners/{miner_name}/hashrate [get]
+func (s *Service) handleMinerHistoricalHashrate(c *gin.Context) {
+	minerName := c.Param("miner_name")
+	manager, ok := s.Manager.(*Manager)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		return
+	}
+
+	// Parse time range from query params, default to last 24 hours
+	until := time.Now()
+	since := until.Add(-24 * time.Hour)
+
+	if sinceStr := c.Query("since"); sinceStr != "" {
+		if t, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			since = t
+		}
+	}
+	if untilStr := c.Query("until"); untilStr != "" {
+		if t, err := time.Parse(time.RFC3339, untilStr); err == nil {
+			until = t
+		}
+	}
+
+	history, err := manager.GetMinerHistoricalHashrate(minerName, since, until)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, history)
 }

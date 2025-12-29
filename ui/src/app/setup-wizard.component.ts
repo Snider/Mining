@@ -3,12 +3,6 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MinerService } from './miner.service';
 
-// Import Web Awesome components
-import "@awesome.me/webawesome/dist/webawesome.js";
-import '@awesome.me/webawesome/dist/components/button/button.js';
-import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
-import '@awesome.me/webawesome/dist/components/card/card.js';
-import '@awesome.me/webawesome/dist/components/icon/icon.js';
 
 @Component({
   selector: 'snider-mining-setup-wizard',

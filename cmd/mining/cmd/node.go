@@ -141,11 +141,9 @@ This allows other nodes to connect, send commands, and receive stats.`,
 
 		transport := node.NewTransport(nm, pr, config)
 
-		// Set message handler
-		transport.OnMessage(func(conn *node.PeerConnection, msg *node.Message) {
-			// Handle messages (will be expanded with controller/worker logic)
-			fmt.Printf("[%s] Received %s from %s\n", time.Now().Format("15:04:05"), msg.Type, conn.Peer.Name)
-		})
+		// Create worker to handle incoming messages
+		worker := node.NewWorker(nm, transport)
+		worker.RegisterWithTransport()
 
 		if err := transport.Start(); err != nil {
 			return fmt.Errorf("failed to start transport: %w", err)

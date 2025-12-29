@@ -318,14 +318,15 @@ paths:
       - system
   /miners:
     get:
-      description: Get a list of all running miners, including their full stats.
+      description: Get a list of all running miners
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items: {}
+            items:
+              $ref: '#/definitions/mining.XMRigMiner'
             type: array
       summary: List all running miners
       tags:
@@ -370,6 +371,27 @@ paths:
               $ref: '#/definitions/mining.HashratePoint'
             type: array
       summary: Get miner hashrate history
+      tags:
+      - miners
+  /miners/{miner_name}/logs:
+    get:
+      description: Get the captured stdout/stderr output from a running miner
+      parameters:
+      - description: Miner Name
+        in: path
+        name: miner_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: Get miner log output
       tags:
       - miners
   /miners/{miner_name}/stats:

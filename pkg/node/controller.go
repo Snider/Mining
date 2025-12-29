@@ -58,6 +58,24 @@ func (c *Controller) handleResponse(conn *PeerConnection, msg *Message) {
 
 // sendRequest sends a message and waits for a response.
 func (c *Controller) sendRequest(peerID string, msg *Message, timeout time.Duration) (*Message, error) {
+	actualPeerID := peerID
+
+	// Auto-connect if not already connected
+	if c.transport.GetConnection(peerID) == nil {
+		peer := c.peers.GetPeer(peerID)
+		if peer == nil {
+			return nil, fmt.Errorf("peer not found: %s", peerID)
+		}
+		conn, err := c.transport.Connect(peer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to peer: %w", err)
+		}
+		// Use the real peer ID after handshake (it may have changed)
+		actualPeerID = conn.Peer.ID
+		// Update the message destination
+		msg.To = actualPeerID
+	}
+
 	// Create response channel
 	respCh := make(chan *Message, 1)
 
@@ -73,7 +91,7 @@ func (c *Controller) sendRequest(peerID string, msg *Message, timeout time.Durat
 	}()
 
 	// Send the message
-	if err := c.transport.Send(peerID, msg); err != nil {
+	if err := c.transport.Send(actualPeerID, msg); err != nil {
 		return nil, fmt.Errorf("failed to send message: %w", err)
 	}
 

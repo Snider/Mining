@@ -3,6 +3,7 @@ package mining
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -38,9 +39,15 @@ func (m *TTMiner) Start(config *Config) error {
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
+	// Always capture output to LogBuffer
+	if m.LogBuffer != nil {
+		m.cmd.Stdout = m.LogBuffer
+		m.cmd.Stderr = m.LogBuffer
+	}
+	// Also output to console if requested
 	if config.LogOutput {
-		m.cmd.Stdout = os.Stdout
-		m.cmd.Stderr = os.Stderr
+		m.cmd.Stdout = io.MultiWriter(m.LogBuffer, os.Stdout)
+		m.cmd.Stderr = io.MultiWriter(m.LogBuffer, os.Stderr)
 	}
 
 	if err := m.cmd.Start(); err != nil {

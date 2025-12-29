@@ -17,7 +17,6 @@ services:
       dockerfile: Dockerfile.node
     container_name: mining-controller
     hostname: mining-controller
-    command: ["node", "serve", "--listen", ":9091"]
     ports:
       - "9091:9091"
     volumes:

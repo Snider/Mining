@@ -129,8 +129,9 @@ func TestXMRigMiner_Start_Stop_Good(t *testing.T) {
 	miner.MinerBinary = dummyExePath
 
 	config := &Config{
-		Pool:   "test:1234",
-		Wallet: "testwallet",
+		Pool:     "test:1234",
+		Wallet:   "testwallet",
+		HTTPPort: 9999, // Required for API port assignment
 	}
 
 	err := miner.Start(config)
@@ -177,14 +178,20 @@ func TestXMRigMiner_GetStats_Good(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		summary := XMRigSummary{
 			Hashrate: struct {
-				Total []float64 `json:"total"`
-			}{Total: []float64{123.45}},
+				Total   []float64 `json:"total"`
+				Highest float64   `json:"highest"`
+			}{Total: []float64{123.45}, Highest: 130.0},
 			Results: struct {
-				SharesGood  uint64 `json:"shares_good"`
-				SharesTotal uint64 `json:"shares_total"`
+				DiffCurrent int   `json:"diff_current"`
+				SharesGood  int   `json:"shares_good"`
+				SharesTotal int   `json:"shares_total"`
+				AvgTime     int   `json:"avg_time"`
+				AvgTimeMS   int   `json:"avg_time_ms"`
+				HashesTotal int   `json:"hashes_total"`
+				Best        []int `json:"best"`
 			}{SharesGood: 10, SharesTotal: 12},
-			Uptime:    600,
-			Algorithm: "rx/0",
+			Uptime: 600,
+			Algo:   "rx/0",
 		}
 		json.NewEncoder(w).Encode(summary)
 	}))

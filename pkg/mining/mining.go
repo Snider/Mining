@@ -26,6 +26,7 @@ type Miner interface {
 	GetHashrateHistory() []HashratePoint
 	AddHashratePoint(point HashratePoint)
 	ReduceHashrateHistory(now time.Time)
+	GetLogs() []string
 }
 
 // InstallationDetails contains information about an installed miner.
@@ -114,9 +115,9 @@ type Config struct {
 	Hash              string `json:"hash,omitempty"`
 	NoDMI             bool   `json:"noDMI,omitempty"`
 	// GPU-specific options
-	Devices           string `json:"devices,omitempty"`   // GPU device selection (e.g., "0,1,2")
-	Intensity         int    `json:"intensity,omitempty"` // Mining intensity for GPU miners
-	CLIArgs           string `json:"cliArgs,omitempty"`   // Additional CLI arguments
+	Devices   string `json:"devices,omitempty"`   // GPU device selection (e.g., "0,1,2")
+	Intensity int    `json:"intensity,omitempty"` // Mining intensity for GPU miners
+	CLIArgs   string `json:"cliArgs,omitempty"`   // Additional CLI arguments
 }
 
 // PerformanceMetrics represents the performance metrics for a miner.

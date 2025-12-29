@@ -1,23 +1,10 @@
-import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, inject, signal, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MinerService } from './miner.service';
 import { ChartComponent } from './chart.component';
+import { TerminalModalComponent } from './terminal-modal.component';
 
-// Import Web Awesome components
-import "@awesome.me/webawesome/dist/webawesome.js";
-import '@awesome.me/webawesome/dist/components/card/card.js';
-import '@awesome.me/webawesome/dist/components/button/button.js';
-import '@awesome.me/webawesome/dist/components/tooltip/tooltip.js';
-import '@awesome.me/webawesome/dist/components/icon/icon.js';
-import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
-import '@awesome.me/webawesome/dist/components/input/input.js';
-import '@awesome.me/webawesome/dist/components/select/select.js';
-import '@awesome.me/webawesome/dist/components/badge/badge.js';
-import '@awesome.me/webawesome/dist/components/details/details.js';
-import '@awesome.me/webawesome/dist/components/tab-group/tab-group.js';
-import '@awesome.me/webawesome/dist/components/tab/tab.js';
-import '@awesome.me/webawesome/dist/components/tab-panel/tab-panel.js';
 
 // Worker stats interface
 export interface WorkerStats {
@@ -36,16 +23,57 @@ export interface WorkerStats {
   selector: 'snider-mining-dashboard',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [CommonModule, FormsModule, ChartComponent],
+  imports: [CommonModule, FormsModule, ChartComponent, TerminalModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
-export class MiningDashboardComponent {
+export class MiningDashboardComponent implements OnDestroy {
   minerService = inject(MinerService);
   state = this.minerService.state;
   error = signal<string | null>(null);
   selectedProfileId = signal<string | null>(null);
   selectedMinerName = signal<string | null>(null); // For individual miner view
+  terminalMinerName: string | null = null; // For terminal modal
+
+  // Firewall warning - shows if miner running but no hashrate after 15 seconds
+  firewallWarningDismissed = signal<boolean>(false);
+
+  // Computed signal that checks if we should show the warning
+  firewallWarning = computed(() => {
+    if (this.firewallWarningDismissed()) return false;
+
+    const miners = this.runningMiners();
+    if (miners.length === 0) return false;
+
+    // Check if any miner has been running for 15+ seconds with no hashrate
+    for (const miner of miners) {
+      const uptime = miner.full_stats?.uptime || 0;
+      const hashrate = miner.full_stats?.hashrate?.total?.[0] || 0;
+
+      // If miner has been up for 15+ seconds but has no hashrate, show warning
+      if (uptime >= 15 && hashrate === 0) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  constructor() {
+    // Reset dismissed state when all miners stop
+    effect(() => {
+      if (this.runningMiners().length === 0) {
+        this.firewallWarningDismissed.set(false);
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    // cleanup if needed
+  }
+
+  dismissFirewallWarning() {
+    this.firewallWarningDismissed.set(true);
+  }
 
   // All running miners
   runningMiners = computed(() => this.state().runningMiners);
@@ -267,5 +295,14 @@ export class MiningDashboardComponent {
     const total = worker.shares + worker.rejected;
     if (total === 0) return 100;
     return (worker.shares / total) * 100;
+  }
+
+  // Terminal modal methods
+  openTerminal(minerName: string) {
+    this.terminalMinerName = minerName;
+  }
+
+  closeTerminal() {
+    this.terminalMinerName = null;
   }
 }

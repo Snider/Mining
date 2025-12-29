@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sync"
@@ -16,9 +17,9 @@ import (
 
 // TransportConfig configures the WebSocket transport.
 type TransportConfig struct {
-	ListenAddr   string        // ":9091" default
-	WSPath       string        // "/ws" - WebSocket endpoint path
-	TLSCertPath  string        // Optional TLS for wss://
+	ListenAddr   string // ":9091" default
+	WSPath       string // "/ws" - WebSocket endpoint path
+	TLSCertPath  string // Optional TLS for wss://
 	TLSKeyPath   string
 	MaxConns     int           // Maximum concurrent connections
 	PingInterval time.Duration // WebSocket keepalive interval
@@ -153,38 +154,42 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 		return nil, fmt.Errorf("failed to connect to peer: %w", err)
 	}
 
-	// Derive shared secret
-	sharedSecret, err := t.node.DeriveSharedSecret(peer.PublicKey)
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("failed to derive shared secret: %w", err)
-	}
-
 	pc := &PeerConnection{
 		Peer:         peer,
 		Conn:         conn,
-		SharedSecret: sharedSecret,
 		LastActivity: time.Now(),
 		transport:    t,
 	}
 
-	// Perform handshake
+	// Perform handshake first to exchange public keys
 	if err := t.performHandshake(pc); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("handshake failed: %w", err)
 	}
 
-	// Store connection
+	// Now derive shared secret using the received public key
+	sharedSecret, err := t.node.DeriveSharedSecret(pc.Peer.PublicKey)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to derive shared secret: %w", err)
+	}
+	pc.SharedSecret = sharedSecret
+
+	// Store connection using the real peer ID from handshake
 	t.mu.Lock()
-	t.conns[peer.ID] = pc
+	t.conns[pc.Peer.ID] = pc
 	t.mu.Unlock()
 
+	log.Printf("[Connect] Connected to %s, SharedSecret len: %d", pc.Peer.ID, len(pc.SharedSecret))
+
 	// Update registry
-	t.registry.SetConnected(peer.ID, true)
+	t.registry.SetConnected(pc.Peer.ID, true)
 
 	// Start read loop
 	t.wg.Add(1)
 	go t.readLoop(pc)
+
+	log.Printf("[Connect] Started readLoop for %s", pc.Peer.ID)
 
 	// Start keepalive
 	t.wg.Add(1)
@@ -383,6 +388,18 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 		return fmt.Errorf("handshake rejected: %s", ackPayload.Reason)
 	}
 
+	// Update peer with the received identity info
+	pc.Peer.ID = ackPayload.Identity.ID
+	pc.Peer.PublicKey = ackPayload.Identity.PublicKey
+	pc.Peer.Name = ackPayload.Identity.Name
+	pc.Peer.Role = ackPayload.Identity.Role
+
+	// Update the peer in registry with the real identity
+	if err := t.registry.UpdatePeer(pc.Peer); err != nil {
+		// If update fails (peer not found with old ID), add as new
+		t.registry.AddPeer(pc.Peer)
+	}
+
 	return nil
 }
 
@@ -400,6 +417,7 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 
 		_, data, err := pc.Conn.ReadMessage()
 		if err != nil {
+			log.Printf("[readLoop] Read error from %s: %v", pc.Peer.ID, err)
 			return
 		}
 
@@ -408,8 +426,11 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 		// Decrypt message using SMSG with shared secret
 		msg, err := t.decryptMessage(data, pc.SharedSecret)
 		if err != nil {
+			log.Printf("[readLoop] Decrypt error from %s: %v (data len: %d)", pc.Peer.ID, err, len(data))
 			continue // Skip invalid messages
 		}
+
+		log.Printf("[readLoop] Received %s from %s (reply to: %s)", msg.Type, pc.Peer.ID, msg.ReplyTo)
 
 		// Dispatch to handler
 		if t.handler != nil {

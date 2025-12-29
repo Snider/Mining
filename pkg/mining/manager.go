@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Snider/Mining/pkg/database"
 )
 
 // ManagerInterface defines the contract for a miner manager.
@@ -24,10 +26,12 @@ type ManagerInterface interface {
 
 // Manager handles the lifecycle and operations of multiple miners.
 type Manager struct {
-	miners    map[string]Miner
-	mu        sync.RWMutex
-	stopChan  chan struct{}
-	waitGroup sync.WaitGroup
+	miners      map[string]Miner
+	mu          sync.RWMutex
+	stopChan    chan struct{}
+	waitGroup   sync.WaitGroup
+	dbEnabled   bool
+	dbRetention int
 }
 
 var _ ManagerInterface = (*Manager)(nil)
@@ -40,9 +44,73 @@ func NewManager() *Manager {
 		waitGroup: sync.WaitGroup{},
 	}
 	m.syncMinersConfig() // Ensure config file is populated
+	m.initDatabase()
 	m.autostartMiners()
 	m.startStatsCollection()
 	return m
+}
+
+// initDatabase initializes the SQLite database based on config.
+func (m *Manager) initDatabase() {
+	cfg, err := LoadMinersConfig()
+	if err != nil {
+		log.Printf("Warning: could not load config for database init: %v", err)
+		return
+	}
+
+	m.dbEnabled = cfg.Database.Enabled
+	m.dbRetention = cfg.Database.RetentionDays
+	if m.dbRetention == 0 {
+		m.dbRetention = 30
+	}
+
+	if !m.dbEnabled {
+		log.Println("Database persistence is disabled")
+		return
+	}
+
+	dbCfg := database.Config{
+		Enabled:       true,
+		RetentionDays: m.dbRetention,
+	}
+
+	if err := database.Initialize(dbCfg); err != nil {
+		log.Printf("Warning: failed to initialize database: %v", err)
+		m.dbEnabled = false
+		return
+	}
+
+	log.Printf("Database persistence enabled (retention: %d days)", m.dbRetention)
+
+	// Start periodic cleanup
+	m.startDBCleanup()
+}
+
+// startDBCleanup starts a goroutine that periodically cleans old data.
+func (m *Manager) startDBCleanup() {
+	m.waitGroup.Add(1)
+	go func() {
+		defer m.waitGroup.Done()
+		// Run cleanup once per hour
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+
+		// Run initial cleanup
+		if err := database.Cleanup(m.dbRetention); err != nil {
+			log.Printf("Warning: database cleanup failed: %v", err)
+		}
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := database.Cleanup(m.dbRetention); err != nil {
+					log.Printf("Warning: database cleanup failed: %v", err)
+				}
+			case <-m.stopChan:
+				return
+			}
+		}
+	}()
 }
 
 // syncMinersConfig ensures the miners.json config file has entries for all available miners.
@@ -346,8 +414,17 @@ func (m *Manager) startStatsCollection() {
 func (m *Manager) collectMinerStats() {
 	m.mu.RLock()
 	minersToCollect := make([]Miner, 0, len(m.miners))
-	for _, miner := range m.miners {
+	minerTypes := make(map[string]string)
+	for name, miner := range m.miners {
 		minersToCollect = append(minersToCollect, miner)
+		// Determine miner type from name prefix
+		if strings.HasPrefix(name, "xmrig") {
+			minerTypes[name] = "xmrig"
+		} else if strings.HasPrefix(name, "tt-miner") || strings.HasPrefix(name, "ttminer") {
+			minerTypes[name] = "tt-miner"
+		} else {
+			minerTypes[name] = "unknown"
+		}
 	}
 	m.mu.RUnlock()
 
@@ -358,11 +435,28 @@ func (m *Manager) collectMinerStats() {
 			log.Printf("Error getting stats for miner %s: %v\n", miner.GetName(), err)
 			continue
 		}
-		miner.AddHashratePoint(HashratePoint{
+
+		point := HashratePoint{
 			Timestamp: now,
 			Hashrate:  stats.Hashrate,
-		})
+		}
+
+		// Add to in-memory history (rolling window)
+		miner.AddHashratePoint(point)
 		miner.ReduceHashrateHistory(now)
+
+		// Persist to database if enabled
+		if m.dbEnabled {
+			minerName := miner.GetName()
+			minerType := minerTypes[minerName]
+			dbPoint := database.HashratePoint{
+				Timestamp: point.Timestamp,
+				Hashrate:  point.Hashrate,
+			}
+			if err := database.InsertHashratePoint(minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
+				log.Printf("Warning: failed to persist hashrate for %s: %v", minerName, err)
+			}
+		}
 	}
 }
 
@@ -381,6 +475,56 @@ func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) 
 func (m *Manager) Stop() {
 	close(m.stopChan)
 	m.waitGroup.Wait()
+
+	// Close the database
+	if m.dbEnabled {
+		if err := database.Close(); err != nil {
+			log.Printf("Warning: failed to close database: %v", err)
+		}
+	}
+}
+
+// GetMinerHistoricalStats returns historical stats from the database for a miner.
+func (m *Manager) GetMinerHistoricalStats(minerName string) (*database.HashrateStats, error) {
+	if !m.dbEnabled {
+		return nil, fmt.Errorf("database persistence is disabled")
+	}
+	return database.GetHashrateStats(minerName)
+}
+
+// GetMinerHistoricalHashrate returns historical hashrate data from the database.
+func (m *Manager) GetMinerHistoricalHashrate(minerName string, since, until time.Time) ([]HashratePoint, error) {
+	if !m.dbEnabled {
+		return nil, fmt.Errorf("database persistence is disabled")
+	}
+
+	dbPoints, err := database.GetHashrateHistory(minerName, database.ResolutionHigh, since, until)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert database points to mining points
+	points := make([]HashratePoint, len(dbPoints))
+	for i, p := range dbPoints {
+		points[i] = HashratePoint{
+			Timestamp: p.Timestamp,
+			Hashrate:  p.Hashrate,
+		}
+	}
+	return points, nil
+}
+
+// GetAllMinerHistoricalStats returns historical stats for all miners from the database.
+func (m *Manager) GetAllMinerHistoricalStats() ([]database.HashrateStats, error) {
+	if !m.dbEnabled {
+		return nil, fmt.Errorf("database persistence is disabled")
+	}
+	return database.GetAllMinerStats()
+}
+
+// IsDatabaseEnabled returns whether database persistence is enabled.
+func (m *Manager) IsDatabaseEnabled() bool {
+	return m.dbEnabled
 }
 
 // Helper to convert port to string for net.JoinHostPort

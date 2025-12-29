@@ -1,6 +1,6 @@
 .chart-container {
   width: 100%;
-  height: 100%;
+  height: 300px;
   min-height: 200px;
   display: flex;
   flex-direction: column;
@@ -8,9 +8,15 @@
 
 .hashrate-chart {
   width: 100%;
-  height: 100%;
+  height: 300px;
   min-height: 200px;
   display: block;
+}
+
+/* Ensure Highcharts container fills the space */
+.hashrate-chart ::ng-deep .highcharts-container {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .chart-loading {
@@ -20,11 +26,6 @@
   justify-content: center;
   gap: 1rem;
   height: 200px;
-  color: var(--wa-color-neutral-500);
+  color: #94a3b8;
   font-size: 0.9rem;
-}
-
-.chart-loading wa-spinner {
-  font-size: 2rem;
-  --indicator-color: var(--wa-color-primary-600);
 }

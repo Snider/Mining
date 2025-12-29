@@ -41,20 +41,28 @@ func NewXMRigMiner() *XMRigMiner {
 			HashrateHistory:       make([]HashratePoint, 0),
 			LowResHashrateHistory: make([]HashratePoint, 0),
 			LastLowResAggregation: time.Now(),
+			LogBuffer:             NewLogBuffer(500), // Keep last 500 lines
 		},
 	}
 }
 
 // getXMRigConfigPath returns the platform-specific path for the xmrig.json file.
-func getXMRigConfigPath() (string, error) {
-	path, err := xdg.ConfigFile("lethean-desktop/xmrig.json")
+// If instanceName is provided, it creates an instance-specific config file.
+func getXMRigConfigPath(instanceName string) (string, error) {
+	configFileName := "xmrig.json"
+	if instanceName != "" && instanceName != "xmrig" {
+		// Use instance-specific config file (e.g., xmrig-78.json)
+		configFileName = instanceName + ".json"
+	}
+
+	path, err := xdg.ConfigFile("lethean-desktop/" + configFileName)
 	if err != nil {
 		// Fallback for non-XDG environments or when XDG variables are not set
 		homeDir, homeErr := os.UserHomeDir()
 		if homeErr != nil {
 			return "", homeErr
 		}
-		return filepath.Join(homeDir, ".config", "lethean-desktop", "xmrig.json"), nil
+		return filepath.Join(homeDir, ".config", "lethean-desktop", configFileName), nil
 	}
 	return path, nil
 }
@@ -116,8 +124,8 @@ func (m *XMRigMiner) Install() error {
 
 // Uninstall removes all files related to the XMRig miner, including its specific config file.
 func (m *XMRigMiner) Uninstall() error {
-	// Remove the specific xmrig.json config file using the centralized helper
-	configPath, err := getXMRigConfigPath()
+	// Remove the instance-specific config file
+	configPath, err := getXMRigConfigPath(m.Name)
 	if err == nil {
 		os.Remove(configPath) // Ignore error if it doesn't exist
 	}
@@ -150,8 +158,8 @@ func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
 		}
 	}
 
-	// Get the config path using the helper
-	configPath, err := getXMRigConfigPath()
+	// Get the config path using the helper (use instance name if set)
+	configPath, err := getXMRigConfigPath(m.Name)
 	if err != nil {
 		// Log the error but don't fail CheckInstallation if config path can't be determined
 		configPath = "Error: Could not determine config path"

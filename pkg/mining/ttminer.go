@@ -69,6 +69,7 @@ func NewTTMiner() *TTMiner {
 			HashrateHistory:       make([]HashratePoint, 0),
 			LowResHashrateHistory: make([]HashratePoint, 0),
 			LastLowResAggregation: time.Now(),
+			LogBuffer:             NewLogBuffer(500), // Keep last 500 lines
 		},
 	}
 }

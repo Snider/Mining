@@ -63,11 +63,31 @@ export class MinerService implements OnDestroy {
   // Separate signal for hashrate history as it updates frequently
   public hashrateHistory = signal<Map<string, HashratePoint[]>>(new Map());
 
+  // --- View Mode Signals (single/multi miner view) ---
+  public viewMode = signal<'all' | 'single'>('all');
+  public selectedMinerName = signal<string | null>(null);
+
   // --- Computed Signals for easy access in components ---
   public runningMiners = computed(() => this.state().runningMiners);
   public installedMiners = computed(() => this.state().installedMiners);
   public apiAvailable = computed(() => this.state().apiAvailable);
   public profiles = computed(() => this.state().profiles);
+
+  // Selected miner object (when in single mode)
+  public selectedMiner = computed(() => {
+    const name = this.selectedMinerName();
+    if (!name) return null;
+    return this.runningMiners().find(m => m.name === name) || null;
+  });
+
+  // Displayed miners based on view mode
+  public displayedMiners = computed(() => {
+    if (this.viewMode() === 'all') {
+      return this.runningMiners();
+    }
+    const selected = this.selectedMiner();
+    return selected ? [selected] : [];
+  });
 
   constructor(private http: HttpClient) {
     this.forceRefreshState();
@@ -164,6 +184,10 @@ export class MinerService implements OnDestroy {
     );
   }
 
+  getMinerLogs(minerName: string) {
+    return this.http.get<string[]>(`${this.apiBaseUrl}/miners/${minerName}/logs`);
+  }
+
   createProfile(profile: MiningProfile) {
     return this.http.post(`${this.apiBaseUrl}/profiles`, profile).pipe(
       tap(() => this.refreshProfiles())
@@ -180,6 +204,34 @@ export class MinerService implements OnDestroy {
     return this.http.delete(`${this.apiBaseUrl}/profiles/${profileId}`).pipe(
       tap(() => this.refreshProfiles())
     );
+  }
+
+  // --- View Mode Methods ---
+
+  /**
+   * Select a specific miner for single-miner view
+   */
+  selectMiner(minerName: string) {
+    this.selectedMinerName.set(minerName);
+    this.viewMode.set('single');
+  }
+
+  /**
+   * Switch to all-miners view
+   */
+  selectAllMiners() {
+    this.selectedMinerName.set(null);
+    this.viewMode.set('all');
+  }
+
+  /**
+   * Find the profile associated with a running miner
+   */
+  getProfileForMiner(minerName: string): MiningProfile | null {
+    // Extract miner type from the name (e.g., "xmrig-123" -> "xmrig")
+    const minerType = minerName.split('-')[0];
+    // Find matching profile by miner type
+    return this.profiles().find(p => p.minerType === minerType) || null;
   }
 
   // --- Private Endpoints and Helpers ---

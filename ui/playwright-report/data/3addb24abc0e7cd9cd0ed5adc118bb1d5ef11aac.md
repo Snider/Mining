@@ -1,0 +1,70 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e5]:
+  - complementary [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - img
+        - generic [ref=e11]: Mining
+      - button [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation [ref=e15]:
+      - button "Workers" [ref=e16] [cursor=pointer]:
+        - generic [ref=e18]: Workers
+      - button "Graphs" [ref=e19] [cursor=pointer]:
+        - generic [ref=e21]: Graphs
+      - button "Console" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]: Console
+      - button "Pools" [ref=e25] [cursor=pointer]:
+        - generic [ref=e27]: Pools
+      - button "Profiles" [ref=e28] [cursor=pointer]:
+        - generic [ref=e30]: Profiles
+      - button "Miners" [ref=e31] [cursor=pointer]:
+        - generic [ref=e33]: Miners
+    - generic [ref=e37]: Mining Active
+  - generic [ref=e38]:
+    - generic [ref=e39]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - img [ref=e43]
+          - generic [ref=e45]:
+            - generic [ref=e46]: "0"
+            - generic [ref=e47]: H/s
+          - generic [ref=e48]: Hashrate
+        - generic [ref=e50]:
+          - img [ref=e51]
+          - generic [ref=e54]: "0"
+          - generic [ref=e55]: Shares
+        - generic [ref=e57]:
+          - img [ref=e58]
+          - generic [ref=e61]: 8s
+          - generic [ref=e62]: Uptime
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - generic [ref=e68]: Not connected
+          - generic [ref=e69]: Pool
+        - generic [ref=e71]:
+          - img [ref=e72]
+          - generic [ref=e75]: "1"
+          - generic [ref=e76]: Workers
+      - button "All Workers (1)" [ref=e79] [cursor=pointer]:
+        - generic [ref=e80]:
+          - img [ref=e81]
+          - generic [ref=e83]: All Workers
+          - generic [ref=e84]: (1)
+        - img [ref=e85]
+    - generic [ref=e89]:
+      - generic [ref=e91]:
+        - generic [ref=e92]: "Worker:"
+        - combobox [ref=e93] [cursor=pointer]:
+          - option "xmrig-279" [selected]
+      - paragraph [ref=e96]: Waiting for logs from xmrig-279...
+      - generic [ref=e97]:
+        - generic [ref=e98] [cursor=pointer]:
+          - checkbox "Auto-scroll" [checked] [ref=e99]
+          - generic [ref=e100]: Auto-scroll
+        - button "Clear" [disabled] [ref=e101]:
+          - img
+          - text: Clear
+```

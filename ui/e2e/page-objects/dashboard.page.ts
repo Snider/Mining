@@ -12,7 +12,7 @@ export class DashboardPage {
   constructor(page: Page) {
     this.page = page;
     this.dashboard = page.locator('snider-mining-dashboard').first();
-    this.statsBarContainer = page.locator('.stats-bar-container').first();
+    this.statsBarContainer = page.locator('.quick-stats').first();
     this.statsListContainer = page.locator('.stats-list-container').first();
     this.chartContainer = page.locator('.chart-container').first();
     this.noMinersMessage = page.locator('text=No miners running').first();

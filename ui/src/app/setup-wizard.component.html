@@ -1,56 +1,65 @@
-<div class="setup-wizard">
-  <div class="header-title">
-    <wa-icon name="cpu" style="font-size: 1.5rem;"></wa-icon>
+<div class="setup-wizard flex flex-col gap-6 p-6 max-w-md mx-auto">
+  <div class="flex items-center gap-3 text-xl font-semibold">
+    <svg class="w-6 h-6 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+    </svg>
     <span>Setup Required</span>
   </div>
 
-  <p>To begin, please install a miner from the list below.</p>
-  <h4>Available Miners</h4>
-  <div class="miner-list">
+  <p class="text-slate-400">To begin, please install a miner from the list below.</p>
+
+  <h4 class="text-lg font-medium">Available Miners</h4>
+
+  <div class="flex flex-col gap-2">
     @for (miner of state().manageableMiners; track miner.name) {
-      <div class="miner-item">
-        <span>{{ miner.name }}</span>
+      <div class="flex items-center justify-between p-3 card">
+        <span class="font-medium">{{ miner.name }}</span>
         @if (miner.is_installed) {
-          <wa-button
-            variant="danger"
-            size="small"
+          <button
+            class="btn btn-danger btn-sm"
             [disabled]="actionInProgress() === 'uninstall-' + miner.name"
             (click)="uninstallMiner(miner.name)">
             @if (actionInProgress() === 'uninstall-' + miner.name) {
-              <wa-spinner class="button-spinner"></wa-spinner>
+              <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
             } @else {
-              <wa-icon name="trash" slot="prefix"></wa-icon>
-              Uninstall
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
             }
-          </wa-button>
+            Uninstall
+          </button>
         } @else {
-          <wa-button
-            variant="success"
-            size="small"
+          <button
+            class="btn btn-primary btn-sm"
             [disabled]="actionInProgress() === 'install-' + miner.name"
             (click)="installMiner(miner.name)">
             @if (actionInProgress() === 'install-' + miner.name) {
-              <wa-spinner class="button-spinner"></wa-spinner>
+              <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
             } @else {
-              <wa-icon name="download" slot="prefix"></wa-icon>
-              Install
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
             }
-          </wa-button>
+            Install
+          </button>
         }
       </div>
     } @empty {
-      <div class="miner-item">
-        <span>Could not load available miners.</span>
+      <div class="card p-4">
+        <span class="text-slate-400">Could not load available miners.</span>
       </div>
     }
   </div>
+
   @if (error()) {
-    <wa-card class="card-error">
-      <div slot="header">
-        <wa-icon name="exclamation-triangle" style="font-size: 1.5rem;"></wa-icon>
+    <div class="card bg-danger-50 border-danger-500 p-4">
+      <div class="flex items-center gap-2 text-danger-600 font-semibold mb-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
         An Error Occurred
       </div>
-      <p>{{ error() }}</p>
-    </wa-card>
+      <p class="text-sm">{{ error() }}</p>
+    </div>
   }
 </div>

@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, inject, effect, signal, Input } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, effect, Input, ViewEncapsulation, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HighchartsChartComponent, ChartConstructorType } from 'highcharts-angular';
 import * as Highcharts from 'highcharts';
@@ -13,81 +13,152 @@ type SeriesWithData = Highcharts.SeriesAreaOptions | Highcharts.SeriesSplineOpti
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [CommonModule, HighchartsChartComponent],
   templateUrl: './chart.component.html',
-  styleUrls: ['./chart.component.css']
+  styleUrls: ['./chart.component.css'],
+  encapsulation: ViewEncapsulation.None
 })
 export class ChartComponent {
-  @Input() minerName?: string;
-  minerService = inject(MinerService);
+  private minerService = inject(MinerService);
+  private destroyRef = inject(DestroyRef);
 
   Highcharts: typeof Highcharts = Highcharts;
   chartConstructor: ChartConstructorType = 'chart';
-  chartOptions = signal<Highcharts.Options>({});
-  updateFlag = signal(false);
+
+  // Use regular properties instead of signals for Highcharts compatibility
+  chartOptions: Highcharts.Options;
+  updateFlag = false;
+  chartReady = false;
+  private chartRef: Highcharts.Chart | null = null;
+
+  // Callback when chart is created
+  chartCallback = (chart: Highcharts.Chart) => {
+    console.log('[Chart] Chart callback called!');
+    this.chartRef = chart;
+    this.chartReady = true;
+  };
+
+  // Consistent colors per miner name
+  private minerColors: Map<string, string> = new Map();
+  private colorPalette = [
+    '#6366f1', '#22c55e', '#f59e0b', '#ef4444',
+    '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
+  ];
+  private nextColorIndex = 0;
+
+  private getColorForMiner(minerName: string): string {
+    if (!this.minerColors.has(minerName)) {
+      this.minerColors.set(minerName, this.colorPalette[this.nextColorIndex % this.colorPalette.length]);
+      this.nextColorIndex++;
+    }
+    return this.minerColors.get(minerName)!;
+  }
 
   constructor() {
-    this.chartOptions.set(this.createBaseChartOptions());
+    // Initialize with valid chart options
+    this.chartOptions = {
+      ...this.createBaseChartOptions(),
+      chart: {
+        ...this.createBaseChartOptions().chart,
+        type: 'area'
+      },
+      title: { text: 'Total Hashrate' },
+      plotOptions: {
+        area: {
+          stacking: 'normal',
+          marker: { enabled: false },
+          lineWidth: 2,
+          fillOpacity: 0.3
+        }
+      },
+      series: [] // Start empty, will be populated by effect
+    };
 
-    effect(() => {
+    // Create effect with proper cleanup
+    const effectRef = effect(() => {
       const historyMap = this.minerService.hashrateHistory();
-      let yAxisOptions: Highcharts.YAxisOptions = {};
 
-      if (this.minerName) {
-        // Single miner mode
-        const history = historyMap.get(this.minerName);
-        const chartData = history ? history.map(point => [new Date(point.timestamp).getTime(), point.hashrate]) : [];
+      // Skip if no data
+      if (historyMap.size === 0) {
+        return;
+      }
 
-        yAxisOptions = this.calculateYAxisBoundsForSingle(chartData.map(d => d[1]));
-
-        this.chartOptions.update(options => ({
-          ...options,
-          title: { text: `${this.minerName} Hashrate` },
-          chart: { type: 'spline' },
-          plotOptions: { area: undefined, spline: { marker: { enabled: false } } },
-          yAxis: { ...options.yAxis, ...yAxisOptions },
-          series: [{ type: 'spline', name: 'Hashrate', data: chartData }]
-        }));
-
-      } else {
-        // Overview mode
-        if (historyMap.size === 0) {
-          this.chartOptions.update(options => ({ ...options, series: [] }));
-        } else {
-          const newSeries: SeriesWithData[] = [];
-          historyMap.forEach((history, name) => {
-            const chartData = history.map(point => [new Date(point.timestamp).getTime(), point.hashrate]);
-            newSeries.push({ type: 'area', name: name, data: chartData });
-          });
-
-          yAxisOptions = this.calculateYAxisBoundsForStacked(newSeries);
-
-          this.chartOptions.update(options => ({
-            ...options,
-            title: { text: 'Total Hashrate' },
-            chart: { type: 'area' },
-            plotOptions: { area: { stacking: 'normal', marker: { enabled: false } } },
-            yAxis: { ...options.yAxis, ...yAxisOptions },
-            series: newSeries
-          }));
+      // Clean up colors for miners no longer active
+      const activeNames = new Set(historyMap.keys());
+      for (const name of this.minerColors.keys()) {
+        if (!activeNames.has(name)) {
+          this.minerColors.delete(name);
         }
       }
 
-      this.updateFlag.update(flag => !flag);
+      // Build series data with consistent colors per miner
+      const newSeries: SeriesWithData[] = [];
+      historyMap.forEach((history, name) => {
+        const chartData = history.map(point => [new Date(point.timestamp).getTime(), point.hashrate]);
+        newSeries.push({
+          type: 'area',
+          name: name,
+          data: chartData,
+          color: this.getColorForMiner(name),
+          fillOpacity: 0.4
+        } as SeriesWithData);
+      });
+
+      const yAxisOptions = this.calculateYAxisBoundsForStacked(newSeries);
+
+      // Build new chart options
+      this.chartOptions = {
+        ...this.createBaseChartOptions(),
+        title: { text: 'Total Hashrate' },
+        chart: {
+          ...this.createBaseChartOptions().chart,
+          type: 'area'
+        },
+        legend: {
+          enabled: historyMap.size > 1,
+          align: 'center',
+          verticalAlign: 'bottom',
+          itemStyle: {
+            color: '#666',
+            fontSize: '11px'
+          }
+        },
+        plotOptions: {
+          area: {
+            stacking: 'normal',
+            marker: { enabled: false },
+            lineWidth: 2,
+            fillOpacity: 0.3
+          }
+        },
+        yAxis: { ...this.createBaseChartOptions().yAxis, ...yAxisOptions },
+        series: newSeries
+      };
+
+      // Toggle update flag to trigger Highcharts redraw
+      this.updateFlag = !this.updateFlag;
     });
+
+    // Register cleanup
+    this.destroyRef.onDestroy(() => effectRef.destroy());
   }
 
   private calculateYAxisBoundsForSingle(data: number[]): Highcharts.YAxisOptions {
     if (data.length === 0) {
-      return { min: 0, max: undefined };
+      return { min: 0, max: 100 }; // Default range when no data
     }
 
     const min = Math.min(...data);
     const max = Math.max(...data);
 
+    // Handle case where all values are 0 or very small
+    if (max <= 0) {
+      return { min: 0, max: 100 }; // Default range
+    }
+
     if (min === max) {
       return { min: Math.max(0, min - 50), max: max + 50 };
     }
 
-    const padding = (max - min) * 0.1; // 10% padding
+    const padding = (max - min) * 0.1;
 
     return {
       min: Math.max(0, min - padding),
@@ -99,8 +170,6 @@ export class ChartComponent {
     const totalsByTimestamp: { [key: number]: number } = {};
 
     series.forEach(s => {
-      // Cast to any to avoid TS errors with union types where 'data' might be missing on some types
-      // even though we know SeriesWithData has it.
       const data = (s as any).data;
       if (data) {
         (data as [number, number][]).forEach(([timestamp, value]) => {
@@ -111,14 +180,20 @@ export class ChartComponent {
 
     const totalValues = Object.values(totalsByTimestamp);
     if (totalValues.length === 0) {
-      return { min: 0, max: undefined };
+      return { min: 0, max: 100 }; // Default range when no data
     }
 
     const maxTotal = Math.max(...totalValues);
-    const padding = maxTotal * 0.1; // 10% padding on top
+
+    // Handle case where all values are 0 or very small
+    if (maxTotal <= 0) {
+      return { min: 0, max: 100 }; // Default range
+    }
+
+    const padding = maxTotal * 0.1;
 
     return {
-      min: 0, // Stacked chart should always start at 0
+      min: 0,
       max: maxTotal + padding
     };
   }
@@ -128,7 +203,7 @@ export class ChartComponent {
       chart: {
         backgroundColor: 'transparent',
         style: {
-          fontFamily: 'var(--wa-font-sans, system-ui, sans-serif)'
+          fontFamily: 'var(--font-family-sans, system-ui, sans-serif)'
         },
         spacing: [10, 10, 10, 10]
       },
@@ -136,11 +211,11 @@ export class ChartComponent {
       xAxis: {
         type: 'datetime',
         title: { text: '' },
-        lineColor: 'var(--wa-color-neutral-300)',
-        tickColor: 'var(--wa-color-neutral-300)',
+        lineColor: '#374151',
+        tickColor: '#374151',
         labels: {
           style: {
-            color: 'var(--wa-color-neutral-600)',
+            color: '#94a3b8',
             fontSize: '11px'
           }
         },
@@ -150,7 +225,7 @@ export class ChartComponent {
         title: { text: '' },
         labels: {
           style: {
-            color: 'var(--wa-color-neutral-600)',
+            color: '#94a3b8',
             fontSize: '11px'
           },
           formatter: function() {
@@ -160,15 +235,15 @@ export class ChartComponent {
             return val + ' H/s';
           }
         },
-        gridLineColor: 'var(--wa-color-neutral-200)',
+        gridLineColor: '#252542',
         gridLineDashStyle: 'Dash'
       },
       legend: {
         enabled: false
       },
       tooltip: {
-        backgroundColor: 'var(--wa-color-neutral-900)',
-        borderColor: 'var(--wa-color-neutral-700)',
+        backgroundColor: '#0f0f1a',
+        borderColor: '#374151',
         borderRadius: 8,
         style: {
           color: '#fff',
@@ -190,12 +265,12 @@ export class ChartComponent {
           fillOpacity: 0.3,
           lineWidth: 2,
           marker: { enabled: false },
-          color: 'var(--wa-color-primary-600)'
+          color: '#00d4ff'
         },
         spline: {
           lineWidth: 2.5,
           marker: { enabled: false },
-          color: 'var(--wa-color-primary-600)'
+          color: '#00d4ff'
         }
       },
       series: [],

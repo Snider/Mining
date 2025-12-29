@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -38,8 +39,8 @@ func (m *XMRigMiner) Start(config *Config) error {
 			return err
 		}
 	} else {
-		// Use the centralized helper to get the config path
-		configPath, err := getXMRigConfigPath()
+		// Use the centralized helper to get the instance-specific config path
+		configPath, err := getXMRigConfigPath(m.Name)
 		if err != nil {
 			return fmt.Errorf("could not determine config file path: %w", err)
 		}
@@ -49,7 +50,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 		}
 	}
 
-	args := []string{"-c", "\"" + m.ConfigPath + "\""}
+	args := []string{"-c", m.ConfigPath}
 
 	if m.API != nil && m.API.Enabled {
 		args = append(args, "--http-host", m.API.ListenHost, "--http-port", fmt.Sprintf("%d", m.API.ListenPort))
@@ -61,9 +62,15 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
+	// Always capture output to LogBuffer
+	if m.LogBuffer != nil {
+		m.cmd.Stdout = m.LogBuffer
+		m.cmd.Stderr = m.LogBuffer
+	}
+	// Also output to console if requested
 	if config.LogOutput {
-		m.cmd.Stdout = os.Stdout
-		m.cmd.Stderr = os.Stderr
+		m.cmd.Stdout = io.MultiWriter(m.LogBuffer, os.Stdout)
+		m.cmd.Stderr = io.MultiWriter(m.LogBuffer, os.Stderr)
 	}
 
 	if err := m.cmd.Start(); err != nil {
@@ -79,6 +86,21 @@ func (m *XMRigMiner) Start(config *Config) error {
 		m.cmd = nil
 		m.mu.Unlock()
 	}()
+
+	return nil
+}
+
+// Stop terminates the miner process and cleans up the instance-specific config file.
+func (m *XMRigMiner) Stop() error {
+	// Call the base Stop to kill the process
+	if err := m.BaseMiner.Stop(); err != nil {
+		return err
+	}
+
+	// Clean up the instance-specific config file
+	if m.ConfigPath != "" {
+		os.Remove(m.ConfigPath) // Ignore error if it doesn't exist
+	}
 
 	return nil
 }
@@ -105,8 +127,8 @@ func addCliArgs(config *Config, args *[]string) {
 
 // createConfig creates a JSON configuration file for the XMRig miner.
 func (m *XMRigMiner) createConfig(config *Config) error {
-	// Use the centralized helper to get the config path
-	configPath, err := getXMRigConfigPath()
+	// Use the centralized helper to get the instance-specific config path
+	configPath, err := getXMRigConfigPath(m.Name)
 	if err != nil {
 		return err
 	}

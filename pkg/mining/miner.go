@@ -23,6 +23,62 @@ import (
 	"github.com/adrg/xdg"
 )
 
+// LogBuffer is a thread-safe ring buffer for capturing miner output.
+type LogBuffer struct {
+	lines    []string
+	maxLines int
+	mu       sync.RWMutex
+}
+
+// NewLogBuffer creates a new log buffer with the specified max lines.
+func NewLogBuffer(maxLines int) *LogBuffer {
+	return &LogBuffer{
+		lines:    make([]string, 0, maxLines),
+		maxLines: maxLines,
+	}
+}
+
+// Write implements io.Writer for capturing output.
+func (lb *LogBuffer) Write(p []byte) (n int, err error) {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+
+	// Split input into lines
+	text := string(p)
+	newLines := strings.Split(text, "\n")
+
+	for _, line := range newLines {
+		if line == "" {
+			continue
+		}
+		// Add timestamp prefix
+		timestampedLine := fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), line)
+		lb.lines = append(lb.lines, timestampedLine)
+
+		// Trim if over max
+		if len(lb.lines) > lb.maxLines {
+			lb.lines = lb.lines[len(lb.lines)-lb.maxLines:]
+		}
+	}
+	return len(p), nil
+}
+
+// GetLines returns all captured log lines.
+func (lb *LogBuffer) GetLines() []string {
+	lb.mu.RLock()
+	defer lb.mu.RUnlock()
+	result := make([]string, len(lb.lines))
+	copy(result, lb.lines)
+	return result
+}
+
+// Clear clears the log buffer.
+func (lb *LogBuffer) Clear() {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.lines = lb.lines[:0]
+}
+
 // BaseMiner provides a foundation for specific miner implementations.
 type BaseMiner struct {
 	Name                  string `json:"name"`
@@ -39,6 +95,7 @@ type BaseMiner struct {
 	HashrateHistory       []HashratePoint `json:"hashrateHistory"`
 	LowResHashrateHistory []HashratePoint `json:"lowResHashrateHistory"`
 	LastLowResAggregation time.Time       `json:"-"`
+	LogBuffer             *LogBuffer      `json:"-"`
 }
 
 // GetName returns the name of the miner.
@@ -271,6 +328,28 @@ func (b *BaseMiner) AddHashratePoint(point HashratePoint) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.HashrateHistory = append(b.HashrateHistory, point)
+}
+
+// GetHighResHistoryLength returns the number of high-resolution hashrate points.
+func (b *BaseMiner) GetHighResHistoryLength() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.HashrateHistory)
+}
+
+// GetLowResHistoryLength returns the number of low-resolution hashrate points.
+func (b *BaseMiner) GetLowResHistoryLength() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.LowResHashrateHistory)
+}
+
+// GetLogs returns the captured log output from the miner process.
+func (b *BaseMiner) GetLogs() []string {
+	if b.LogBuffer == nil {
+		return []string{}
+	}
+	return b.LogBuffer.GetLines()
 }
 
 // ReduceHashrateHistory aggregates and trims hashrate data.

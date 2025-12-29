@@ -3,6 +3,7 @@ package node
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -94,7 +95,12 @@ func (w *Worker) HandleMessage(conn *PeerConnection, msg *Message) {
 	}
 
 	if response != nil {
-		conn.Send(response)
+		log.Printf("[Worker] Sending %s response to %s", response.Type, msg.From)
+		if err := conn.Send(response); err != nil {
+			log.Printf("[Worker] Failed to send response: %v", err)
+		} else {
+			log.Printf("[Worker] Response sent successfully")
+		}
 	}
 }
 

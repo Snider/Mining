@@ -66,7 +66,7 @@ const docTemplate = `{
         },
         "/miners": {
             "get": {
-                "description": "Get a list of all running miners, including their full stats.",
+                "description": "Get a list of all running miners",
                 "produces": [
                     "application/json"
                 ],
@@ -79,7 +79,9 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "array",
-                            "items": {}
+                            "items": {
+                                "$ref": "#/definitions/mining.XMRigMiner"
+                            }
                         }
                     }
                 }
@@ -166,6 +168,38 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/mining.HashratePoint"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/miners/{miner_name}/logs": {
+            "get": {
+                "description": "Get the captured stdout/stderr output from a running miner",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miners"
+                ],
+                "summary": "Get miner log output",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Miner Name",
+                        "name": "miner_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
                             }
                         }
                     }
