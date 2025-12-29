@@ -1,4 +1,17 @@
 <div class="chart-container">
+  <div class="chart-header">
+    <h3 class="chart-title">Hashrate History</h3>
+    <div class="time-range-selector">
+      @for (range of minerService.timeRanges; track range.minutes) {
+        <button
+          class="time-range-btn"
+          [class.active]="minerService.selectedTimeRange() === range.minutes"
+          (click)="minerService.setTimeRange(range.minutes)">
+          {{ range.label }}
+        </button>
+      }
+    </div>
+  </div>
   <highcharts-chart
     class="hashrate-chart"
     [Highcharts]="Highcharts"

@@ -10,7 +10,7 @@ import { MainLayoutComponent } from './layouts/main-layout.component';
   imports: [
     CommonModule,
     SetupWizardComponent,
-    MainLayoutComponent
+    MainLayoutComponent,
   ],
   templateUrl: './app.html',
   styleUrls: ['./app.css'],

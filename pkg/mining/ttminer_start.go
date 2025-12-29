@@ -39,6 +39,13 @@ func (m *TTMiner) Start(config *Config) error {
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
+	// Create stdin pipe for console commands
+	stdinPipe, err := m.cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+	m.stdinPipe = stdinPipe
+
 	// Always capture output to LogBuffer
 	if m.LogBuffer != nil {
 		m.cmd.Stdout = m.LogBuffer

@@ -63,6 +63,24 @@ export class MinerService implements OnDestroy {
   // Separate signal for hashrate history as it updates frequently
   public hashrateHistory = signal<Map<string, HashratePoint[]>>(new Map());
 
+  // Historical hashrate data from database with configurable time range
+  public historicalHashrate = signal<Map<string, HashratePoint[]>>(new Map());
+  public selectedTimeRange = signal<number>(60); // Default 60 minutes
+  private historyPollingSubscription?: Subscription;
+
+  // Available time ranges in minutes
+  public readonly timeRanges = [
+    { label: '5m', minutes: 5 },
+    { label: '15m', minutes: 15 },
+    { label: '30m', minutes: 30 },
+    { label: '45m', minutes: 45 },
+    { label: '1h', minutes: 60 },
+    { label: '3h', minutes: 180 },
+    { label: '6h', minutes: 360 },
+    { label: '12h', minutes: 720 },
+    { label: '24h', minutes: 1440 },
+  ];
+
   // --- View Mode Signals (single/multi miner view) ---
   public viewMode = signal<'all' | 'single'>('all');
   public selectedMinerName = signal<string | null>(null);
@@ -92,10 +110,12 @@ export class MinerService implements OnDestroy {
   constructor(private http: HttpClient) {
     this.forceRefreshState();
     this.startPollingLive_Data();
+    this.startPollingHistoricalData();
   }
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.historyPollingSubscription?.unsubscribe();
   }
 
   // --- Data Loading and Polling Logic ---
@@ -116,6 +136,8 @@ export class MinerService implements OnDestroy {
       if (initialState) {
         this.state.set(initialState);
         this.updateHashrateHistory(initialState.runningMiners);
+        // Fetch historical data now that we know which miners are running
+        this.fetchHistoricalHashrate();
       }
     });
   }
@@ -130,6 +152,66 @@ export class MinerService implements OnDestroy {
       this.state.update(s => ({ ...s, runningMiners }));
       this.updateHashrateHistory(runningMiners);
     });
+  }
+
+  /**
+   * Starts a polling interval to fetch historical data from database.
+   * Polls every 30 seconds. Initial fetch happens in forceRefreshState after miners are loaded.
+   */
+  private startPollingHistoricalData() {
+    // Poll every 30 seconds (initial fetch happens in forceRefreshState)
+    this.historyPollingSubscription = interval(30000).subscribe(() => {
+      this.fetchHistoricalHashrate();
+    });
+  }
+
+  /**
+   * Fetches 24-hour historical hashrate data for all running miners from the database.
+   */
+  private fetchHistoricalHashrate() {
+    const runningMiners = this.state().runningMiners;
+    if (runningMiners.length === 0) {
+      this.historicalHashrate.set(new Map());
+      return;
+    }
+
+    // Fetch historical data for each running miner
+    const requests = runningMiners.map(miner =>
+      this.getHistoricalHashrateForMiner(miner.name).pipe(
+        map(data => ({ name: miner.name, data })),
+        catchError(() => of({ name: miner.name, data: [] as HashratePoint[] }))
+      )
+    );
+
+    forkJoin(requests).subscribe(results => {
+      const newHistory = new Map<string, HashratePoint[]>();
+      results.forEach(result => {
+        if (result.data && result.data.length > 0) {
+          newHistory.set(result.name, result.data);
+        }
+      });
+      this.historicalHashrate.set(newHistory);
+    });
+  }
+
+  /**
+   * Fetches historical hashrate for a specific miner based on selected time range.
+   */
+  private getHistoricalHashrateForMiner(minerName: string) {
+    const minutes = this.selectedTimeRange();
+    const since = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+    const until = new Date().toISOString();
+    return this.http.get<HashratePoint[]>(
+      `${this.apiBaseUrl}/history/miners/${minerName}/hashrate?since=${since}&until=${until}`
+    );
+  }
+
+  /**
+   * Sets the time range for historical data and refreshes immediately.
+   */
+  public setTimeRange(minutes: number) {
+    this.selectedTimeRange.set(minutes);
+    this.fetchHistoricalHashrate();
   }
 
   private stopPolling() {
@@ -185,7 +267,24 @@ export class MinerService implements OnDestroy {
   }
 
   getMinerLogs(minerName: string) {
-    return this.http.get<string[]>(`${this.apiBaseUrl}/miners/${minerName}/logs`);
+    return this.http.get<string[]>(`${this.apiBaseUrl}/miners/${minerName}/logs`).pipe(
+      map(logs => logs.map(line => {
+        try {
+          // Decode base64 encoded log lines
+          return atob(line);
+        } catch {
+          // If decoding fails, return the original line
+          return line;
+        }
+      }))
+    );
+  }
+
+  sendStdin(minerName: string, input: string) {
+    return this.http.post<{status: string, input: string}>(
+      `${this.apiBaseUrl}/miners/${minerName}/stdin`,
+      { input }
+    );
   }
 
   createProfile(profile: MiningProfile) {

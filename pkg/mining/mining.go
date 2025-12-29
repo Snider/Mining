@@ -27,6 +27,7 @@ type Miner interface {
 	AddHashratePoint(point HashratePoint)
 	ReduceHashrateHistory(now time.Time)
 	GetLogs() []string
+	WriteStdin(input string) error
 }
 
 // InstallationDetails contains information about an installed miner.

@@ -92,6 +92,7 @@ type BaseMiner struct {
 	API                   *API   `json:"api"`
 	mu                    sync.RWMutex
 	cmd                   *exec.Cmd
+	stdinPipe             io.WriteCloser  `json:"-"`
 	HashrateHistory       []HashratePoint `json:"hashrateHistory"`
 	LowResHashrateHistory []HashratePoint `json:"lowResHashrateHistory"`
 	LastLowResAggregation time.Time       `json:"-"`
@@ -135,7 +136,31 @@ func (b *BaseMiner) Stop() error {
 		return errors.New("miner is not running")
 	}
 
+	// Close stdin pipe if open
+	if b.stdinPipe != nil {
+		b.stdinPipe.Close()
+		b.stdinPipe = nil
+	}
+
 	return b.cmd.Process.Kill()
+}
+
+// WriteStdin sends input to the miner's stdin (for console commands).
+func (b *BaseMiner) WriteStdin(input string) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if !b.Running || b.stdinPipe == nil {
+		return errors.New("miner is not running or stdin not available")
+	}
+
+	// Append newline if not present
+	if !strings.HasSuffix(input, "\n") {
+		input += "\n"
+	}
+
+	_, err := b.stdinPipe.Write([]byte(input))
+	return err
 }
 
 // Uninstall removes all files related to the miner.

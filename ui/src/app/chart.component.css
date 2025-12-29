@@ -1,9 +1,53 @@
 .chart-container {
   width: 100%;
-  height: 300px;
   min-height: 200px;
   display: flex;
   flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  gap: 1rem;
+}
+
+.chart-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.time-range-selector {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.time-range-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-range-btn:hover {
+  color: #e2e8f0;
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.time-range-btn.active {
+  color: var(--color-accent-400, #00d4ff);
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--color-accent-500, #00d4ff);
 }
 
 .hashrate-chart {

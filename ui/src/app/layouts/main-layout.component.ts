@@ -1,31 +1,21 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
+import { filter, map } from 'rxjs/operators';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
 import { StatsPanelComponent } from '../components/stats-panel/stats-panel.component';
 import { MinerSwitcherComponent } from '../components/miner-switcher/miner-switcher.component';
-import { WorkersComponent } from '../pages/workers/workers.component';
-import { GraphsComponent } from '../pages/graphs/graphs.component';
-import { ConsoleComponent } from '../pages/console/console.component';
-import { PoolsComponent } from '../pages/pools/pools.component';
-import { ProfilesComponent } from '../pages/profiles/profiles.component';
-import { MinersComponent } from '../pages/miners/miners.component';
-import { NodesComponent } from '../pages/nodes/nodes.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
   imports: [
     CommonModule,
+    RouterOutlet,
     SidebarComponent,
     StatsPanelComponent,
     MinerSwitcherComponent,
-    WorkersComponent,
-    GraphsComponent,
-    ConsoleComponent,
-    PoolsComponent,
-    ProfilesComponent,
-    MinersComponent,
-    NodesComponent
   ],
   template: `
     <div class="main-layout">
@@ -38,32 +28,7 @@ import { NodesComponent } from '../pages/nodes/nodes.component';
         </div>
 
         <div class="page-content">
-          @switch (currentRoute()) {
-            @case ('workers') {
-              <app-workers></app-workers>
-            }
-            @case ('graphs') {
-              <app-graphs></app-graphs>
-            }
-            @case ('console') {
-              <app-console></app-console>
-            }
-            @case ('pools') {
-              <app-pools></app-pools>
-            }
-            @case ('profiles') {
-              <app-profiles></app-profiles>
-            }
-            @case ('miners') {
-              <app-miners></app-miners>
-            }
-            @case ('nodes') {
-              <app-nodes></app-nodes>
-            }
-            @default {
-              <app-workers></app-workers>
-            }
-          }
+          <router-outlet></router-outlet>
         </div>
       </div>
     </div>
@@ -102,17 +67,42 @@ import { NodesComponent } from '../pages/nodes/nodes.component';
     }
   `]
 })
-export class MainLayoutComponent {
-  currentRoute = signal('workers');
-  private editingProfileId: string | null = null;
+export class MainLayoutComponent implements AfterViewInit {
+  private router = inject(Router);
+
+  // Track current route from router events
+  currentRoute = toSignal(
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map(event => {
+        // Extract route from URL like "/#/workers" or "/workers"
+        const url = event.urlAfterRedirects;
+        const segments = url.split('/').filter(s => s && s !== '#');
+        return segments[0] || 'dashboard';
+      })
+    ),
+    { initialValue: this.getInitialRoute() }
+  );
+
+  private getInitialRoute(): string {
+    const url = this.router.url;
+    const segments = url.split('/').filter(s => s && s !== '#');
+    return segments[0] || 'dashboard';
+  }
+
+  ngAfterViewInit() {
+    // Re-trigger navigation after router-outlet is available
+    // This handles the case where router tried to navigate before outlet existed
+    const route = this.getInitialRoute();
+    setTimeout(() => this.router.navigate(['/', route]), 0);
+  }
 
   onRouteChange(route: string) {
-    this.currentRoute.set(route);
+    this.router.navigate(['/', route]);
   }
 
   navigateToProfiles(profileId: string) {
-    this.editingProfileId = profileId;
-    this.currentRoute.set('profiles');
-    // TODO: Could emit event to profiles page to open edit modal for this profile
+    // TODO: Could pass profileId via query params or state
+    this.router.navigate(['/', 'profiles']);
   }
 }

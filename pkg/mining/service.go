@@ -2,6 +2,7 @@ package mining
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -129,6 +130,7 @@ func (s *Service) SetupRoutes() {
 			minersGroup.GET("/:miner_name/stats", s.handleGetMinerStats)
 			minersGroup.GET("/:miner_name/hashrate-history", s.handleGetMinerHashrateHistory)
 			minersGroup.GET("/:miner_name/logs", s.handleGetMinerLogs)
+			minersGroup.POST("/:miner_name/stdin", s.handleMinerStdin)
 		}
 
 		// Historical data endpoints (database-backed)
@@ -471,11 +473,11 @@ func (s *Service) handleGetMinerHashrateHistory(c *gin.Context) {
 
 // handleGetMinerLogs godoc
 // @Summary Get miner log output
-// @Description Get the captured stdout/stderr output from a running miner
+// @Description Get the captured stdout/stderr output from a running miner. Log lines are base64 encoded to preserve ANSI escape codes and special characters.
 // @Tags miners
 // @Produce  json
 // @Param miner_name path string true "Miner Name"
-// @Success 200 {array} string
+// @Success 200 {array} string "Base64 encoded log lines"
 // @Router /miners/{miner_name}/logs [get]
 func (s *Service) handleGetMinerLogs(c *gin.Context) {
 	minerName := c.Param("miner_name")
@@ -485,7 +487,51 @@ func (s *Service) handleGetMinerLogs(c *gin.Context) {
 		return
 	}
 	logs := miner.GetLogs()
-	c.JSON(http.StatusOK, logs)
+	// Base64 encode each log line to preserve ANSI escape codes and special characters
+	encodedLogs := make([]string, len(logs))
+	for i, line := range logs {
+		encodedLogs[i] = base64.StdEncoding.EncodeToString([]byte(line))
+	}
+	c.JSON(http.StatusOK, encodedLogs)
+}
+
+// StdinInput represents input to send to miner's stdin
+type StdinInput struct {
+	Input string `json:"input" binding:"required"`
+}
+
+// handleMinerStdin godoc
+// @Summary Send input to miner stdin
+// @Description Send console commands to a running miner's stdin (e.g., 'h' for hashrate, 'p' for pause)
+// @Tags miners
+// @Accept json
+// @Produce json
+// @Param miner_name path string true "Miner Name"
+// @Param input body StdinInput true "Input to send"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /miners/{miner_name}/stdin [post]
+func (s *Service) handleMinerStdin(c *gin.Context) {
+	minerName := c.Param("miner_name")
+	miner, err := s.Manager.GetMiner(minerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
+		return
+	}
+
+	var input StdinInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input: " + err.Error()})
+		return
+	}
+
+	if err := miner.WriteStdin(input.Input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "sent", "input": input.Input})
 }
 
 // handleListProfiles godoc

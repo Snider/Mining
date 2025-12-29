@@ -1,7 +1,7 @@
 import { Component, inject, computed, signal, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MinerService } from '../../miner.service';
-import { HttpClient } from '@angular/common/http';
 import { interval, Subscription, switchMap } from 'rxjs';
 
 @Component({
@@ -58,7 +58,7 @@ import { interval, Subscription, switchMap } from 'rxjs';
         @if (logs().length > 0) {
           @for (line of logs(); track $index) {
             <div class="log-line" [class.error]="isErrorLine(line)" [class.warning]="isWarningLine(line)">
-              <span class="log-text">{{ line }}</span>
+              <span class="log-text" [innerHTML]="ansiToHtml(line)"></span>
             </div>
           }
         } @else if (activeMiner()) {
@@ -73,6 +73,19 @@ import { interval, Subscription, switchMap } from 'rxjs';
             <p>Start a miner to see console output</p>
           </div>
         }
+      </div>
+
+      <!-- Console Input -->
+      <div class="console-input-wrapper">
+        <span class="input-prompt">></span>
+        <input
+          type="text"
+          class="console-input"
+          placeholder="Type command (h=hashrate, p=pause, r=resume, s=results, c=connection)"
+          [value]="stdinInput()"
+          (input)="onStdinInput($event)"
+          (keydown.enter)="sendStdinCommand()"
+          [disabled]="!activeMiner()">
       </div>
 
       <!-- Console Controls -->
@@ -259,6 +272,49 @@ import { interval, Subscription, switchMap } from 'rxjs';
       font-size: 0.875rem;
     }
 
+    .console-input-wrapper {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      background: rgba(10, 10, 18, 0.6);
+      backdrop-filter: blur(4px);
+      border-left: 1px solid rgb(37 37 66 / 0.2);
+      border-right: 1px solid rgb(37 37 66 / 0.2);
+    }
+
+    .input-prompt {
+      color: var(--color-accent-500);
+      font-family: var(--font-family-mono);
+      font-size: 0.875rem;
+      margin-right: 0.5rem;
+      opacity: 0.7;
+    }
+
+    .console-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: rgba(163, 230, 53, 0.8);
+      font-family: var(--font-family-mono);
+      font-size: 0.8125rem;
+      caret-color: var(--color-accent-500);
+    }
+
+    .console-input::placeholder {
+      color: rgba(100, 116, 139, 0.4);
+      font-style: italic;
+    }
+
+    .console-input:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .console-input:focus {
+      color: #a3e635;
+    }
+
     .console-controls {
       display: flex;
       align-items: center;
@@ -314,7 +370,7 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('consoleOutput') consoleOutput!: ElementRef;
 
   private minerService = inject(MinerService);
-  private http = inject(HttpClient);
+  private sanitizer = inject(DomSanitizer);
   private state = this.minerService.state;
   private pollSub?: Subscription;
 
@@ -337,13 +393,16 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   logs = signal<string[]>([]);
   autoScroll = signal(true);
+  stdinInput = signal('');
   private shouldScroll = false;
 
   ngOnInit() {
-    // Auto-select first miner for console view
+    // Auto-select first miner for console view and fetch logs immediately
     const miners = this.runningMiners();
     if (miners.length > 0) {
       this.consoleSelectedMiner.set(miners[0].name);
+      // Fetch logs immediately - don't wait for interval
+      this.fetchLogs(miners[0].name);
     }
 
     // Poll for logs every 2 seconds
@@ -351,12 +410,12 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
       switchMap(() => {
         const miner = this.activeMiner();
         if (!miner) return [];
-        return this.http.get<{logs: string[]}>(`/api/v1/mining/miners/${miner}/logs`);
+        return this.minerService.getMinerLogs(miner);
       })
     ).subscribe({
-      next: (response: any) => {
-        if (response?.logs) {
-          this.logs.set(response.logs);
+      next: (logs: string[]) => {
+        if (logs && Array.isArray(logs)) {
+          this.logs.set(logs);
           if (this.autoScroll()) {
             this.shouldScroll = true;
           }
@@ -385,10 +444,10 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private fetchLogs(minerName: string) {
-    this.http.get<{logs: string[]}>(`/api/v1/mining/miners/${minerName}/logs`).subscribe({
-      next: (response) => {
-        if (response?.logs) {
-          this.logs.set(response.logs);
+    this.minerService.getMinerLogs(minerName).subscribe({
+      next: (logs) => {
+        if (logs && Array.isArray(logs)) {
+          this.logs.set(logs);
           this.shouldScroll = true;
         }
       }
@@ -408,6 +467,26 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.selectConsoleMiner(select.value);
   }
 
+  onStdinInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.stdinInput.set(input.value);
+  }
+
+  sendStdinCommand() {
+    const miner = this.activeMiner();
+    const input = this.stdinInput();
+    if (!miner || !input.trim()) return;
+
+    this.minerService.sendStdin(miner, input).subscribe({
+      next: () => {
+        this.stdinInput.set('');
+      },
+      error: (err) => {
+        console.error('Failed to send stdin:', err);
+      }
+    });
+  }
+
   isErrorLine(line: string): boolean {
     const lower = line.toLowerCase();
     return lower.includes('error') || lower.includes('failed') || lower.includes('fatal');
@@ -416,5 +495,66 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
   isWarningLine(line: string): boolean {
     const lower = line.toLowerCase();
     return lower.includes('warn') || lower.includes('timeout') || lower.includes('retry');
+  }
+
+  // Convert ANSI escape codes to HTML with CSS styling
+  ansiToHtml(text: string): SafeHtml {
+    // ANSI color codes mapping
+    const colors: { [key: string]: string } = {
+      '30': '#1e1e1e', '31': '#ef4444', '32': '#22c55e', '33': '#eab308',
+      '34': '#3b82f6', '35': '#a855f7', '36': '#06b6d4', '37': '#e5e5e5',
+      '90': '#737373', '91': '#fca5a5', '92': '#86efac', '93': '#fde047',
+      '94': '#93c5fd', '95': '#d8b4fe', '96': '#67e8f9', '97': '#ffffff',
+    };
+    const bgColors: { [key: string]: string } = {
+      '40': '#1e1e1e', '41': '#dc2626', '42': '#16a34a', '43': '#ca8a04',
+      '44': '#2563eb', '45': '#9333ea', '46': '#0891b2', '47': '#d4d4d4',
+    };
+
+    let html = this.escapeHtml(text);
+    let currentStyles: string[] = [];
+
+    // Process ANSI escape sequences
+    html = html.replace(/\x1b\[([0-9;]*)m/g, (_, codes) => {
+      if (!codes || codes === '0') {
+        currentStyles = [];
+        return '</span>';
+      }
+
+      const codeList = codes.split(';');
+      const styles: string[] = [];
+
+      for (const code of codeList) {
+        if (code === '1') styles.push('font-weight:bold');
+        else if (code === '3') styles.push('font-style:italic');
+        else if (code === '4') styles.push('text-decoration:underline');
+        else if (colors[code]) styles.push(`color:${colors[code]}`);
+        else if (bgColors[code]) styles.push(`background:${bgColors[code]};padding:0 2px`);
+      }
+
+      if (styles.length > 0) {
+        currentStyles = styles;
+        return `<span style="${styles.join(';')}">`;
+      }
+      return '';
+    });
+
+    // Clean up any unclosed spans
+    const openSpans = (html.match(/<span/g) || []).length;
+    const closeSpans = (html.match(/<\/span>/g) || []).length;
+    for (let i = 0; i < openSpans - closeSpans; i++) {
+      html += '</span>';
+    }
+
+    return this.sanitizer.bypassSecurityTrustHtml(html);
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }

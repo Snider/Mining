@@ -17,7 +17,7 @@ type SeriesWithData = Highcharts.SeriesAreaOptions | Highcharts.SeriesSplineOpti
   encapsulation: ViewEncapsulation.None
 })
 export class ChartComponent {
-  private minerService = inject(MinerService);
+  minerService = inject(MinerService);  // Public for template access
   private destroyRef = inject(DestroyRef);
 
   Highcharts: typeof Highcharts = Highcharts;
@@ -60,7 +60,7 @@ export class ChartComponent {
         ...this.createBaseChartOptions().chart,
         type: 'area'
       },
-      title: { text: 'Total Hashrate' },
+      title: { text: '' },
       plotOptions: {
         area: {
           stacking: 'normal',
@@ -74,12 +74,8 @@ export class ChartComponent {
 
     // Create effect with proper cleanup
     const effectRef = effect(() => {
-      const historyMap = this.minerService.hashrateHistory();
-
-      // Skip if no data
-      if (historyMap.size === 0) {
-        return;
-      }
+      // Use 24-hour historical data from database
+      const historyMap = this.minerService.historicalHashrate();
 
       // Clean up colors for miners no longer active
       const activeNames = new Set(historyMap.keys());
@@ -107,7 +103,7 @@ export class ChartComponent {
       // Build new chart options
       this.chartOptions = {
         ...this.createBaseChartOptions(),
-        title: { text: 'Total Hashrate' },
+        title: { text: '' },
         chart: {
           ...this.createBaseChartOptions().chart,
           type: 'area'
