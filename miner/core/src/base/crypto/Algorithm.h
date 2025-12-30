@@ -82,6 +82,8 @@ public:
         AR2_CHUKWA_V2   = 0x61140000,   // "argon2/chukwav2"  Argon2id (Chukwa v2).
         AR2_WRKZ        = 0x61120000,   // "argon2/wrkz"      Argon2id (WRKZ)
         KAWPOW_RVN      = 0x6b0f0000,   // "kawpow/rvn"       KawPow (RVN)
+        ETCHASH_ETC     = 0x65100000,   // "etchash"          ETChash (ETC)
+        ETHASH_ETH      = 0x65100001,   // "ethash"           Ethash (ETH)
     };
 
     enum Family : uint32_t {
@@ -95,7 +97,8 @@ public:
         RANDOM_X        = 0x72000000,
         ARGON2          = 0x61000000,
         KAWPOW          = 0x6b000000,
-        GHOSTRIDER      = 0x6c000000
+        GHOSTRIDER      = 0x6c000000,
+        ETCHASH         = 0x65000000
     };
 
     static const char *kINVALID;
@@ -161,6 +164,13 @@ public:
 #   ifdef XMRIG_ALGO_GHOSTRIDER
     static const char* kGHOSTRIDER;
     static const char* kGHOSTRIDER_RTM;
+#   endif
+
+#   ifdef XMRIG_ALGO_ETCHASH
+    static const char *kETCHASH;
+    static const char *kETCHASH_ETC;
+    static const char *kETHASH;
+    static const char *kETHASH_ETH;
 #   endif
 
     inline Algorithm() = default;

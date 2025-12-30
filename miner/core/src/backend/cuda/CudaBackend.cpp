@@ -46,6 +46,12 @@
 #endif
 
 
+#ifdef XMRIG_ALGO_ETCHASH
+#   include "crypto/etchash/ETCCache.h"
+#   include "crypto/etchash/ETChash.h"
+#endif
+
+
 #ifdef XMRIG_FEATURE_API
 #   include "base/api/interfaces/IApiRequest.h"
 #endif
@@ -223,6 +229,15 @@ public:
             if (algo.family() == Algorithm::KAWPOW) {
                 const uint32_t epoch = job.height() / KPHash::EPOCH_LENGTH;
                 mem_used = (KPCache::dag_size(epoch) + oneMiB - 1) / oneMiB;
+            }
+#           endif
+
+#           ifdef XMRIG_ALGO_ETCHASH
+            if (algo.family() == Algorithm::ETCHASH) {
+                const uint32_t epoch = (algo == Algorithm::ETCHASH_ETC)
+                    ? ETChash::epoch(job.height())
+                    : Ethash::epoch(job.height());
+                mem_used = (ETCCache::dagSize(epoch) + oneMiB - 1) / oneMiB;
             }
 #           endif
 

@@ -101,6 +101,13 @@ const char* Algorithm::kGHOSTRIDER      = "ghostrider";
 const char* Algorithm::kGHOSTRIDER_RTM  = "ghostrider";
 #endif
 
+#ifdef XMRIG_ALGO_ETCHASH
+const char *Algorithm::kETCHASH         = "etchash";
+const char *Algorithm::kETCHASH_ETC     = "etchash";
+const char *Algorithm::kETHASH          = "ethash";
+const char *Algorithm::kETHASH_ETH      = "ethash";
+#endif
+
 
 #define ALGO_NAME(ALGO)         { Algorithm::ALGO, Algorithm::k##ALGO }
 #define ALGO_ALIAS(ALGO, NAME)  { NAME, Algorithm::ALGO }
@@ -162,6 +169,11 @@ static const std::map<uint32_t, const char *> kAlgorithmNames = {
 
 #   ifdef XMRIG_ALGO_GHOSTRIDER
     ALGO_NAME(GHOSTRIDER_RTM),
+#   endif
+
+#   ifdef XMRIG_ALGO_ETCHASH
+    ALGO_NAME(ETCHASH_ETC),
+    ALGO_NAME(ETHASH_ETH),
 #   endif
 };
 
@@ -279,6 +291,14 @@ static const std::map<const char *, Algorithm::Id, aliasCompare> kAlgorithmAlias
     ALGO_ALIAS_AUTO(GHOSTRIDER_RTM), ALGO_ALIAS(GHOSTRIDER_RTM, "ghostrider/rtm"),
                                      ALGO_ALIAS(GHOSTRIDER_RTM, "gr"),
 #   endif
+
+#   ifdef XMRIG_ALGO_ETCHASH
+    ALGO_ALIAS_AUTO(ETCHASH_ETC),    ALGO_ALIAS(ETCHASH_ETC,    "etchash/etc"),
+                                     ALGO_ALIAS(ETCHASH_ETC,    "etc"),
+    ALGO_ALIAS_AUTO(ETHASH_ETH),     ALGO_ALIAS(ETHASH_ETH,     "ethash/eth"),
+                                     ALGO_ALIAS(ETHASH_ETH,     "eth"),
+                                     ALGO_ALIAS(ETHASH_ETH,     "daggerhashimoto"),
+#   endif
 };
 
 
@@ -353,7 +373,8 @@ std::vector<xmrig::Algorithm> xmrig::Algorithm::all(const std::function<bool(con
         RX_0, RX_WOW, RX_ARQ, RX_GRAFT, RX_SFX, RX_YADA,
         AR2_CHUKWA, AR2_CHUKWA_V2, AR2_WRKZ,
         KAWPOW_RVN,
-        GHOSTRIDER_RTM
+        GHOSTRIDER_RTM,
+        ETCHASH_ETC, ETHASH_ETH
     };
 
     Algorithms out;
