@@ -87,6 +87,34 @@ Playwright-based E2E tests covering both API and UI:
 
 Tests automatically start the Go backend and Angular dev server via `playwright.config.ts` webServer config.
 
+### Desktop App (`cmd/desktop/mining-desktop/`)
+
+Native desktop application using Wails v3 with Angular frontend. Embeds the mining backend into a standalone binary.
+
+```bash
+cd cmd/desktop/mining-desktop
+
+# Build for current platform
+wails3 build                    # Outputs: bin/mining-dashboard
+
+# Development mode (hot reload)
+wails3 dev
+
+# Platform-specific builds (via Taskfile)
+task linux:build                # Linux binary
+task windows:build              # Windows .exe
+task darwin:build               # macOS binary
+task darwin:package             # macOS .app bundle
+```
+
+**Key files:**
+- **`main.go`**: Wails app entry point, embeds Angular frontend via `//go:embed all:frontend/dist/browser`
+- **`miningservice.go`**: Go service exposing mining functionality to frontend via Wails bindings
+- **`frontend/bindings/`**: Auto-generated TypeScript bindings for calling Go methods
+- **`build/`**: Platform-specific build configs (icons, manifests, installers)
+
+**GitHub Actions:** `.github/workflows/desktop-release.yml` builds for all platforms on tag or manual dispatch.
+
 ## Key Patterns
 
 - **Interface-based design**: `Miner` and `ManagerInterface` allow different miner implementations
