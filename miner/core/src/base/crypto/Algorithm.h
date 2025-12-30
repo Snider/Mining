@@ -85,6 +85,7 @@ public:
         ETCHASH_ETC     = 0x65100000,   // "etchash"          ETChash (ETC)
         ETHASH_ETH      = 0x65100001,   // "ethash"           Ethash (ETH)
         PROGPOWZ_ZANO   = 0x70100000,   // "progpowz"         ProgPowZ (ZANO)
+        BLAKE3_DCR      = 0x62100000,   // "blake3"           Blake3 (DCR)
     };
 
     enum Family : uint32_t {
@@ -100,7 +101,8 @@ public:
         KAWPOW          = 0x6b000000,
         GHOSTRIDER      = 0x6c000000,
         ETCHASH         = 0x65000000,
-        PROGPOWZ        = 0x70000000
+        PROGPOWZ        = 0x70000000,
+        BLAKE3          = 0x62000000
     };
 
     static const char *kINVALID;
@@ -178,6 +180,11 @@ public:
 #   ifdef XMRIG_ALGO_PROGPOWZ
     static const char *kPROGPOWZ;
     static const char *kPROGPOWZ_ZANO;
+#   endif
+
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    static const char *kBLAKE3;
+    static const char *kBLAKE3_DCR;
 #   endif
 
     inline Algorithm() = default;

@@ -113,6 +113,11 @@ const char *Algorithm::kPROGPOWZ        = "progpowz";
 const char *Algorithm::kPROGPOWZ_ZANO   = "progpowz";
 #endif
 
+#ifdef XMRIG_ALGO_BLAKE3DCR
+const char *Algorithm::kBLAKE3          = "blake3";
+const char *Algorithm::kBLAKE3_DCR      = "blake3";
+#endif
+
 
 #define ALGO_NAME(ALGO)         { Algorithm::ALGO, Algorithm::k##ALGO }
 #define ALGO_ALIAS(ALGO, NAME)  { NAME, Algorithm::ALGO }
@@ -183,6 +188,10 @@ static const std::map<uint32_t, const char *> kAlgorithmNames = {
 
 #   ifdef XMRIG_ALGO_PROGPOWZ
     ALGO_NAME(PROGPOWZ_ZANO),
+#   endif
+
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    ALGO_NAME(BLAKE3_DCR),
 #   endif
 };
 
@@ -313,6 +322,12 @@ static const std::map<const char *, Algorithm::Id, aliasCompare> kAlgorithmAlias
     ALGO_ALIAS_AUTO(PROGPOWZ_ZANO),  ALGO_ALIAS(PROGPOWZ_ZANO,  "progpowz/zano"),
                                      ALGO_ALIAS(PROGPOWZ_ZANO,  "zano"),
 #   endif
+
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    ALGO_ALIAS_AUTO(BLAKE3_DCR),     ALGO_ALIAS(BLAKE3_DCR,     "blake3/dcr"),
+                                     ALGO_ALIAS(BLAKE3_DCR,     "dcr"),
+                                     ALGO_ALIAS(BLAKE3_DCR,     "decred"),
+#   endif
 };
 
 
@@ -389,7 +404,8 @@ std::vector<xmrig::Algorithm> xmrig::Algorithm::all(const std::function<bool(con
         KAWPOW_RVN,
         GHOSTRIDER_RTM,
         ETCHASH_ETC, ETHASH_ETH,
-        PROGPOWZ_ZANO
+        PROGPOWZ_ZANO,
+        BLAKE3_DCR
     };
 
     Algorithms out;
