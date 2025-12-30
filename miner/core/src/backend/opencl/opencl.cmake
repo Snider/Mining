@@ -130,6 +130,45 @@ if (WITH_OPENCL)
              )
     endif()
 
+    if (WITH_PROGPOWZ)
+        list(APPEND HEADERS_BACKEND_OPENCL
+             src/backend/opencl/kernels/progpowz/ProgPowZ_CalculateDAGKernel.h
+             src/backend/opencl/runners/OclProgPowZRunner.h
+             src/backend/opencl/runners/tools/OclProgPowZ.h
+             )
+
+        list(APPEND SOURCES_BACKEND_OPENCL
+             src/backend/opencl/generators/ocl_generic_progpowz_generator.cpp
+             src/backend/opencl/kernels/progpowz/ProgPowZ_CalculateDAGKernel.cpp
+             src/backend/opencl/runners/OclProgPowZRunner.cpp
+             src/backend/opencl/runners/tools/OclProgPowZ.cpp
+             )
+    endif()
+
+    if (WITH_ETCHASH)
+        list(APPEND HEADERS_BACKEND_OPENCL
+             src/backend/opencl/kernels/etchash/Etchash_CalculateDAGKernel.h
+             src/backend/opencl/runners/OclEtchashRunner.h
+             )
+
+        list(APPEND SOURCES_BACKEND_OPENCL
+             src/backend/opencl/generators/ocl_generic_etchash_generator.cpp
+             src/backend/opencl/kernels/etchash/Etchash_CalculateDAGKernel.cpp
+             src/backend/opencl/runners/OclEtchashRunner.cpp
+             )
+    endif()
+
+    if (WITH_BLAKE3DCR)
+        list(APPEND HEADERS_BACKEND_OPENCL
+             src/backend/opencl/runners/OclBlake3Runner.h
+             )
+
+        list(APPEND SOURCES_BACKEND_OPENCL
+             src/backend/opencl/generators/ocl_generic_blake3_generator.cpp
+             src/backend/opencl/runners/OclBlake3Runner.cpp
+             )
+    endif()
+
     if (WITH_STRICT_CACHE)
         add_definitions(/DXMRIG_STRICT_OPENCL_CACHE)
     else()

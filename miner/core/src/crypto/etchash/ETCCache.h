@@ -59,6 +59,9 @@ public:
     // Get seed hash for epoch
     static void seedHash(uint32_t epoch, uint8_t (&seed)[32]);
 
+    // Calculate fast modulo data for GPU kernel
+    static void calculate_fast_mod_data(uint32_t divisor, uint32_t& reciprocal, uint32_t& increment, uint32_t& shift);
+
     // Singleton instances
     static std::mutex s_cacheMutex;
     static ETCCache s_etcCache;   // For ETC (ETChash)

@@ -55,6 +55,18 @@ extern bool ocl_generic_rx_generator(const OclDevice &device, const Algorithm &a
 extern bool ocl_generic_kawpow_generator(const OclDevice& device, const Algorithm& algorithm, OclThreads& threads);
 #endif
 
+#ifdef XMRIG_ALGO_PROGPOWZ
+extern bool ocl_generic_progpowz_generator(const OclDevice& device, const Algorithm& algorithm, OclThreads& threads);
+#endif
+
+#ifdef XMRIG_ALGO_ETCHASH
+extern bool ocl_generic_etchash_generator(const OclDevice& device, const Algorithm& algorithm, OclThreads& threads);
+#endif
+
+#ifdef XMRIG_ALGO_BLAKE3DCR
+extern bool ocl_generic_blake3_generator(const OclDevice& device, const Algorithm& algorithm, OclThreads& threads);
+#endif
+
 extern bool ocl_vega_cn_generator(const OclDevice &device, const Algorithm &algorithm, OclThreads &threads);
 extern bool ocl_generic_cn_generator(const OclDevice &device, const Algorithm &algorithm, OclThreads &threads);
 
@@ -65,6 +77,15 @@ static ocl_gen_config_fun generators[] = {
 #   endif
 #   ifdef XMRIG_ALGO_KAWPOW
     ocl_generic_kawpow_generator,
+#   endif
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    ocl_generic_progpowz_generator,
+#   endif
+#   ifdef XMRIG_ALGO_ETCHASH
+    ocl_generic_etchash_generator,
+#   endif
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    ocl_generic_blake3_generator,
 #   endif
     ocl_vega_cn_generator,
     ocl_generic_cn_generator

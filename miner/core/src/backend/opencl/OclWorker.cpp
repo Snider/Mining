@@ -39,6 +39,18 @@
 #   include "backend/opencl/runners/OclKawPowRunner.h"
 #endif
 
+#ifdef XMRIG_ALGO_PROGPOWZ
+#   include "backend/opencl/runners/OclProgPowZRunner.h"
+#endif
+
+#ifdef XMRIG_ALGO_ETCHASH
+#   include "backend/opencl/runners/OclEtchashRunner.h"
+#endif
+
+#ifdef XMRIG_ALGO_BLAKE3DCR
+#   include "backend/opencl/runners/OclBlake3Runner.h"
+#endif
+
 #include <cassert>
 #include <thread>
 
@@ -94,25 +106,19 @@ xmrig::OclWorker::OclWorker(size_t id, const OclLaunchData &data) :
 
 #   ifdef XMRIG_ALGO_ETCHASH
     case Algorithm::ETCHASH:
-        // ETChash/Ethash GPU support - uses ethash DAG similar to KawPow
-        // TODO: Implement OclEtchashRunner with proper ethash kernel
-        m_runner = nullptr;
+        m_runner = new OclEtchashRunner(id, data);
         break;
 #   endif
 
 #   ifdef XMRIG_ALGO_PROGPOWZ
     case Algorithm::PROGPOWZ:
-        // ProgPowZ GPU support - ProgPow variant used by Zano
-        // TODO: Implement OclProgPowZRunner with ProgPowZ kernel
-        m_runner = nullptr;
+        m_runner = new OclProgPowZRunner(id, data);
         break;
 #   endif
 
 #   ifdef XMRIG_ALGO_BLAKE3DCR
     case Algorithm::BLAKE3:
-        // Blake3 GPU support - fast cryptographic hash for Decred
-        // TODO: Implement OclBlake3Runner
-        m_runner = nullptr;
+        m_runner = new OclBlake3Runner(id, data);
         break;
 #   endif
 

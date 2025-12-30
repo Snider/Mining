@@ -131,4 +131,42 @@ void ETCCache::seedHash(uint32_t epoch, uint8_t (&seed)[32])
 }
 
 
+static inline uint32_t clz(uint32_t x)
+{
+#ifdef _MSC_VER
+    unsigned long index;
+    _BitScanReverse(&index, x);
+    return 31 - index;
+#else
+    return __builtin_clz(x);
+#endif
+}
+
+
+void ETCCache::calculate_fast_mod_data(uint32_t divisor, uint32_t& reciprocal, uint32_t& increment, uint32_t& shift)
+{
+    if ((divisor & (divisor - 1)) == 0) {
+        reciprocal = 1;
+        increment = 0;
+        shift = 31U - clz(divisor);
+    }
+    else {
+        shift = 63U - clz(divisor);
+        const uint64_t N = 1ULL << shift;
+        const uint64_t q = N / divisor;
+        const uint64_t r = N - q * divisor;
+        if (r * 2 < divisor)
+        {
+            reciprocal = static_cast<uint32_t>(q);
+            increment = 1;
+        }
+        else
+        {
+            reciprocal = static_cast<uint32_t>(q + 1);
+            increment = 0;
+        }
+    }
+}
+
+
 } // namespace xmrig
