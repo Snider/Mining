@@ -546,7 +546,7 @@ Security Considerations
 Design Decisions Summary
 
 | Decision       | Choice                   | Rationale                                                              |
- |----------------|--------------------------|------------------------------------------------------------------------|
+|----------------|--------------------------|------------------------------------------------------------------------|
 | Discovery      | Manual only              | Simpler, more secure - explicit peer registration                      |
 | Transport      | WebSocket + SMSG         | Better firewall traversal, built-in framing, browser-friendly          |
 | Node Mode      | Dual (default)           | Maximum flexibility - each node controls remotes AND runs local miners |
