@@ -115,10 +115,19 @@ type Config struct {
 	Seed              string `json:"seed,omitempty"`
 	Hash              string `json:"hash,omitempty"`
 	NoDMI             bool   `json:"noDMI,omitempty"`
-	// GPU-specific options
-	Devices   string `json:"devices,omitempty"`   // GPU device selection (e.g., "0,1,2")
-	Intensity int    `json:"intensity,omitempty"` // Mining intensity for GPU miners
-	CLIArgs   string `json:"cliArgs,omitempty"`   // Additional CLI arguments
+	// GPU-specific options (for XMRig dual CPU+GPU mining)
+	GPUEnabled   bool   `json:"gpuEnabled,omitempty"`   // Enable GPU mining
+	GPUPool      string `json:"gpuPool,omitempty"`      // Separate pool for GPU (can differ from CPU)
+	GPUWallet    string `json:"gpuWallet,omitempty"`    // Wallet for GPU pool (defaults to main Wallet)
+	GPUAlgo      string `json:"gpuAlgo,omitempty"`      // Algorithm for GPU (e.g., "kawpow", "ethash")
+	GPUPassword  string `json:"gpuPassword,omitempty"`  // Password for GPU pool
+	GPUIntensity int    `json:"gpuIntensity,omitempty"` // GPU mining intensity (0-100)
+	GPUThreads   int    `json:"gpuThreads,omitempty"`   // GPU threads per card
+	Devices      string `json:"devices,omitempty"`      // GPU device selection (e.g., "0,1,2")
+	OpenCL       bool   `json:"opencl,omitempty"`       // Enable OpenCL (AMD/Intel GPUs)
+	CUDA         bool   `json:"cuda,omitempty"`         // Enable CUDA (NVIDIA GPUs)
+	Intensity    int    `json:"intensity,omitempty"`    // Mining intensity for GPU miners
+	CLIArgs      string `json:"cliArgs,omitempty"`      // Additional CLI arguments
 }
 
 // PerformanceMetrics represents the performance metrics for a miner.

@@ -166,22 +166,73 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 		cpuConfig["priority"] = config.CPUPriority
 	}
 
+	// Build pools array - CPU pool first
+	pools := []map[string]interface{}{
+		{
+			"url":       config.Pool,
+			"user":      config.Wallet,
+			"pass":      "x",
+			"keepalive": true,
+			"tls":       config.TLS,
+			"algo":      config.Algo,
+		},
+	}
+
+	// Add separate GPU pool if configured
+	if config.GPUEnabled && config.GPUPool != "" {
+		gpuWallet := config.GPUWallet
+		if gpuWallet == "" {
+			gpuWallet = config.Wallet // Default to main wallet
+		}
+		gpuPass := config.GPUPassword
+		if gpuPass == "" {
+			gpuPass = "x"
+		}
+		pools = append(pools, map[string]interface{}{
+			"url":       config.GPUPool,
+			"user":      gpuWallet,
+			"pass":      gpuPass,
+			"keepalive": true,
+			"algo":      config.GPUAlgo,
+		})
+	}
+
+	// Build OpenCL (AMD/Intel GPU) config
+	openclConfig := map[string]interface{}{
+		"enabled": config.GPUEnabled && config.OpenCL,
+	}
+	if config.GPUEnabled && config.OpenCL {
+		if config.GPUIntensity > 0 {
+			openclConfig["intensity"] = config.GPUIntensity
+		}
+		if config.GPUThreads > 0 {
+			openclConfig["threads"] = config.GPUThreads
+		}
+	}
+
+	// Build CUDA (NVIDIA GPU) config
+	cudaConfig := map[string]interface{}{
+		"enabled": config.GPUEnabled && config.CUDA,
+	}
+	if config.GPUEnabled && config.CUDA {
+		if config.GPUIntensity > 0 {
+			cudaConfig["intensity"] = config.GPUIntensity
+		}
+		if config.GPUThreads > 0 {
+			cudaConfig["threads"] = config.GPUThreads
+		}
+	}
+
 	c := map[string]interface{}{
 		"api": map[string]interface{}{
 			"enabled":    m.API != nil && m.API.Enabled,
 			"listen":     apiListen,
 			"restricted": true,
 		},
-		"pools": []map[string]interface{}{
-			{
-				"url":       config.Pool,
-				"user":      config.Wallet,
-				"pass":      "x",
-				"keepalive": true,
-				"tls":       config.TLS,
-			},
-		},
-		"cpu": cpuConfig,
+		"pools":            pools,
+		"cpu":              cpuConfig,
+		"opencl":           openclConfig,
+		"cuda":             cudaConfig,
 		"pause-on-active":  config.PauseOnActive,
 		"pause-on-battery": config.PauseOnBattery,
 	}

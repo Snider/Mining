@@ -48,7 +48,8 @@ func NewXMRigMiner() *XMRigMiner {
 
 // getXMRigConfigPath returns the platform-specific path for the xmrig.json file.
 // If instanceName is provided, it creates an instance-specific config file.
-func getXMRigConfigPath(instanceName string) (string, error) {
+// This is a variable so it can be overridden in tests.
+var getXMRigConfigPath = func(instanceName string) (string, error) {
 	configFileName := "xmrig.json"
 	if instanceName != "" && instanceName != "xmrig" {
 		// Use instance-specific config file (e.g., xmrig-78.json)
