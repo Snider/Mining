@@ -92,6 +92,30 @@ xmrig::OclWorker::OclWorker(size_t id, const OclLaunchData &data) :
 #       endif
         break;
 
+#   ifdef XMRIG_ALGO_ETCHASH
+    case Algorithm::ETCHASH:
+        // ETChash/Ethash GPU support - uses ethash DAG similar to KawPow
+        // TODO: Implement OclEtchashRunner with proper ethash kernel
+        m_runner = nullptr;
+        break;
+#   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    case Algorithm::PROGPOWZ:
+        // ProgPowZ GPU support - ProgPow variant used by Zano
+        // TODO: Implement OclProgPowZRunner with ProgPowZ kernel
+        m_runner = nullptr;
+        break;
+#   endif
+
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    case Algorithm::BLAKE3:
+        // Blake3 GPU support - fast cryptographic hash for Decred
+        // TODO: Implement OclBlake3Runner
+        m_runner = nullptr;
+        break;
+#   endif
+
     default:
         m_runner = new OclCnRunner(id, data);
         break;

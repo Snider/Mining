@@ -41,6 +41,10 @@ public:
         ZEPHYR,
         TOWNFORGE,
         YADA,
+        ETHEREUM_CLASSIC,
+        ETHEREUM,
+        ZANO,
+        DECRED,
         MAX
     };
 

@@ -55,6 +55,10 @@ static const CoinInfo coinInfo[] = {
     { Algorithm::RX_0,            "ZEPH",     "Zephyr",       120,    1000000000000,  BLUE_BG_BOLD(   WHITE_BOLD_S " zephyr  ") },
     { Algorithm::RX_0,            "Townforge","Townforge",    30,     100000000,      MAGENTA_BG_BOLD(WHITE_BOLD_S " townforge ") },
     { Algorithm::RX_YADA,         "YDA",      "YadaCoin",     120,    100000000,      BLUE_BG_BOLD(   WHITE_BOLD_S " yada    ") },
+    { Algorithm::ETCHASH_ETC,     "ETC",      "Ethereum Classic", 13, 1000000000000000000, GREEN_BG_BOLD( WHITE_BOLD_S " etc     ") },
+    { Algorithm::ETHASH_ETH,      "ETH",      "Ethereum",     12,     1000000000000000000, BLUE_BG_BOLD(  WHITE_BOLD_S " eth     ") },
+    { Algorithm::PROGPOWZ_ZANO,   "ZANO",     "Zano",         60,     1000000000000,  CYAN_BG_BOLD(   WHITE_BOLD_S " zano    ") },
+    { Algorithm::BLAKE3_DCR,      "DCR",      "Decred",       300,    100000000,      GREEN_BG_BOLD(  WHITE_BOLD_S " decred  ") },
 };
 
 

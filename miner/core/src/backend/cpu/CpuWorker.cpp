@@ -44,6 +44,10 @@
 #   include "crypto/randomx/randomx.h"
 #endif
 
+#ifdef XMRIG_ALGO_BLAKE3DCR
+#   include "crypto/blake3dcr/Blake3DCR.h"
+#endif
+
 
 #ifdef XMRIG_FEATURE_BENCHMARK
 #   include "backend/common/benchmark/BenchState.h"
@@ -225,6 +229,27 @@ bool xmrig::CpuWorker<N>::selfTest()
     }
 #   endif
 
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    if (m_algorithm.family() == Algorithm::BLAKE3) {
+        // Blake3 is a simple hash, supports any N value
+        return N >= 1;
+    }
+#   endif
+
+#   ifdef XMRIG_ALGO_ETCHASH
+    if (m_algorithm.family() == Algorithm::ETCHASH) {
+        // ETChash/Ethash are GPU-only algorithms
+        return false;
+    }
+#   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    if (m_algorithm.family() == Algorithm::PROGPOWZ) {
+        // ProgPowZ is a GPU-only algorithm
+        return false;
+    }
+#   endif
+
     return false;
 }
 
@@ -322,6 +347,29 @@ void xmrig::CpuWorker<N>::start()
                     else {
                         valid = false;
                     }
+                    break;
+#               endif
+
+#               ifdef XMRIG_ALGO_BLAKE3DCR
+                case Algorithm::BLAKE3:
+                    // Blake3 hash for each parallel hash slot
+                    for (size_t i = 0; i < N; ++i) {
+                        Blake3DCR::hash(m_job.blob() + (i * job.size()), job.size(), m_hash + (i * 32));
+                    }
+                    break;
+#               endif
+
+#               ifdef XMRIG_ALGO_ETCHASH
+                case Algorithm::ETCHASH:
+                    // ETChash/Ethash CPU mining not supported (GPU-only algorithm)
+                    valid = false;
+                    break;
+#               endif
+
+#               ifdef XMRIG_ALGO_PROGPOWZ
+                case Algorithm::PROGPOWZ:
+                    // ProgPowZ CPU mining not supported (GPU-only algorithm)
+                    valid = false;
                     break;
 #               endif
 

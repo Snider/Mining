@@ -31,7 +31,7 @@
 #include "base/kernel/Platform.h"
 #include "base/net/stratum/Client.h"
 
-#if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER
+#if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER || defined XMRIG_ALGO_ETCHASH || defined XMRIG_ALGO_PROGPOWZ
 #   include "base/net/stratum/AutoClient.h"
 #   include "base/net/stratum/EthStratumClient.h"
 #endif
@@ -226,9 +226,18 @@ xmrig::IClient *xmrig::Pool::createClient(int id, IClientListener *listener) con
     IClient *client = nullptr;
 
     if (m_mode == MODE_POOL) {
-#       if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER
+#       if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER || defined XMRIG_ALGO_ETCHASH || defined XMRIG_ALGO_PROGPOWZ
         const uint32_t f = m_algorithm.family();
-        if ((f == Algorithm::KAWPOW) || (f == Algorithm::GHOSTRIDER) || (m_coin == Coin::RAVEN)) {
+        const bool isEthStratum = (f == Algorithm::KAWPOW) || (f == Algorithm::GHOSTRIDER) || (f == Algorithm::ETCHASH) || (f == Algorithm::PROGPOWZ)
+            || (m_coin == Coin::RAVEN)
+#           ifdef XMRIG_ALGO_ETCHASH
+            || (m_coin == Coin::ETHEREUM_CLASSIC) || (m_coin == Coin::ETHEREUM)
+#           endif
+#           ifdef XMRIG_ALGO_PROGPOWZ
+            || (m_coin == Coin::ZANO)
+#           endif
+        ;
+        if (isEthStratum) {
             client = new EthStratumClient(id, Platform::userAgent(), listener);
         }
         else
@@ -245,7 +254,7 @@ xmrig::IClient *xmrig::Pool::createClient(int id, IClientListener *listener) con
         client = new SelfSelectClient(id, Platform::userAgent(), listener, m_submitToOrigin);
     }
 #   endif
-#   if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER
+#   if defined XMRIG_ALGO_KAWPOW || defined XMRIG_ALGO_GHOSTRIDER || defined XMRIG_ALGO_ETCHASH || defined XMRIG_ALGO_PROGPOWZ
     else if (m_mode == MODE_AUTO_ETH) {
         client = new AutoClient(id, Platform::userAgent(), listener);
     }

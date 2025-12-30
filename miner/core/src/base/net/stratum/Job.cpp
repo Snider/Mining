@@ -161,6 +161,21 @@ size_t xmrig::Job::nonceOffset() const
     case Algorithm::GHOSTRIDER:
         return 76;
 
+#   ifdef XMRIG_ALGO_ETCHASH
+    case Algorithm::ETCHASH:
+        return 32;  // ETChash/Ethash uses 32-byte header hash + 8-byte nonce
+#   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    case Algorithm::PROGPOWZ:
+        return 32;  // ProgPowZ follows same pattern as KawPow/Ethash
+#   endif
+
+#   ifdef XMRIG_ALGO_BLAKE3DCR
+    case Algorithm::BLAKE3:
+        return 140; // Decred block header nonce offset
+#   endif
+
     default:
         break;
     }

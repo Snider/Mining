@@ -167,16 +167,20 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 	}
 
 	// Build pools array - CPU pool first
-	pools := []map[string]interface{}{
-		{
-			"url":       config.Pool,
-			"user":      config.Wallet,
-			"pass":      "x",
-			"keepalive": true,
-			"tls":       config.TLS,
-			"algo":      config.Algo,
-		},
+	cpuPool := map[string]interface{}{
+		"url":       config.Pool,
+		"user":      config.Wallet,
+		"pass":      "x",
+		"keepalive": true,
+		"tls":       config.TLS,
 	}
+	// Add algo or coin (coin takes precedence for algorithm auto-detection)
+	if config.Coin != "" {
+		cpuPool["coin"] = config.Coin
+	} else if config.Algo != "" {
+		cpuPool["algo"] = config.Algo
+	}
+	pools := []map[string]interface{}{cpuPool}
 
 	// Add separate GPU pool if configured
 	if config.GPUEnabled && config.GPUPool != "" {
@@ -188,20 +192,27 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 		if gpuPass == "" {
 			gpuPass = "x"
 		}
-		pools = append(pools, map[string]interface{}{
+		gpuPool := map[string]interface{}{
 			"url":       config.GPUPool,
 			"user":      gpuWallet,
 			"pass":      gpuPass,
 			"keepalive": true,
-			"algo":      config.GPUAlgo,
-		})
+		}
+		// Add GPU algo (typically etchash, ethash, kawpow, progpowz for GPU mining)
+		if config.GPUAlgo != "" {
+			gpuPool["algo"] = config.GPUAlgo
+		}
+		pools = append(pools, gpuPool)
 	}
 
 	// Build OpenCL (AMD/Intel GPU) config
+	// GPU mining requires explicit device selection - no auto-picking
 	openclConfig := map[string]interface{}{
-		"enabled": config.GPUEnabled && config.OpenCL,
+		"enabled": config.GPUEnabled && config.OpenCL && config.Devices != "",
 	}
-	if config.GPUEnabled && config.OpenCL {
+	if config.GPUEnabled && config.OpenCL && config.Devices != "" {
+		// User must explicitly specify devices (e.g., "0" or "0,1")
+		openclConfig["devices"] = config.Devices
 		if config.GPUIntensity > 0 {
 			openclConfig["intensity"] = config.GPUIntensity
 		}
@@ -211,10 +222,13 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 	}
 
 	// Build CUDA (NVIDIA GPU) config
+	// GPU mining requires explicit device selection - no auto-picking
 	cudaConfig := map[string]interface{}{
-		"enabled": config.GPUEnabled && config.CUDA,
+		"enabled": config.GPUEnabled && config.CUDA && config.Devices != "",
 	}
-	if config.GPUEnabled && config.CUDA {
+	if config.GPUEnabled && config.CUDA && config.Devices != "" {
+		// User must explicitly specify devices (e.g., "0" or "0,1")
+		cudaConfig["devices"] = config.Devices
 		if config.GPUIntensity > 0 {
 			cudaConfig["intensity"] = config.GPUIntensity
 		}
