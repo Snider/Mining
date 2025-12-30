@@ -84,6 +84,7 @@ public:
         KAWPOW_RVN      = 0x6b0f0000,   // "kawpow/rvn"       KawPow (RVN)
         ETCHASH_ETC     = 0x65100000,   // "etchash"          ETChash (ETC)
         ETHASH_ETH      = 0x65100001,   // "ethash"           Ethash (ETH)
+        PROGPOWZ_ZANO   = 0x70100000,   // "progpowz"         ProgPowZ (ZANO)
     };
 
     enum Family : uint32_t {
@@ -98,7 +99,8 @@ public:
         ARGON2          = 0x61000000,
         KAWPOW          = 0x6b000000,
         GHOSTRIDER      = 0x6c000000,
-        ETCHASH         = 0x65000000
+        ETCHASH         = 0x65000000,
+        PROGPOWZ        = 0x70000000
     };
 
     static const char *kINVALID;
@@ -171,6 +173,11 @@ public:
     static const char *kETCHASH_ETC;
     static const char *kETHASH;
     static const char *kETHASH_ETH;
+#   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    static const char *kPROGPOWZ;
+    static const char *kPROGPOWZ_ZANO;
 #   endif
 
     inline Algorithm() = default;

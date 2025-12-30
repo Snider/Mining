@@ -52,6 +52,12 @@
 #endif
 
 
+#ifdef XMRIG_ALGO_PROGPOWZ
+#   include "crypto/progpowz/ProgPowZCache.h"
+#   include "crypto/progpowz/ProgPowZHash.h"
+#endif
+
+
 #ifdef XMRIG_FEATURE_API
 #   include "base/api/interfaces/IApiRequest.h"
 #endif
@@ -238,6 +244,13 @@ public:
                     ? ETChash::epoch(job.height())
                     : Ethash::epoch(job.height());
                 mem_used = (ETCCache::dagSize(epoch) + oneMiB - 1) / oneMiB;
+            }
+#           endif
+
+#           ifdef XMRIG_ALGO_PROGPOWZ
+            if (algo.family() == Algorithm::PROGPOWZ) {
+                const uint32_t epoch = job.height() / ProgPowZHash::EPOCH_LENGTH;
+                mem_used = (ProgPowZCache::dag_size(epoch) + oneMiB - 1) / oneMiB;
             }
 #           endif
 

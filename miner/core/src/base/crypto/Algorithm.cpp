@@ -108,6 +108,11 @@ const char *Algorithm::kETHASH          = "ethash";
 const char *Algorithm::kETHASH_ETH      = "ethash";
 #endif
 
+#ifdef XMRIG_ALGO_PROGPOWZ
+const char *Algorithm::kPROGPOWZ        = "progpowz";
+const char *Algorithm::kPROGPOWZ_ZANO   = "progpowz";
+#endif
+
 
 #define ALGO_NAME(ALGO)         { Algorithm::ALGO, Algorithm::k##ALGO }
 #define ALGO_ALIAS(ALGO, NAME)  { NAME, Algorithm::ALGO }
@@ -174,6 +179,10 @@ static const std::map<uint32_t, const char *> kAlgorithmNames = {
 #   ifdef XMRIG_ALGO_ETCHASH
     ALGO_NAME(ETCHASH_ETC),
     ALGO_NAME(ETHASH_ETH),
+#   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    ALGO_NAME(PROGPOWZ_ZANO),
 #   endif
 };
 
@@ -299,6 +308,11 @@ static const std::map<const char *, Algorithm::Id, aliasCompare> kAlgorithmAlias
                                      ALGO_ALIAS(ETHASH_ETH,     "eth"),
                                      ALGO_ALIAS(ETHASH_ETH,     "daggerhashimoto"),
 #   endif
+
+#   ifdef XMRIG_ALGO_PROGPOWZ
+    ALGO_ALIAS_AUTO(PROGPOWZ_ZANO),  ALGO_ALIAS(PROGPOWZ_ZANO,  "progpowz/zano"),
+                                     ALGO_ALIAS(PROGPOWZ_ZANO,  "zano"),
+#   endif
 };
 
 
@@ -374,7 +388,8 @@ std::vector<xmrig::Algorithm> xmrig::Algorithm::all(const std::function<bool(con
         AR2_CHUKWA, AR2_CHUKWA_V2, AR2_WRKZ,
         KAWPOW_RVN,
         GHOSTRIDER_RTM,
-        ETCHASH_ETC, ETHASH_ETH
+        ETCHASH_ETC, ETHASH_ETH,
+        PROGPOWZ_ZANO
     };
 
     Algorithms out;
