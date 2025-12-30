@@ -41,11 +41,22 @@ func main() {
 		},
 	})
 
-	// Create the main window
+	// Get saved window state
+	windowState := miningService.GetWindowState()
+	width := windowState.Width
+	height := windowState.Height
+	if width == 0 {
+		width = 1400
+	}
+	if height == 0 {
+		height = 900
+	}
+
+	// Create the main window with saved dimensions
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "Mining Dashboard",
-		Width:  1400,
-		Height: 900,
+		Width:  width,
+		Height: height,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,

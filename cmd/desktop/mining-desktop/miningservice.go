@@ -13,17 +13,20 @@ import (
 
 // MiningService exposes mining functionality to the Wails frontend.
 type MiningService struct {
-	manager    *mining.Manager
-	profileMgr *mining.ProfileManager
+	manager     *mining.Manager
+	profileMgr  *mining.ProfileManager
+	settingsMgr *mining.SettingsManager
 }
 
 // NewMiningService creates a new mining service with an initialized manager.
 func NewMiningService() *MiningService {
 	manager := mining.NewManager()
 	profileMgr, _ := mining.NewProfileManager()
+	settingsMgr, _ := mining.NewSettingsManager()
 	return &MiningService{
-		manager:    manager,
-		profileMgr: profileMgr,
+		manager:     manager,
+		profileMgr:  profileMgr,
+		settingsMgr: settingsMgr,
 	}
 }
 
@@ -296,4 +299,88 @@ func (s *MiningService) SendStdin(name, input string) error {
 // Shutdown gracefully shuts down all miners.
 func (s *MiningService) Shutdown() {
 	s.manager.Stop()
+}
+
+// === Settings Methods ===
+
+// GetSettings returns the current app settings
+func (s *MiningService) GetSettings() (*mining.AppSettings, error) {
+	if s.settingsMgr == nil {
+		return mining.DefaultSettings(), nil
+	}
+	return s.settingsMgr.Get(), nil
+}
+
+// SaveSettings saves the app settings
+func (s *MiningService) SaveSettings(settings *mining.AppSettings) error {
+	if s.settingsMgr == nil {
+		return fmt.Errorf("settings manager not initialized")
+	}
+	return s.settingsMgr.Update(func(s *mining.AppSettings) {
+		*s = *settings
+	})
+}
+
+// SaveWindowState saves the window position and size
+func (s *MiningService) SaveWindowState(x, y, width, height int, maximized bool) error {
+	if s.settingsMgr == nil {
+		return nil
+	}
+	return s.settingsMgr.UpdateWindowState(x, y, width, height, maximized)
+}
+
+// WindowState represents window position and size for the frontend
+type WindowState struct {
+	X         int  `json:"x"`
+	Y         int  `json:"y"`
+	Width     int  `json:"width"`
+	Height    int  `json:"height"`
+	Maximized bool `json:"maximized"`
+}
+
+// GetWindowState returns the saved window state
+func (s *MiningService) GetWindowState() *WindowState {
+	if s.settingsMgr == nil {
+		return &WindowState{Width: 1400, Height: 900}
+	}
+	state := s.settingsMgr.GetWindowState()
+	return &WindowState{
+		X:         state.X,
+		Y:         state.Y,
+		Width:     state.Width,
+		Height:    state.Height,
+		Maximized: state.Maximized,
+	}
+}
+
+// SetStartOnBoot enables/disables start on system boot
+func (s *MiningService) SetStartOnBoot(enabled bool) error {
+	if s.settingsMgr == nil {
+		return nil
+	}
+	return s.settingsMgr.SetStartOnBoot(enabled)
+}
+
+// SetAutostartMiners enables/disables automatic miner start
+func (s *MiningService) SetAutostartMiners(enabled bool) error {
+	if s.settingsMgr == nil {
+		return nil
+	}
+	return s.settingsMgr.SetAutostartMiners(enabled)
+}
+
+// SetCPUThrottle configures CPU throttling settings
+func (s *MiningService) SetCPUThrottle(enabled bool, maxPercent int) error {
+	if s.settingsMgr == nil {
+		return nil
+	}
+	return s.settingsMgr.SetCPUThrottle(enabled, maxPercent)
+}
+
+// SetMinerDefaults updates default miner configuration
+func (s *MiningService) SetMinerDefaults(defaults mining.MinerDefaults) error {
+	if s.settingsMgr == nil {
+		return nil
+	}
+	return s.settingsMgr.SetMinerDefaults(defaults)
 }

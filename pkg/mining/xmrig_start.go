@@ -150,6 +150,22 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 		apiListen = fmt.Sprintf("%s:%d", m.API.ListenHost, m.API.ListenPort)
 	}
 
+	cpuConfig := map[string]interface{}{
+		"enabled":    true,
+		"huge-pages": config.HugePages,
+	}
+
+	// Set thread count or max-threads-hint for CPU throttling
+	if config.Threads > 0 {
+		cpuConfig["threads"] = config.Threads
+	}
+	if config.CPUMaxThreadsHint > 0 {
+		cpuConfig["max-threads-hint"] = config.CPUMaxThreadsHint
+	}
+	if config.CPUPriority > 0 {
+		cpuConfig["priority"] = config.CPUPriority
+	}
+
 	c := map[string]interface{}{
 		"api": map[string]interface{}{
 			"enabled":    m.API != nil && m.API.Enabled,
@@ -165,11 +181,9 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 				"tls":       config.TLS,
 			},
 		},
-		"cpu": map[string]interface{}{
-			"enabled":    true,
-			"threads":    config.Threads,
-			"huge-pages": config.HugePages,
-		},
+		"cpu": cpuConfig,
+		"pause-on-active":  config.PauseOnActive,
+		"pause-on-battery": config.PauseOnBattery,
 	}
 
 	data, err := json.MarshalIndent(c, "", "  ")
