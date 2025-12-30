@@ -6,7 +6,10 @@
 *.dylib
 *.log
 
+# Go CLI binaries
 miner-ctrl
+miner-cli
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -27,6 +30,12 @@ build/
 bin/
 *.tar.gz
 *.zip
+
+# Miner C++ build artifacts
+miner/core/build/
+miner/proxy/build/
+miner/cuda/build/
+miner/heatmap/build/
 
 # IDE specific files
 .idea/
