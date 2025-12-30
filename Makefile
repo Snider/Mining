@@ -1,7 +1,7 @@
 .PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package e2e e2e-ui e2e-api
 
 # Variables
-BINARY_NAME=miner-cli
+BINARY_NAME=miner-ctrl
 MAIN_PACKAGE=./cmd/mining
 GO=go
 GOFLAGS=-v

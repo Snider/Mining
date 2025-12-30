@@ -31,7 +31,7 @@ cd Mining
 # Build everything
 make build
 
-# Output: ./miner-cli
+# Output: ./miner-ctrl
 ```
 
 ## Backend Build
@@ -41,14 +41,14 @@ make build
 ```bash
 make build
 # or
-go build -o miner-cli ./cmd/mining
+go build -o miner-ctrl ./cmd/mining
 ```
 
 ### With Version Info
 
 ```bash
 VERSION=1.0.0
-go build -ldflags "-X main.version=$VERSION" -o miner-cli ./cmd/mining
+go build -ldflags "-X main.version=$VERSION" -o miner-ctrl ./cmd/mining
 ```
 
 ### Cross-Platform Builds
@@ -58,9 +58,9 @@ go build -ldflags "-X main.version=$VERSION" -o miner-cli ./cmd/mining
 make build-all
 
 # Or manually:
-GOOS=linux GOARCH=amd64 go build -o dist/miner-cli-linux-amd64 ./cmd/mining
-GOOS=darwin GOARCH=amd64 go build -o dist/miner-cli-darwin-amd64 ./cmd/mining
-GOOS=windows GOARCH=amd64 go build -o dist/miner-cli-windows-amd64.exe ./cmd/mining
+GOOS=linux GOARCH=amd64 go build -o dist/miner-ctrl-linux-amd64 ./cmd/mining
+GOOS=darwin GOARCH=amd64 go build -o dist/miner-ctrl-darwin-amd64 ./cmd/mining
+GOOS=windows GOARCH=amd64 go build -o dist/miner-ctrl-windows-amd64.exe ./cmd/mining
 ```
 
 ## Frontend Build
@@ -152,7 +152,7 @@ make dev
 
 # Or separately:
 # Terminal 1: Backend
-./miner-cli serve
+./miner-ctrl serve
 
 # Terminal 2: Frontend
 cd ui && ng serve
@@ -185,9 +185,9 @@ docker-compose -f docker-compose.p2p.yml up
 make package
 
 # Creates:
-# - dist/miner-cli_linux_amd64.tar.gz
-# - dist/miner-cli_darwin_amd64.tar.gz
-# - dist/miner-cli_windows_amd64.zip
+# - dist/miner-ctrl_linux_amd64.tar.gz
+# - dist/miner-ctrl_darwin_amd64.tar.gz
+# - dist/miner-ctrl_windows_amd64.zip
 ```
 
 ## Troubleshooting

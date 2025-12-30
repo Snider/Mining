@@ -1,0 +1,65 @@
+NOTICE - Third Party Software Attribution
+=========================================
+
+This directory contains derivative works based on the XMRig project ecosystem.
+These components are incorporated into this project under the compatibility
+provisions of the European Union Public Licence v1.2 (EUPL-1.2), which lists
+GPL-3.0 as a compatible licence (see Appendix of EUPL-1.2).
+
+Original Works and Copyright Holders
+------------------------------------
+
+core/       Based on XMRig
+            Copyright (c) 2018-2024 SChernykh
+            Copyright (c) 2016-2024 XMRig
+            Original: https://github.com/xmrig/xmrig
+            License: GPL-3.0
+
+cuda/       Based on XMRig CUDA Plugin
+            Copyright (c) 2018-2024 SChernykh
+            Copyright (c) 2016-2024 XMRig
+            Original: https://github.com/xmrig/xmrig-cuda
+            License: GPL-3.0
+
+proxy/      Based on XMRig Proxy
+            Copyright (c) 2018-2024 SChernykh
+            Copyright (c) 2016-2024 XMRig
+            Original: https://github.com/xmrig/xmrig-proxy
+            License: GPL-3.0
+
+deps/       Based on XMRig Dependencies
+            Original: https://github.com/xmrig/xmrig-deps
+            License: Various (see individual components)
+
+config/     Based on XMRig Config
+            Copyright (c) 2018-2024 SChernykh
+            Copyright (c) 2016-2024 XMRig
+            Original: https://github.com/nicehash/xmrig-config
+            License: GPL-3.0
+
+workers/    Based on XMRig Workers
+            Copyright (c) 2018-2024 SChernykh
+            Copyright (c) 2016-2024 XMRig
+            Original: https://github.com/xmrig/xmrig-workers
+            License: GPL-3.0
+
+heatmap/    Based on XMRig Nonces Heatmap
+            Original: https://github.com/xmrig/xmrig-nonces-heatmap
+            License: GPL-3.0
+
+Licence Compatibility Statement
+-------------------------------
+
+Per EUPL-1.2 Article 5 (Compatibility clause):
+
+"If the Licensee Distributes or Communicates Derivative Works or copies thereof
+based upon both the Work and another work licensed under a Compatible Licence,
+this Distribution or Communication can be done under the terms of this
+Compatible Licence."
+
+GPL-3.0 is explicitly listed as a Compatible Licence in the EUPL-1.2 Appendix.
+The modifications and derivative works in this directory are distributed under
+EUPL-1.2, the project's primary licence.
+
+All original copyright notices have been preserved in the source files as
+required by both GPL-3.0 and EUPL-1.2 attribution requirements.

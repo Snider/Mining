@@ -1,12 +1,12 @@
 # Mining API Documentation
 
-The Mining project provides a comprehensive RESTful API for managing cryptocurrency miners. This API is served by the `miner-cli serve` command.
+The Mining project provides a comprehensive RESTful API for managing cryptocurrency miners. This API is served by the `miner-ctrl serve` command.
 
 ## Swagger Documentation
 
 The project includes automatically generated Swagger (OpenAPI) documentation.
 
-When you run the service (e.g., `miner-cli serve`), the Swagger UI is available at:
+When you run the service (e.g., `miner-ctrl serve`), the Swagger UI is available at:
 
 ```
 http://<host>:<port>/api/v1/mining/swagger/index.html

@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 
 # Build the CLI
-RUN CGO_ENABLED=0 go build -o miner-cli ./cmd/mining
+RUN CGO_ENABLED=0 go build -o miner-ctrl ./cmd/mining
 
 # Runtime image
 FROM alpine:3.19
@@ -30,7 +30,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 
 # Copy the binary
-COPY --from=builder /app/miner-cli /usr/local/bin/miner-cli
+COPY --from=builder /app/miner-ctrl /usr/local/bin/miner-ctrl
 
 # Create config directories
 RUN mkdir -p /root/.config/lethean-desktop /root/.local/share/lethean-desktop
@@ -39,5 +39,5 @@ RUN mkdir -p /root/.config/lethean-desktop /root/.local/share/lethean-desktop
 EXPOSE 9091
 
 # Default command shows help
-ENTRYPOINT ["miner-cli"]
+ENTRYPOINT ["miner-ctrl"]
 CMD ["--help"]

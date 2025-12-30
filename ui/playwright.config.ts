@@ -43,7 +43,7 @@ export default defineConfig({
   webServer: isApiOnly
     ? [
         {
-          command: 'cd .. && make build && ./miner-cli serve --host localhost --port 9090',
+          command: 'cd .. && make build && ./miner-ctrl serve --host localhost --port 9090',
           url: 'http://localhost:9090/api/v1/mining/info',
           reuseExistingServer: true,
           timeout: 120000,
@@ -51,7 +51,7 @@ export default defineConfig({
       ]
     : [
         {
-          command: 'cd .. && make build && ./miner-cli serve --host localhost --port 9090',
+          command: 'cd .. && make build && ./miner-ctrl serve --host localhost --port 9090',
           url: 'http://localhost:9090/api/v1/mining/info',
           reuseExistingServer: !process.env.CI,
           timeout: 120000,

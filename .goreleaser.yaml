@@ -11,9 +11,9 @@ before:
     - sh -c 'cd ui && npm install && npm run build'
 
 builds:
-  - id: mining-cli
+  - id: mining-ctrl
     main: ./cmd/mining
-    binary: miner-cli
+    binary: miner-ctrl
 
     env:
       - CGO_ENABLED=0
@@ -109,5 +109,5 @@ announce:
   skip: false
   discord:
     enabled: true
-    message_template: "miner-cli {{.Tag}} is out!  Check it out at {{ .ReleaseURL }}"
+    message_template: "miner-ctrl {{.Tag}} is out!  Check it out at {{ .ReleaseURL }}"
     author: "Lethean Releases"

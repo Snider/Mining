@@ -155,7 +155,7 @@ var serveCmd = &cobra.Command{
 					}
 				default:
 					fmt.Fprintf(os.Stderr, "Unknown command: %s. Only 'start', 'status', 'stop', 'list' are directly supported in this shell.\n", command)
-					fmt.Fprintf(os.Stderr, "For other commands, please run them directly from your terminal (e.g., 'miner-cli doctor').\n")
+					fmt.Fprintf(os.Stderr, "For other commands, please run them directly from your terminal (e.g., 'miner-ctrl doctor').\n")
 				}
 				fmt.Print(">> ")
 			}

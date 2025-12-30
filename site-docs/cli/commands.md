@@ -1,11 +1,11 @@
 # CLI Commands
 
-Complete reference for the `miner-cli` command-line interface.
+Complete reference for the `miner-ctrl` command-line interface.
 
 ## Global Flags
 
 ```bash
-miner-cli [command] [flags]
+miner-ctrl [command] [flags]
 ```
 
 | Flag | Description |
@@ -20,7 +20,7 @@ miner-cli [command] [flags]
 Start the REST API server and web dashboard.
 
 ```bash
-miner-cli serve [flags]
+miner-ctrl serve [flags]
 ```
 
 | Flag | Default | Description |
@@ -33,13 +33,13 @@ miner-cli serve [flags]
 
 ```bash
 # Start with defaults
-miner-cli serve
+miner-ctrl serve
 
 # Custom port
-miner-cli serve --port 8080
+miner-ctrl serve --port 8080
 
 # Disable autostart
-miner-cli serve --no-autostart
+miner-ctrl serve --no-autostart
 ```
 
 ---
@@ -49,7 +49,7 @@ miner-cli serve --no-autostart
 Start a miner with a specific configuration.
 
 ```bash
-miner-cli start <miner-type> [flags]
+miner-ctrl start <miner-type> [flags]
 ```
 
 | Flag | Description |
@@ -64,13 +64,13 @@ miner-cli start <miner-type> [flags]
 
 ```bash
 # Start XMRig with pool and wallet
-miner-cli start xmrig --pool pool.example.com:3333 --wallet 4xxx...
+miner-ctrl start xmrig --pool pool.example.com:3333 --wallet 4xxx...
 
 # Start using a profile
-miner-cli start --profile "My Profile"
+miner-ctrl start --profile "My Profile"
 
 # Start TT-Miner on specific GPUs
-miner-cli start tt-miner --pool pool.example.com:4444 --devices 0,1
+miner-ctrl start tt-miner --pool pool.example.com:4444 --devices 0,1
 ```
 
 ---
@@ -80,17 +80,17 @@ miner-cli start tt-miner --pool pool.example.com:4444 --devices 0,1
 Stop a running miner.
 
 ```bash
-miner-cli stop <miner-name>
+miner-ctrl stop <miner-name>
 ```
 
 **Examples:**
 
 ```bash
 # Stop a specific miner
-miner-cli stop xmrig-123
+miner-ctrl stop xmrig-123
 
 # Stop all miners
-miner-cli stop --all
+miner-ctrl stop --all
 ```
 
 ---
@@ -100,17 +100,17 @@ miner-cli stop --all
 Show status of running miners.
 
 ```bash
-miner-cli status [miner-name]
+miner-ctrl status [miner-name]
 ```
 
 **Examples:**
 
 ```bash
 # Show all miners
-miner-cli status
+miner-ctrl status
 
 # Show specific miner
-miner-cli status xmrig-123
+miner-ctrl status xmrig-123
 ```
 
 **Output:**
@@ -126,7 +126,7 @@ xmrig-123     1.23 kH/s   42/43     1h 23m    pool.example.com
 List available or running miners.
 
 ```bash
-miner-cli list [flags]
+miner-ctrl list [flags]
 ```
 
 | Flag | Description |
@@ -142,14 +142,14 @@ miner-cli list [flags]
 Install a miner.
 
 ```bash
-miner-cli install <miner-type>
+miner-ctrl install <miner-type>
 ```
 
 **Examples:**
 
 ```bash
-miner-cli install xmrig
-miner-cli install tt-miner
+miner-ctrl install xmrig
+miner-ctrl install tt-miner
 ```
 
 ---
@@ -159,7 +159,7 @@ miner-cli install tt-miner
 Uninstall a miner.
 
 ```bash
-miner-cli uninstall <miner-type>
+miner-ctrl uninstall <miner-type>
 ```
 
 ---
@@ -169,7 +169,7 @@ miner-cli uninstall <miner-type>
 Update a miner to the latest version.
 
 ```bash
-miner-cli update <miner-type>
+miner-ctrl update <miner-type>
 ```
 
 ---
@@ -179,7 +179,7 @@ miner-cli update <miner-type>
 Check system health and miner installations.
 
 ```bash
-miner-cli doctor
+miner-ctrl doctor
 ```
 
 **Output:**
@@ -212,7 +212,7 @@ P2P node management commands.
 Initialize node identity.
 
 ```bash
-miner-cli node init [flags]
+miner-ctrl node init [flags]
 ```
 
 | Flag | Description |
@@ -225,7 +225,7 @@ miner-cli node init [flags]
 Show node information.
 
 ```bash
-miner-cli node info
+miner-ctrl node info
 ```
 
 ### node serve
@@ -233,7 +233,7 @@ miner-cli node info
 Start P2P server.
 
 ```bash
-miner-cli node serve [flags]
+miner-ctrl node serve [flags]
 ```
 
 | Flag | Default | Description |
@@ -251,7 +251,7 @@ Peer management commands.
 Add a peer node.
 
 ```bash
-miner-cli peer add [flags]
+miner-ctrl peer add [flags]
 ```
 
 | Flag | Description |
@@ -264,7 +264,7 @@ miner-cli peer add [flags]
 List registered peers.
 
 ```bash
-miner-cli peer list
+miner-ctrl peer list
 ```
 
 ### peer remove
@@ -272,7 +272,7 @@ miner-cli peer list
 Remove a peer.
 
 ```bash
-miner-cli peer remove <peer-id>
+miner-ctrl peer remove <peer-id>
 ```
 
 ### peer ping
@@ -280,7 +280,7 @@ miner-cli peer remove <peer-id>
 Ping a peer.
 
 ```bash
-miner-cli peer ping <peer-id>
+miner-ctrl peer ping <peer-id>
 ```
 
 ---
@@ -294,7 +294,7 @@ Remote miner operations.
 Get stats from remote peers.
 
 ```bash
-miner-cli remote status [peer-id]
+miner-ctrl remote status [peer-id]
 ```
 
 ### remote start
@@ -302,7 +302,7 @@ miner-cli remote status [peer-id]
 Start miner on remote peer.
 
 ```bash
-miner-cli remote start <peer-id> --profile <profile-id>
+miner-ctrl remote start <peer-id> --profile <profile-id>
 ```
 
 ### remote stop
@@ -310,7 +310,7 @@ miner-cli remote start <peer-id> --profile <profile-id>
 Stop miner on remote peer.
 
 ```bash
-miner-cli remote stop <peer-id> [miner-name]
+miner-ctrl remote stop <peer-id> [miner-name]
 ```
 
 ### remote logs
@@ -318,7 +318,7 @@ miner-cli remote stop <peer-id> [miner-name]
 Get logs from remote miner.
 
 ```bash
-miner-cli remote logs <peer-id> <miner-name> [flags]
+miner-ctrl remote logs <peer-id> <miner-name> [flags]
 ```
 
 | Flag | Default | Description |
@@ -336,7 +336,7 @@ Profile management commands.
 List all profiles.
 
 ```bash
-miner-cli profile list
+miner-ctrl profile list
 ```
 
 ### profile create
@@ -344,7 +344,7 @@ miner-cli profile list
 Create a new profile.
 
 ```bash
-miner-cli profile create [flags]
+miner-ctrl profile create [flags]
 ```
 
 ### profile delete
@@ -352,5 +352,5 @@ miner-cli profile create [flags]
 Delete a profile.
 
 ```bash
-miner-cli profile delete <profile-id>
+miner-ctrl profile delete <profile-id>
 ```

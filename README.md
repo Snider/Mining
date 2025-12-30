@@ -10,7 +10,7 @@
 GoLang Miner management with embedable RESTful control - A modern, modular package for managing cryptocurrency miners.
 
 ```bash
-miner-cli serve --host localhost --port 9090 --namespace /api/v1/mining
+miner-ctrl serve --host localhost --port 9090 --namespace /api/v1/mining
 ```
 
 ```html
@@ -61,27 +61,27 @@ go get github.com/Snider/Mining
 
 ### CLI Commands
 
-The `miner-cli` provides the following commands:
+The `miner-ctrl` provides the following commands:
 
 ```
-miner-cli completion  Generate the autocompletion script for the specified shell
-miner-cli doctor      Check and refresh the status of installed miners
-miner-cli help        Help about any command
-miner-cli install     Install or update a miner
-miner-cli list        List running and available miners
-miner-cli serve       Start the mining service and interactive shell
-miner-cli start       Start a new miner
-miner-cli status      Get status of a running miner
-miner-cli stop        Stop a running miner
-miner-cli uninstall   Uninstall a miner
-miner-cli update      Check for updates to installed miners
+miner-ctrl completion  Generate the autocompletion script for the specified shell
+miner-ctrl doctor      Check and refresh the status of installed miners
+miner-ctrl help        Help about any command
+miner-ctrl install     Install or update a miner
+miner-ctrl list        List running and available miners
+miner-ctrl serve       Start the mining service and interactive shell
+miner-ctrl start       Start a new miner
+miner-ctrl status      Get status of a running miner
+miner-ctrl stop        Stop a running miner
+miner-ctrl uninstall   Uninstall a miner
+miner-ctrl update      Check for updates to installed miners
 ```
 
-For more details on any command, use `miner-cli [command] --help`.
+For more details on any command, use `miner-ctrl [command] --help`.
 
 ### RESTful API Endpoints
 
-When running the `miner-cli serve` command, the following RESTful API endpoints are exposed (default base path `/api/v1/mining`):
+When running the `miner-ctrl serve` command, the following RESTful API endpoints are exposed (default base path `/api/v1/mining`):
 
 - `GET /api/v1/mining/info` - Get cached miner installation information and system details.
 - `POST /api/v1/mining/doctor` - Perform a live check on all available miners to verify their installation status, version, and path.
@@ -108,7 +108,7 @@ Swagger documentation is typically available at `http://<host>:<port>/api/v1/min
 
 ```bash
 # Build the CLI
-go build -o miner-cli ./cmd/mining
+go build -o miner-ctrl ./cmd/mining
 
 # Run tests
 go test ./...

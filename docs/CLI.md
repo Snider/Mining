@@ -1,6 +1,6 @@
 # Mining CLI Documentation
 
-The `miner-cli` is the command-line interface for the Mining project. It allows you to manage miners directly from the terminal or start a REST API server.
+The `miner-ctrl` is the command-line interface for the Mining project. It allows you to manage miners directly from the terminal or start a REST API server.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Starts the mining service and interactive shell.
 
 **Usage:**
 ```bash
-miner-cli serve [flags]
+miner-ctrl serve [flags]
 ```
 
 **Flags:**
@@ -33,7 +33,7 @@ Start a new miner.
 
 **Usage:**
 ```bash
-miner-cli start [miner-type] [flags]
+miner-ctrl start [miner-type] [flags]
 ```
 
 ### `stop`
@@ -41,7 +41,7 @@ Stop a running miner.
 
 **Usage:**
 ```bash
-miner-cli stop [miner-name]
+miner-ctrl stop [miner-name]
 ```
 
 ### `status`
@@ -49,7 +49,7 @@ Get status of a running miner.
 
 **Usage:**
 ```bash
-miner-cli status [miner-name]
+miner-ctrl status [miner-name]
 ```
 
 ### `list`
@@ -57,7 +57,7 @@ List running and available miners.
 
 **Usage:**
 ```bash
-miner-cli list
+miner-ctrl list
 ```
 
 ### `install`
@@ -65,7 +65,7 @@ Install or update a miner.
 
 **Usage:**
 ```bash
-miner-cli install [miner-type]
+miner-ctrl install [miner-type]
 ```
 
 ### `uninstall`
@@ -73,7 +73,7 @@ Uninstall a miner.
 
 **Usage:**
 ```bash
-miner-cli uninstall [miner-type]
+miner-ctrl uninstall [miner-type]
 ```
 
 ### `update`
@@ -81,7 +81,7 @@ Check for updates to installed miners.
 
 **Usage:**
 ```bash
-miner-cli update
+miner-ctrl update
 ```
 
 ### `doctor`
@@ -89,7 +89,7 @@ Check and refresh the status of installed miners.
 
 **Usage:**
 ```bash
-miner-cli doctor
+miner-ctrl doctor
 ```
 
 ### `completion`
@@ -97,5 +97,5 @@ Generate the autocompletion script for the specified shell (bash, zsh, fish, pow
 
 **Usage:**
 ```bash
-miner-cli completion [shell]
+miner-ctrl completion [shell]
 ```

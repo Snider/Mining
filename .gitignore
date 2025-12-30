@@ -6,7 +6,7 @@
 *.dylib
 *.log
 
-miner-cli
+miner-ctrl
 # Test binary, built with `go test -c`
 *.test
 

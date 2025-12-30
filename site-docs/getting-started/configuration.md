@@ -103,7 +103,7 @@ Stores saved mining profiles:
 ## Command Line Flags
 
 ```bash
-./miner-cli serve --help
+./miner-ctrl serve --help
 
 Flags:
   -p, --port int      API port (default 9090)
@@ -135,7 +135,7 @@ The P2P node identity is auto-generated on first run:
 
 ```bash
 # Initialize with custom name
-./miner-cli node init --name "my-rig" --role worker
+./miner-ctrl node init --name "my-rig" --role worker
 ```
 
 See [P2P Multi-Node](../features/p2p-multinode.md) for more details.

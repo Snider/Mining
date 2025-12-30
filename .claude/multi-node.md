@@ -305,20 +305,20 @@ Phase 6: CLI Commands
 6.1 Node Management
 
 File: cmd/mining/cmd/node.go
-// miner-cli node init --name "rig-alpha" --role worker
-// miner-cli node init --name "control-center" --role controller
+// miner-ctrl node init --name "rig-alpha" --role worker
+// miner-ctrl node init --name "control-center" --role controller
 var nodeInitCmd = &cobra.Command{
 Use:   "init",
 Short: "Initialize node identity",
 }
 
-// miner-cli node info
+// miner-ctrl node info
 var nodeInfoCmd = &cobra.Command{
 Use:   "info",
 Short: "Show node identity and status",
 }
 
-// miner-cli node serve --listen :9091
+// miner-ctrl node serve --listen :9091
 var nodeServeCmd = &cobra.Command{
 Use:   "serve",
 Short: "Start P2P server for remote connections",
@@ -327,25 +327,25 @@ Short: "Start P2P server for remote connections",
 6.2 Peer Management
 
 File: cmd/mining/cmd/peer.go
-// miner-cli peer add --address 192.168.1.100:9091 --name "rig-alpha"
+// miner-ctrl peer add --address 192.168.1.100:9091 --name "rig-alpha"
 var peerAddCmd = &cobra.Command{
 Use:   "add",
 Short: "Add a peer node (initiates handshake)",
 }
 
-// miner-cli peer list
+// miner-ctrl peer list
 var peerListCmd = &cobra.Command{
 Use:   "list",
 Short: "List registered peers with status",
 }
 
-// miner-cli peer remove <peer-id>
+// miner-ctrl peer remove <peer-id>
 var peerRemoveCmd = &cobra.Command{
 Use:   "remove",
 Short: "Remove a peer from registry",
 }
 
-// miner-cli peer ping <peer-id>
+// miner-ctrl peer ping <peer-id>
 var peerPingCmd = &cobra.Command{
 Use:   "ping",
 Short: "Ping a peer and update metrics",
@@ -354,33 +354,33 @@ Short: "Ping a peer and update metrics",
 6.3 Remote Operations
 
 File: cmd/mining/cmd/remote.go
-// miner-cli remote status [peer-id]
+// miner-ctrl remote status [peer-id]
 // Shows stats from all peers or specific peer
 var remoteStatusCmd = &cobra.Command{
 Use:   "status",
 Short: "Get mining status from remote peers",
 }
 
-// miner-cli remote start <peer-id> --profile <profile-id>
+// miner-ctrl remote start <peer-id> --profile <profile-id>
 var remoteStartCmd = &cobra.Command{
 Use:   "start",
 Short: "Start miner on remote peer",
 }
 
-// miner-cli remote stop <peer-id> [miner-name]
+// miner-ctrl remote stop <peer-id> [miner-name]
 var remoteStopCmd = &cobra.Command{
 Use:   "stop",
 Short: "Stop miner on remote peer",
 }
 
-// miner-cli remote deploy <peer-id> --profile <profile-id>
-// miner-cli remote deploy <peer-id> --miner xmrig
+// miner-ctrl remote deploy <peer-id> --profile <profile-id>
+// miner-ctrl remote deploy <peer-id> --miner xmrig
 var remoteDeployCmd = &cobra.Command{
 Use:   "deploy",
 Short: "Deploy config or miner bundle to remote peer",
 }
 
-// miner-cli remote logs <peer-id> <miner-name> --lines 100
+// miner-ctrl remote logs <peer-id> <miner-name> --lines 100
 var remoteLogsCmd = &cobra.Command{
 Use:   "logs",
 Short: "Get console logs from remote miner",

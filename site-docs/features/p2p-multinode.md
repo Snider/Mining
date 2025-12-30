@@ -57,17 +57,17 @@ On each machine:
 
 ```bash
 # Controller node
-./miner-cli node init --name "control-center" --role controller
+./miner-ctrl node init --name "control-center" --role controller
 
 # Worker nodes
-./miner-cli node init --name "rig-alpha" --role worker
+./miner-ctrl node init --name "rig-alpha" --role worker
 ```
 
 ### 2. Start P2P Server
 
 ```bash
 # Start with P2P enabled (default port 9091)
-./miner-cli node serve --listen :9091
+./miner-ctrl node serve --listen :9091
 ```
 
 ### 3. Add Peers
@@ -75,7 +75,7 @@ On each machine:
 From the controller, add worker nodes:
 
 ```bash
-./miner-cli peer add --address 192.168.1.100:9091 --name "rig-alpha"
+./miner-ctrl peer add --address 192.168.1.100:9091 --name "rig-alpha"
 ```
 
 Or via the UI:
@@ -125,25 +125,25 @@ The Nodes page shows all registered peers with:
 ### Get Remote Stats
 
 ```bash
-./miner-cli remote status rig-alpha
+./miner-ctrl remote status rig-alpha
 ```
 
 ### Start Remote Miner
 
 ```bash
-./miner-cli remote start rig-alpha --profile my-profile
+./miner-ctrl remote start rig-alpha --profile my-profile
 ```
 
 ### Stop Remote Miner
 
 ```bash
-./miner-cli remote stop rig-alpha xmrig-123
+./miner-ctrl remote stop rig-alpha xmrig-123
 ```
 
 ### Get Remote Logs
 
 ```bash
-./miner-cli remote logs rig-alpha xmrig-123 --lines 100
+./miner-ctrl remote logs rig-alpha xmrig-123 --lines 100
 ```
 
 ## Security
@@ -197,21 +197,21 @@ GET  /api/v1/mining/remote/{peerId}/logs/{miner} # Get remote logs
 
 ```bash
 # Node commands
-miner-cli node init --name "my-rig" --role worker
-miner-cli node info
-miner-cli node serve --listen :9091
+miner-ctrl node init --name "my-rig" --role worker
+miner-ctrl node info
+miner-ctrl node serve --listen :9091
 
 # Peer commands
-miner-cli peer add --address 192.168.1.100:9091 --name "rig"
-miner-cli peer list
-miner-cli peer remove <peer-id>
-miner-cli peer ping <peer-id>
+miner-ctrl peer add --address 192.168.1.100:9091 --name "rig"
+miner-ctrl peer list
+miner-ctrl peer remove <peer-id>
+miner-ctrl peer ping <peer-id>
 
 # Remote commands
-miner-cli remote status [peer-id]
-miner-cli remote start <peer-id> --profile <profile-id>
-miner-cli remote stop <peer-id> [miner-name]
-miner-cli remote logs <peer-id> <miner-name> --lines 100
+miner-ctrl remote status [peer-id]
+miner-ctrl remote start <peer-id> --profile <profile-id>
+miner-ctrl remote stop <peer-id> [miner-name]
+miner-ctrl remote logs <peer-id> <miner-name> --lines 100
 ```
 
 ## Network Requirements

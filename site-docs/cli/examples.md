@@ -8,23 +8,23 @@ Practical examples for common tasks.
 
 ```bash
 # Install XMRig
-miner-cli install xmrig
+miner-ctrl install xmrig
 
 # Start mining with a profile
-miner-cli start --profile "My Profile"
+miner-ctrl start --profile "My Profile"
 
 # Or with direct parameters
-miner-cli start xmrig --pool pool.example.com:3333 --wallet 4xxx...
+miner-ctrl start xmrig --pool pool.example.com:3333 --wallet 4xxx...
 ```
 
 ### Monitor Mining Status
 
 ```bash
 # Check status of all miners
-miner-cli status
+miner-ctrl status
 
 # Watch status continuously
-watch -n 5 miner-cli status
+watch -n 5 miner-ctrl status
 ```
 
 ---
@@ -35,10 +35,10 @@ watch -n 5 miner-cli status
 
 ```bash
 # List existing profiles
-miner-cli profile list
+miner-ctrl profile list
 
 # Start a miner from profile
-miner-cli start --profile "Monero Mining"
+miner-ctrl start --profile "Monero Mining"
 ```
 
 ---
@@ -49,49 +49,49 @@ miner-cli start --profile "Monero Mining"
 
 ```bash
 # Initialize as controller
-miner-cli node init --name "control-center" --role controller
+miner-ctrl node init --name "control-center" --role controller
 
 # Start the P2P server
-miner-cli node serve --listen :9091
+miner-ctrl node serve --listen :9091
 ```
 
 ### Set Up a Worker Node
 
 ```bash
 # Initialize as worker
-miner-cli node init --name "rig-alpha" --role worker
+miner-ctrl node init --name "rig-alpha" --role worker
 
 # Start accepting connections
-miner-cli node serve --listen :9091
+miner-ctrl node serve --listen :9091
 ```
 
 ### Connect and Manage Peers
 
 ```bash
 # On controller: add a worker
-miner-cli peer add --address 192.168.1.100:9091 --name "rig-alpha"
+miner-ctrl peer add --address 192.168.1.100:9091 --name "rig-alpha"
 
 # List all peers
-miner-cli peer list
+miner-ctrl peer list
 
 # Ping a peer
-miner-cli peer ping abc123
+miner-ctrl peer ping abc123
 ```
 
 ### Remote Mining Commands
 
 ```bash
 # Get stats from all remote miners
-miner-cli remote status
+miner-ctrl remote status
 
 # Start miner on remote peer
-miner-cli remote start abc123 --profile "My Profile"
+miner-ctrl remote start abc123 --profile "My Profile"
 
 # Stop miner on remote peer
-miner-cli remote stop abc123 xmrig-456
+miner-ctrl remote stop abc123 xmrig-456
 
 # Get logs from remote miner
-miner-cli remote logs abc123 xmrig-456 --lines 50
+miner-ctrl remote logs abc123 xmrig-456 --lines 50
 ```
 
 ---
@@ -102,20 +102,20 @@ miner-cli remote logs abc123 xmrig-456 --lines 50
 
 ```bash
 # Start with defaults (port 9090)
-miner-cli serve
+miner-ctrl serve
 
 # Custom port
-miner-cli serve --port 8080
+miner-ctrl serve --port 8080
 
 # Disable autostart
-miner-cli serve --no-autostart
+miner-ctrl serve --no-autostart
 ```
 
 ### System Health Check
 
 ```bash
 # Run diagnostics
-miner-cli doctor
+miner-ctrl doctor
 ```
 
 Output:
@@ -148,11 +148,11 @@ Recommendations
 PROFILE="My Profile"
 
 while true; do
-    miner-cli start --profile "$PROFILE"
+    miner-ctrl start --profile "$PROFILE"
     sleep 10
 
     # Check if still running
-    if ! miner-cli status | grep -q "running"; then
+    if ! miner-ctrl status | grep -q "running"; then
         echo "Miner stopped, restarting..."
         continue
     fi

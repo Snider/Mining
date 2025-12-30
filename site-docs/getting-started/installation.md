@@ -20,8 +20,8 @@ cd Mining
 # Build the CLI binary
 make build
 
-# The binary is now at ./miner-cli
-./miner-cli --help
+# The binary is now at ./miner-ctrl
+./miner-ctrl --help
 ```
 
 ### Build Commands
@@ -54,7 +54,7 @@ Works out of the box on both Intel and Apple Silicon.
 
 Build with:
 ```powershell
-go build -o miner-cli.exe ./cmd/mining
+go build -o miner-ctrl.exe ./cmd/mining
 ```
 
 ## Docker
@@ -75,13 +75,13 @@ docker run -d \
 
 ```bash
 # Check version
-./miner-cli --version
+./miner-ctrl --version
 
 # Run doctor to check system
-./miner-cli doctor
+./miner-ctrl doctor
 
 # Start the server
-./miner-cli serve
+./miner-ctrl serve
 ```
 
 Then open [http://localhost:9090](http://localhost:9090) to access the dashboard.

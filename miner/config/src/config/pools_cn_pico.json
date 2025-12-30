@@ -1,0 +1,34 @@
+{
+  "pools": [
+    {
+      "id": "hv",
+      "name": "Hash Vault",
+      "type": "nodejs-pool"
+    },
+    {
+      "id": "c",
+      "name": "Custom",
+      "type": "custom"
+    }
+  ],
+  "hv": {
+    "editor": "nodejs-pool",
+    "coins": [
+      {
+        "code": "TRTL",
+        "name": "TurtleCoin",
+        "url": "pool.turtle.hashvault.pro:3333",
+        "variant": "trtl"
+      },
+      {
+        "code": "LOKI",
+        "name": "Loki",
+        "url": "pool.loki.hashvault.pro:3333",
+        "variant": -1
+      }
+    ]
+  },
+  "c": {
+    "editor": "custom"
+  }
+}

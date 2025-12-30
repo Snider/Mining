@@ -62,7 +62,7 @@ cd Mining
 make build
 
 # Start the server
-./miner-cli serve
+./miner-ctrl serve
 ```
 
 Then open [http://localhost:9090](http://localhost:9090) in your browser!

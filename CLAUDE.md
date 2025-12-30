@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Build the CLI binary
-make build                  # Outputs: miner-cli
+make build                  # Outputs: miner-ctrl
 
 # Run tests
 make test                   # Tests with race detection and coverage

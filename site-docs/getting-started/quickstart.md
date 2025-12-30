@@ -5,7 +5,7 @@ Get mining in 5 minutes with this quick start guide.
 ## Step 1: Start the Server
 
 ```bash
-./miner-cli serve
+./miner-ctrl serve
 ```
 
 This starts:

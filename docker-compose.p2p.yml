@@ -4,9 +4,9 @@
 #   docker-compose -f docker-compose.p2p.yml up -d
 #
 # Then in another terminal:
-#   docker exec -it mining-controller miner-cli node info
-#   docker exec -it mining-worker1 miner-cli node info
-#   docker exec -it mining-controller miner-cli peer add --address mining-worker1:9091 --name worker1
+#   docker exec -it mining-controller miner-ctrl node info
+#   docker exec -it mining-worker1 miner-ctrl node info
+#   docker exec -it mining-controller miner-ctrl peer add --address mining-worker1:9091 --name worker1
 
 version: '3.8'
 
@@ -28,8 +28,8 @@ services:
     command:
       - -c
       - |
-        miner-cli node init --name controller --role controller
-        miner-cli node serve --listen :9091
+        miner-ctrl node init --name controller --role controller
+        miner-ctrl node serve --listen :9091
 
   worker1:
     build:
@@ -48,8 +48,8 @@ services:
     command:
       - -c
       - |
-        miner-cli node init --name worker1 --role worker
-        miner-cli node serve --listen :9091
+        miner-ctrl node init --name worker1 --role worker
+        miner-ctrl node serve --listen :9091
 
   worker2:
     build:
@@ -68,8 +68,8 @@ services:
     command:
       - -c
       - |
-        miner-cli node init --name worker2 --role worker
-        miner-cli node serve --listen :9091
+        miner-ctrl node init --name worker2 --role worker
+        miner-ctrl node serve --listen :9091
 
 networks:
   mining-p2p:
