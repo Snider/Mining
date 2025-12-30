@@ -1,0 +1,106 @@
+site_name: Mining Dashboard
+docs_dir: site-docs
+site_description: Multi-Miner Management System - Control XMRig, TT-Miner and more from a single dashboard
+site_author: Built with Claude Code
+repo_url: https://github.com/Snider/Mining
+repo_name: Snider/Mining
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: lime
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: lime
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+  logo: assets/logo.svg
+  favicon: assets/favicon.ico
+
+plugins:
+  - search
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Snider/Mining
+  generator: false
+
+copyright: Built with Claude Code - AI-Powered Development
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Features:
+    - Dashboard: features/dashboard.md
+    - Mining Profiles: features/profiles.md
+    - Console & Logs: features/console.md
+    - Multi-Miner Support: features/multi-miner.md
+    - Historical Data: features/history.md
+    - P2P Multi-Node: features/p2p-multinode.md
+  - User Interface:
+    - Overview: ui/overview.md
+    - Screenshots: ui/screenshots.md
+  - API Reference:
+    - REST API: api/rest-api.md
+    - Endpoints: api/endpoints.md
+  - CLI Reference:
+    - Commands: cli/commands.md
+    - Examples: cli/examples.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Backend: architecture/backend.md
+    - Frontend: architecture/frontend.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Building: development/building.md
+  - About:
+    - Built with Claude: about/claude.md
+    - Changelog: about/changelog.md
