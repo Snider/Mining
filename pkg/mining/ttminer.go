@@ -17,7 +17,7 @@ import (
 // TTMiner represents a TT-Miner (GPU miner), embedding the BaseMiner for common functionality.
 type TTMiner struct {
 	BaseMiner
-	FullStats *TTMinerSummary `json:"full_stats,omitempty"`
+	FullStats *TTMinerSummary `json:"-"` // Excluded from JSON to prevent race during marshaling
 }
 
 // TTMinerSummary represents the stats response from TT-Miner API

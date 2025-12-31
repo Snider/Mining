@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +16,7 @@ type MockMiner struct {
 	UninstallFunc             func() error
 	StartFunc                 func(config *Config) error
 	StopFunc                  func() error
-	GetStatsFunc              func() (*PerformanceMetrics, error)
+	GetStatsFunc              func(ctx context.Context) (*PerformanceMetrics, error)
 	GetNameFunc               func() string
 	GetPathFunc               func() string
 	GetBinaryPathFunc         func() string
@@ -32,7 +33,9 @@ func (m *MockMiner) Install() error                         { return m.InstallFu
 func (m *MockMiner) Uninstall() error                       { return m.UninstallFunc() }
 func (m *MockMiner) Start(config *Config) error             { return m.StartFunc(config) }
 func (m *MockMiner) Stop() error                            { return m.StopFunc() }
-func (m *MockMiner) GetStats() (*PerformanceMetrics, error) { return m.GetStatsFunc() }
+func (m *MockMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
+	return m.GetStatsFunc(ctx)
+}
 func (m *MockMiner) GetName() string                        { return m.GetNameFunc() }
 func (m *MockMiner) GetPath() string                        { return m.GetPathFunc() }
 func (m *MockMiner) GetBinaryPath() string                  { return m.GetBinaryPathFunc() }
@@ -176,7 +179,7 @@ func TestHandleGetMinerStats(t *testing.T) {
 	router, mockManager := setupTestRouter()
 	mockManager.GetMinerFunc = func(minerName string) (Miner, error) {
 		return &MockMiner{
-			GetStatsFunc: func() (*PerformanceMetrics, error) {
+			GetStatsFunc: func(ctx context.Context) (*PerformanceMetrics, error) {
 				return &PerformanceMetrics{Hashrate: 100}, nil
 			},
 			GetLogsFunc: func() []string { return []string{} },

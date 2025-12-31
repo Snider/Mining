@@ -266,21 +266,31 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 // UninstallMiner stops, uninstalls, and removes a miner's configuration.
 func (m *Manager) UninstallMiner(minerType string) error {
 	m.mu.Lock()
+	// Collect miners to stop and delete (can't modify map during iteration)
+	minersToDelete := make([]string, 0)
+	minersToStop := make([]Miner, 0)
 	for name, runningMiner := range m.miners {
 		if rm, ok := runningMiner.(*XMRigMiner); ok && strings.EqualFold(rm.ExecutableName, minerType) {
-			if err := runningMiner.Stop(); err != nil {
-				log.Printf("Warning: failed to stop running miner %s during uninstall: %v", name, err)
-			}
-			delete(m.miners, name)
+			minersToStop = append(minersToStop, runningMiner)
+			minersToDelete = append(minersToDelete, name)
 		}
 		if rm, ok := runningMiner.(*TTMiner); ok && strings.EqualFold(rm.ExecutableName, minerType) {
-			if err := runningMiner.Stop(); err != nil {
-				log.Printf("Warning: failed to stop running miner %s during uninstall: %v", name, err)
-			}
-			delete(m.miners, name)
+			minersToStop = append(minersToStop, runningMiner)
+			minersToDelete = append(minersToDelete, name)
 		}
 	}
+	// Delete from map first, then release lock before stopping (Stop may block)
+	for _, name := range minersToDelete {
+		delete(m.miners, name)
+	}
 	m.mu.Unlock()
+
+	// Stop miners outside the lock to avoid blocking
+	for i, miner := range minersToStop {
+		if err := miner.Stop(); err != nil {
+			log.Printf("Warning: failed to stop running miner %s during uninstall: %v", minersToDelete[i], err)
+		}
+	}
 
 	var miner Miner
 	switch strings.ToLower(minerType) {

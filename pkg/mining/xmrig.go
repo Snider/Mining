@@ -20,7 +20,7 @@ import (
 // XMRigMiner represents an XMRig miner, embedding the BaseMiner for common functionality.
 type XMRigMiner struct {
 	BaseMiner
-	FullStats *XMRigSummary `json:"full_stats,omitempty"`
+	FullStats *XMRigSummary `json:"-"` // Excluded from JSON to prevent race during marshaling
 }
 
 var (

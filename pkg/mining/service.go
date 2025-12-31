@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -117,6 +118,7 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 			log.Printf("Server error on %s: %v", s.Server.Addr, err)
 			errChan <- err
 		}
+		close(errChan) // Prevent goroutine leak
 	}()
 
 	go func() {
@@ -129,14 +131,27 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 		}
 	}()
 
-	// Give the server a moment to start and check for immediate errors
-	select {
-	case err := <-errChan:
-		return fmt.Errorf("failed to start server: %w", err)
-	case <-time.After(100 * time.Millisecond):
-		// Server started successfully
-		return nil
+	// Verify server is actually listening by attempting to connect
+	maxRetries := 50 // 50 * 100ms = 5 seconds max
+	for i := 0; i < maxRetries; i++ {
+		select {
+		case err := <-errChan:
+			if err != nil {
+				return fmt.Errorf("failed to start server: %w", err)
+			}
+			return nil // Channel closed without error means server shut down
+		default:
+			// Try to connect to verify server is listening
+			conn, err := net.DialTimeout("tcp", s.Server.Addr, 50*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				return nil // Server is ready
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
+
+	return fmt.Errorf("server failed to start listening on %s within timeout", s.Server.Addr)
 }
 
 // SetupRoutes configures all API routes on the Gin router.

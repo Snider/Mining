@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/adrg/xdg"
 )
+
+// configMu protects concurrent access to config file operations
+var configMu sync.RWMutex
 
 // MinerAutostartConfig represents the configuration for a single miner's autostart settings.
 type MinerAutostartConfig struct {
@@ -45,6 +49,9 @@ func GetMinersConfigPath() (string, error) {
 
 // LoadMinersConfig loads the miners configuration from the file system.
 func LoadMinersConfig() (*MinersConfig, error) {
+	configMu.RLock()
+	defer configMu.RUnlock()
+
 	configPath, err := GetMinersConfigPath()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine miners config path: %w", err)
@@ -77,6 +84,9 @@ func LoadMinersConfig() (*MinersConfig, error) {
 
 // SaveMinersConfig saves the miners configuration to the file system.
 func SaveMinersConfig(cfg *MinersConfig) error {
+	configMu.Lock()
+	defer configMu.Unlock()
+
 	configPath, err := GetMinersConfigPath()
 	if err != nil {
 		return fmt.Errorf("could not determine miners config path: %w", err)

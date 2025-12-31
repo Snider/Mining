@@ -106,7 +106,12 @@ func IsInitialized() bool {
 	return db != nil
 }
 
-// GetDB returns the database connection (for advanced queries)
+// GetDB returns the database connection (for advanced queries).
+//
+// Deprecated: This function is unsafe for concurrent use because the returned
+// pointer may become invalid if Close() is called by another goroutine after
+// GetDB() returns. Use the dedicated query functions (InsertHashratePoint,
+// GetHashrateHistory, etc.) instead, which handle locking internally.
 func GetDB() *sql.DB {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
