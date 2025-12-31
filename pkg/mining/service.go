@@ -99,6 +99,32 @@ func isRetryableError(status int) bool {
 		status == http.StatusGatewayTimeout
 }
 
+// requestIDMiddleware adds a unique request ID to each request for tracing
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Use existing request ID from header if provided, otherwise generate one
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+
+		// Set in context for use by handlers
+		c.Set("requestID", requestID)
+
+		// Set in response header
+		c.Header("X-Request-ID", requestID)
+
+		c.Next()
+	}
+}
+
+// generateRequestID creates a unique request ID using timestamp and random bytes
+func generateRequestID() string {
+	b := make([]byte, 8)
+	_, _ = base64.StdEncoding.Decode(b, []byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b[:4])
+}
+
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -194,8 +220,8 @@ func (s *Service) InitRouter() {
 			"http://wails.localhost", // Wails desktop app (uses localhost origin)
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}
@@ -206,6 +232,9 @@ func (s *Service) InitRouter() {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20) // 1MB
 		c.Next()
 	})
+
+	// Add X-Request-ID middleware for request tracing
+	s.Router.Use(requestIDMiddleware())
 
 	s.SetupRoutes()
 }
