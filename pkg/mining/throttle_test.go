@@ -34,7 +34,7 @@ func TestCPUThrottleSingleMiner(t *testing.T) {
 		Algo:              "rx/0",
 	}
 
-	minerInstance, err := manager.StartMiner("xmrig", config)
+	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)
 	if err != nil {
 		t.Fatalf("Failed to start miner: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestCPUThrottleSingleMiner(t *testing.T) {
 		t.Errorf("CPU usage %.1f%% exceeds expected ~10%% (with tolerance)", avgCPU)
 	}
 
-	manager.StopMiner(minerInstance.GetName())
+	manager.StopMiner(context.Background(), minerInstance.GetName())
 }
 
 // TestCPUThrottleDualMiners tests that two miners together respect combined CPU limits
@@ -79,7 +79,7 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 		Algo:              "rx/0",
 	}
 
-	miner1Instance, err := manager.StartMiner("xmrig", config1)
+	miner1Instance, err := manager.StartMiner(context.Background(), "xmrig", config1)
 	if err != nil {
 		t.Fatalf("Failed to start first miner: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 		Algo:              "gr", // GhostRider algo
 	}
 
-	miner2Instance, err := manager.StartMiner("xmrig", config2)
+	miner2Instance, err := manager.StartMiner(context.Background(), "xmrig", config2)
 	if err != nil {
 		t.Fatalf("Failed to start second miner: %v", err)
 	}
@@ -119,8 +119,8 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 	}
 
 	// Clean up
-	manager.StopMiner(miner1Instance.GetName())
-	manager.StopMiner(miner2Instance.GetName())
+	manager.StopMiner(context.Background(), miner1Instance.GetName())
+	manager.StopMiner(context.Background(), miner2Instance.GetName())
 }
 
 // TestCPUThrottleThreadCount tests thread-based CPU limiting
@@ -150,12 +150,12 @@ func TestCPUThrottleThreadCount(t *testing.T) {
 		Algo:    "rx/0",
 	}
 
-	minerInstance, err := manager.StartMiner("xmrig", config)
+	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)
 	if err != nil {
 		t.Fatalf("Failed to start miner: %v", err)
 	}
 	t.Logf("Started miner: %s", minerInstance.GetName())
-	defer manager.StopMiner(minerInstance.GetName())
+	defer manager.StopMiner(context.Background(), minerInstance.GetName())
 
 	// Let miner warm up
 	time.Sleep(15 * time.Second)
@@ -194,7 +194,7 @@ func TestMinerResourceIsolation(t *testing.T) {
 		Algo:              "rx/0",
 	}
 
-	miner1, err := manager.StartMiner("xmrig", config1)
+	miner1, err := manager.StartMiner(context.Background(), "xmrig", config1)
 	if err != nil {
 		t.Fatalf("Failed to start miner 1: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestMinerResourceIsolation(t *testing.T) {
 		Algo:              "gr",
 	}
 
-	miner2, err := manager.StartMiner("xmrig", config2)
+	miner2, err := manager.StartMiner(context.Background(), "xmrig", config2)
 	if err != nil {
 		t.Fatalf("Failed to start miner 2: %v", err)
 	}
@@ -248,8 +248,8 @@ func TestMinerResourceIsolation(t *testing.T) {
 	}
 
 	// Clean up
-	manager.StopMiner(miner1.GetName())
-	manager.StopMiner(miner2.GetName())
+	manager.StopMiner(context.Background(), miner1.GetName())
+	manager.StopMiner(context.Background(), miner2.GetName())
 }
 
 // measureCPUUsage measures average CPU usage over a duration

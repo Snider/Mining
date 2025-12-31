@@ -53,28 +53,32 @@ func (m *MockMiner) WriteStdin(input string) error        { return m.WriteStdinF
 type MockManager struct {
 	ListMinersFunc              func() []Miner
 	ListAvailableMinersFunc     func() []AvailableMiner
-	StartMinerFunc              func(minerType string, config *Config) (Miner, error)
-	StopMinerFunc               func(minerName string) error
+	StartMinerFunc              func(ctx context.Context, minerType string, config *Config) (Miner, error)
+	StopMinerFunc               func(ctx context.Context, minerName string) error
 	GetMinerFunc                func(minerName string) (Miner, error)
 	GetMinerHashrateHistoryFunc func(minerName string) ([]HashratePoint, error)
-	UninstallMinerFunc          func(minerType string) error
+	UninstallMinerFunc          func(ctx context.Context, minerType string) error
 	StopFunc                    func()
 }
 
 func (m *MockManager) ListMiners() []Miner                   { return m.ListMinersFunc() }
 func (m *MockManager) ListAvailableMiners() []AvailableMiner { return m.ListAvailableMinersFunc() }
-func (m *MockManager) StartMiner(minerType string, config *Config) (Miner, error) {
-	return m.StartMinerFunc(minerType, config)
+func (m *MockManager) StartMiner(ctx context.Context, minerType string, config *Config) (Miner, error) {
+	return m.StartMinerFunc(ctx, minerType, config)
 }
-func (m *MockManager) StopMiner(minerName string) error { return m.StopMinerFunc(minerName) }
+func (m *MockManager) StopMiner(ctx context.Context, minerName string) error {
+	return m.StopMinerFunc(ctx, minerName)
+}
 func (m *MockManager) GetMiner(minerName string) (Miner, error) {
 	return m.GetMinerFunc(minerName)
 }
 func (m *MockManager) GetMinerHashrateHistory(minerName string) ([]HashratePoint, error) {
 	return m.GetMinerHashrateHistoryFunc(minerName)
 }
-func (m *MockManager) UninstallMiner(minerType string) error { return m.UninstallMinerFunc(minerType) }
-func (m *MockManager) Stop()                                 { m.StopFunc() }
+func (m *MockManager) UninstallMiner(ctx context.Context, minerType string) error {
+	return m.UninstallMinerFunc(ctx, minerType)
+}
+func (m *MockManager) Stop() { m.StopFunc() }
 
 var _ ManagerInterface = (*MockManager)(nil)
 
@@ -82,14 +86,18 @@ func setupTestRouter() (*gin.Engine, *MockManager) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	mockManager := &MockManager{
-		ListMinersFunc:              func() []Miner { return []Miner{} },
-		ListAvailableMinersFunc:     func() []AvailableMiner { return []AvailableMiner{} },
-		StartMinerFunc:              func(minerType string, config *Config) (Miner, error) { return nil, nil },
-		StopMinerFunc:               func(minerName string) error { return nil },
-		GetMinerFunc:                func(minerName string) (Miner, error) { return nil, nil },
-		GetMinerHashrateHistoryFunc: func(minerName string) ([]HashratePoint, error) { return nil, nil },
-		UninstallMinerFunc:          func(minerType string) error { return nil },
-		StopFunc:                    func() {},
+		ListMinersFunc:          func() []Miner { return []Miner{} },
+		ListAvailableMinersFunc: func() []AvailableMiner { return []AvailableMiner{} },
+		StartMinerFunc: func(ctx context.Context, minerType string, config *Config) (Miner, error) {
+			return nil, nil
+		},
+		StopMinerFunc: func(ctx context.Context, minerName string) error { return nil },
+		GetMinerFunc:  func(minerName string) (Miner, error) { return nil, nil },
+		GetMinerHashrateHistoryFunc: func(minerName string) ([]HashratePoint, error) {
+			return nil, nil
+		},
+		UninstallMinerFunc: func(ctx context.Context, minerType string) error { return nil },
+		StopFunc:           func() {},
 	}
 	service := &Service{
 		Manager:       mockManager,
@@ -162,7 +170,7 @@ func TestHandleInstallMiner(t *testing.T) {
 
 func TestHandleStopMiner(t *testing.T) {
 	router, mockManager := setupTestRouter()
-	mockManager.StopMinerFunc = func(minerName string) error {
+	mockManager.StopMinerFunc = func(ctx context.Context, minerName string) error {
 		return nil
 	}
 

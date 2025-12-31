@@ -235,6 +235,33 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		mgr.SetEventHub(eventHub)
 	}
 
+	// Set up state provider for WebSocket state sync on reconnect
+	eventHub.SetStateProvider(func() interface{} {
+		miners := manager.ListMiners()
+		if len(miners) == 0 {
+			return nil
+		}
+		// Return current state of all miners
+		state := make([]map[string]interface{}, 0, len(miners))
+		for _, miner := range miners {
+			stats, _ := miner.GetStats(context.Background())
+			minerState := map[string]interface{}{
+				"name":   miner.GetName(),
+				"status": "running",
+			}
+			if stats != nil {
+				minerState["hashrate"] = stats.Hashrate
+				minerState["shares"] = stats.Shares
+				minerState["rejected"] = stats.Rejected
+				minerState["uptime"] = stats.Uptime
+			}
+			state = append(state, minerState)
+		}
+		return map[string]interface{}{
+			"miners": state,
+		}
+	})
+
 	return &Service{
 		Manager:        manager,
 		ProfileManager: profileManager,
@@ -567,7 +594,7 @@ func (s *Service) handleUpdateCheck(c *gin.Context) {
 // @Router /miners/{miner_type}/uninstall [delete]
 func (s *Service) handleUninstallMiner(c *gin.Context) {
 	minerType := c.Param("miner_name")
-	if err := s.Manager.UninstallMiner(minerType); err != nil {
+	if err := s.Manager.UninstallMiner(c.Request.Context(), minerType); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -662,7 +689,7 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 		return
 	}
 
-	miner, err := s.Manager.StartMiner(profile.MinerType, &config)
+	miner, err := s.Manager.StartMiner(c.Request.Context(), profile.MinerType, &config)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -680,7 +707,7 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 // @Router /miners/{miner_name} [delete]
 func (s *Service) handleStopMiner(c *gin.Context) {
 	minerName := c.Param("miner_name")
-	if err := s.Manager.StopMiner(minerName); err != nil {
+	if err := s.Manager.StopMiner(c.Request.Context(), minerName); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

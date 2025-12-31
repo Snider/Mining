@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"testing"
 )
 
@@ -26,7 +27,7 @@ func TestStartAndStopMiner(t *testing.T) {
 	// but we can test the manager's behavior.
 	// This will fail because the miner executable is not present,
 	// which is expected in a test environment.
-	_, err := manager.StartMiner("xmrig", config)
+	_, err := manager.StartMiner(context.Background(), "xmrig", config)
 	if err == nil {
 		t.Log("StartMiner did not fail as expected in test environment")
 	}

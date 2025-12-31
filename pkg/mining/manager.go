@@ -19,13 +19,13 @@ var instanceNameRegex = regexp.MustCompile(`[^a-zA-Z0-9_/-]`)
 
 // ManagerInterface defines the contract for a miner manager.
 type ManagerInterface interface {
-	StartMiner(minerType string, config *Config) (Miner, error)
-	StopMiner(name string) error
+	StartMiner(ctx context.Context, minerType string, config *Config) (Miner, error)
+	StopMiner(ctx context.Context, name string) error
 	GetMiner(name string) (Miner, error)
 	ListMiners() []Miner
 	ListAvailableMiners() []AvailableMiner
 	GetMinerHashrateHistory(name string) ([]HashratePoint, error)
-	UninstallMiner(minerType string) error
+	UninstallMiner(ctx context.Context, minerType string) error
 	Stop()
 }
 
@@ -201,7 +201,7 @@ func (m *Manager) autostartMiners() {
 	for _, minerCfg := range cfg.Miners {
 		if minerCfg.Autostart && minerCfg.Config != nil {
 			log.Printf("Autostarting miner: %s", minerCfg.MinerType)
-			if _, err := m.StartMiner(minerCfg.MinerType, minerCfg.Config); err != nil {
+			if _, err := m.StartMiner(context.Background(), minerCfg.MinerType, minerCfg.Config); err != nil {
 				log.Printf("Failed to autostart miner %s: %v", minerCfg.MinerType, err)
 			}
 		}
@@ -223,7 +223,15 @@ func findAvailablePort() (int, error) {
 }
 
 // StartMiner starts a new miner and saves its configuration.
-func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
+// The context can be used to cancel the operation.
+func (m *Manager) StartMiner(ctx context.Context, minerType string, config *Config) (Miner, error) {
+	// Check for cancellation before acquiring lock
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -314,7 +322,15 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 }
 
 // UninstallMiner stops, uninstalls, and removes a miner's configuration.
-func (m *Manager) UninstallMiner(minerType string) error {
+// The context can be used to cancel the operation.
+func (m *Manager) UninstallMiner(ctx context.Context, minerType string) error {
+	// Check for cancellation before acquiring lock
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	m.mu.Lock()
 	// Collect miners to stop and delete (can't modify map during iteration)
 	minersToDelete := make([]string, 0)
@@ -394,7 +410,15 @@ func (m *Manager) updateMinerConfig(minerType string, autostart bool, config *Co
 
 // StopMiner stops a running miner and removes it from the manager.
 // If the miner is already stopped, it will still be removed from the manager.
-func (m *Manager) StopMiner(name string) error {
+// The context can be used to cancel the operation.
+func (m *Manager) StopMiner(ctx context.Context, name string) error {
+	// Check for cancellation before acquiring lock
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

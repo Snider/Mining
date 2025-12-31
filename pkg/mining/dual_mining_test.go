@@ -37,7 +37,7 @@ func TestDualMiningCPUAndGPU(t *testing.T) {
 		Devices:    "0",   // Device 0 only - user must pick
 	}
 
-	minerInstance, err := manager.StartMiner("xmrig", config)
+	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)
 	if err != nil {
 		t.Fatalf("Failed to start dual miner: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestDualMiningCPUAndGPU(t *testing.T) {
 	}
 
 	// Clean up
-	manager.StopMiner(minerInstance.GetName())
+	manager.StopMiner(context.Background(), minerInstance.GetName())
 }
 
 // TestGPUDeviceSelection tests that GPU mining requires explicit device selection

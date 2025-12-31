@@ -23,7 +23,8 @@ const (
 	EventMinerConnected EventType = "miner.connected"
 
 	// System events
-	EventPong EventType = "pong"
+	EventPong      EventType = "pong"
+	EventStateSync EventType = "state.sync" // Initial state on connect/reconnect
 )
 
 // Event represents a mining event that can be broadcast to clients
@@ -62,6 +63,9 @@ type wsClient struct {
 	closeOnce sync.Once
 }
 
+// StateProvider is a function that returns the current state for sync
+type StateProvider func() interface{}
+
 // EventHub manages WebSocket connections and event broadcasting
 type EventHub struct {
 	// Registered clients
@@ -84,6 +88,9 @@ type EventHub struct {
 
 	// Connection limits
 	maxConnections int
+
+	// State provider for sync on connect
+	stateProvider StateProvider
 }
 
 // DefaultMaxConnections is the default maximum WebSocket connections
@@ -126,8 +133,33 @@ func (h *EventHub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			stateProvider := h.stateProvider
 			h.mu.Unlock()
 			log.Printf("[EventHub] Client connected (total: %d)", len(h.clients))
+
+			// Send initial state sync if provider is set
+			if stateProvider != nil {
+				go func(c *wsClient) {
+					state := stateProvider()
+					if state != nil {
+						event := Event{
+							Type:      EventStateSync,
+							Timestamp: time.Now(),
+							Data:      state,
+						}
+						data, err := json.Marshal(event)
+						if err != nil {
+							log.Printf("[EventHub] Failed to marshal state sync: %v", err)
+							return
+						}
+						select {
+						case c.send <- data:
+						default:
+							// Client buffer full
+						}
+					}
+				}(client)
+			}
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -206,6 +238,13 @@ func (h *EventHub) shouldSendToClient(client *wsClient, event Event) bool {
 // Stop stops the EventHub
 func (h *EventHub) Stop() {
 	close(h.stop)
+}
+
+// SetStateProvider sets the function that provides current state for new clients
+func (h *EventHub) SetStateProvider(provider StateProvider) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.stateProvider = provider
 }
 
 // Broadcast sends an event to all subscribed clients
