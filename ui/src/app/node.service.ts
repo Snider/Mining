@@ -1,7 +1,8 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { of, interval, Subscription } from 'rxjs';
 import { switchMap, catchError, tap } from 'rxjs/operators';
+import { ApiConfigService } from './api-config.service';
 
 // --- Node Interfaces ---
 export interface NodeIdentity {
@@ -63,8 +64,13 @@ export interface NodeState {
   providedIn: 'root'
 })
 export class NodeService {
-  private apiBaseUrl = 'http://localhost:9090/api/v1/mining';
+  private readonly apiConfig = inject(ApiConfigService);
   private pollingSubscription?: Subscription;
+
+  /** Get the API base URL from configuration */
+  private get apiBaseUrl(): string {
+    return this.apiConfig.apiBaseUrl;
+  }
 
   // --- State Signal ---
   public state = signal<NodeState>({

@@ -1,18 +1,18 @@
-import { Component, signal, output, input, inject, HostListener } from '@angular/core';
+import { Component, signal, output, input, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { IconComponent, IconName } from './icon.component';
 
 interface NavItem {
   id: string;
   label: string;
-  icon: SafeHtml;
+  icon: IconName;
   route: string;
 }
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   template: `
     <!-- Mobile menu button (visible on small screens) -->
     <button class="mobile-menu-btn" (click)="toggleMobileMenu()">
@@ -61,7 +61,9 @@ interface NavItem {
             [class.active]="currentRoute() === item.route"
             (click)="navigateAndClose(item.route)"
             [title]="collapsed() && !mobileOpen() ? item.label : ''">
-            <span class="nav-icon" [innerHTML]="item.icon"></span>
+            <span class="nav-icon">
+              <app-icon [name]="item.icon" />
+            </span>
             @if (!collapsed() || mobileOpen()) {
               <span class="nav-label">{{ item.label }}</span>
             }
@@ -216,11 +218,6 @@ interface NavItem {
       flex-shrink: 0;
     }
 
-    .nav-icon :deep(svg) {
-      width: 20px;
-      height: 20px;
-    }
-
     .nav-label {
       font-size: 0.875rem;
       font-weight: 500;
@@ -296,8 +293,6 @@ interface NavItem {
   `]
 })
 export class SidebarComponent {
-  private sanitizer = inject(DomSanitizer);
-
   collapsed = signal(false);
   mobileOpen = signal(false);
   currentRoute = input<string>('dashboard');
@@ -312,53 +307,14 @@ export class SidebarComponent {
   }
 
   navItems: NavItem[] = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      route: 'dashboard',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>')
-    },
-    {
-      id: 'workers',
-      label: 'Workers',
-      route: 'workers',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>')
-    },
-    {
-      id: 'console',
-      label: 'Console',
-      route: 'console',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>')
-    },
-    {
-      id: 'pools',
-      label: 'Pools',
-      route: 'pools',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>')
-    },
-    {
-      id: 'profiles',
-      label: 'Profiles',
-      route: 'profiles',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>')
-    },
-    {
-      id: 'miners',
-      label: 'Miners',
-      route: 'miners',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>')
-    },
-    {
-      id: 'nodes',
-      label: 'Nodes',
-      route: 'nodes',
-      icon: this.trustIcon('<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>')
-    }
+    { id: 'dashboard', label: 'Dashboard', route: 'dashboard', icon: 'dashboard' },
+    { id: 'workers', label: 'Workers', route: 'workers', icon: 'workers' },
+    { id: 'console', label: 'Console', route: 'console', icon: 'console' },
+    { id: 'pools', label: 'Pools', route: 'pools', icon: 'pools' },
+    { id: 'profiles', label: 'Profiles', route: 'profiles', icon: 'profiles' },
+    { id: 'miners', label: 'Miners', route: 'miners', icon: 'miners' },
+    { id: 'nodes', label: 'Nodes', route: 'nodes', icon: 'nodes' }
   ];
-
-  private trustIcon(svg: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(svg);
-  }
 
   toggleCollapse() {
     this.collapsed.update(v => !v);

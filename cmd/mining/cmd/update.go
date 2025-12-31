@@ -5,11 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/Snider/Mining/pkg/mining"
+	"github.com/adrg/xdg"
 	"github.com/spf13/cobra"
 )
+
+// validateUpdateConfigPath validates that a config path is within the expected XDG config directory
+func validateUpdateConfigPath(configPath string) error {
+	expectedBase := filepath.Join(xdg.ConfigHome, "lethean-desktop")
+	cleanPath := filepath.Clean(configPath)
+	if !strings.HasPrefix(cleanPath, expectedBase+string(os.PathSeparator)) && cleanPath != expectedBase {
+		return fmt.Errorf("invalid config path: must be within %s", expectedBase)
+	}
+	return nil
+}
 
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
@@ -34,20 +46,26 @@ var updateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("could not read signpost file: %w", err)
 		}
-		configPath := string(configPathBytes)
+		configPath := strings.TrimSpace(string(configPathBytes))
+
+		// Security: Validate that the config path is within the expected directory
+		if err := validateUpdateConfigPath(configPath); err != nil {
+			return fmt.Errorf("security error: %w", err)
+		}
 
 		cacheBytes, err := os.ReadFile(configPath)
 		if err != nil {
 			return fmt.Errorf("could not read cache file from %s: %w", configPath, err)
 		}
 
-		var cachedDetails []*mining.InstallationDetails
-		if err := json.Unmarshal(cacheBytes, &cachedDetails); err != nil {
+		// Fix: Use SystemInfo type (matches what doctor.go saves)
+		var systemInfo mining.SystemInfo
+		if err := json.Unmarshal(cacheBytes, &systemInfo); err != nil {
 			return fmt.Errorf("could not parse cache file: %w", err)
 		}
 
 		updatesFound := false
-		for _, details := range cachedDetails {
+		for _, details := range systemInfo.InstalledMinersInfo {
 			if !details.IsInstalled {
 				continue
 			}

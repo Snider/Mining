@@ -387,3 +387,253 @@ func TestPeerRegistry_Persistence(t *testing.T) {
 		t.Errorf("expected name 'Persistent Peer', got '%s'", loaded.Name)
 	}
 }
+
+// --- Security Feature Tests ---
+
+func TestPeerRegistry_AuthMode(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	// Default should be Open
+	if pr.GetAuthMode() != PeerAuthOpen {
+		t.Errorf("expected default auth mode to be Open, got %d", pr.GetAuthMode())
+	}
+
+	// Set to Allowlist
+	pr.SetAuthMode(PeerAuthAllowlist)
+	if pr.GetAuthMode() != PeerAuthAllowlist {
+		t.Errorf("expected auth mode to be Allowlist after setting, got %d", pr.GetAuthMode())
+	}
+
+	// Set back to Open
+	pr.SetAuthMode(PeerAuthOpen)
+	if pr.GetAuthMode() != PeerAuthOpen {
+		t.Errorf("expected auth mode to be Open after resetting, got %d", pr.GetAuthMode())
+	}
+}
+
+func TestPeerRegistry_PublicKeyAllowlist(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	testKey := "base64PublicKeyExample1234567890123456"
+
+	// Initially key should not be allowed
+	if pr.IsPublicKeyAllowed(testKey) {
+		t.Error("key should not be allowed before adding")
+	}
+
+	// Add key to allowlist
+	pr.AllowPublicKey(testKey)
+	if !pr.IsPublicKeyAllowed(testKey) {
+		t.Error("key should be allowed after adding")
+	}
+
+	// List should contain the key
+	keys := pr.ListAllowedPublicKeys()
+	found := false
+	for _, k := range keys {
+		if k == testKey {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("ListAllowedPublicKeys should contain the added key")
+	}
+
+	// Revoke key
+	pr.RevokePublicKey(testKey)
+	if pr.IsPublicKeyAllowed(testKey) {
+		t.Error("key should not be allowed after revoking")
+	}
+
+	// List should be empty
+	keys = pr.ListAllowedPublicKeys()
+	if len(keys) != 0 {
+		t.Errorf("expected 0 keys after revoke, got %d", len(keys))
+	}
+}
+
+func TestPeerRegistry_IsPeerAllowed_OpenMode(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	pr.SetAuthMode(PeerAuthOpen)
+
+	// In Open mode, any peer should be allowed
+	if !pr.IsPeerAllowed("unknown-peer", "unknown-key") {
+		t.Error("in Open mode, all peers should be allowed")
+	}
+
+	if !pr.IsPeerAllowed("", "") {
+		t.Error("in Open mode, even empty IDs should be allowed")
+	}
+}
+
+func TestPeerRegistry_IsPeerAllowed_AllowlistMode(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	pr.SetAuthMode(PeerAuthAllowlist)
+
+	// Unknown peer with unknown key should be rejected
+	if pr.IsPeerAllowed("unknown-peer", "unknown-key") {
+		t.Error("in Allowlist mode, unknown peers should be rejected")
+	}
+
+	// Pre-registered peer should be allowed
+	peer := &Peer{
+		ID:        "registered-peer",
+		Name:      "Registered",
+		PublicKey: "registered-key",
+	}
+	pr.AddPeer(peer)
+
+	if !pr.IsPeerAllowed("registered-peer", "any-key") {
+		t.Error("pre-registered peer should be allowed in Allowlist mode")
+	}
+
+	// Peer with allowlisted public key should be allowed
+	pr.AllowPublicKey("allowed-key-1234567890")
+	if !pr.IsPeerAllowed("new-peer", "allowed-key-1234567890") {
+		t.Error("peer with allowlisted key should be allowed")
+	}
+
+	// Unknown peer with non-allowlisted key should still be rejected
+	if pr.IsPeerAllowed("another-peer", "not-allowed-key") {
+		t.Error("peer without allowlisted key should be rejected")
+	}
+}
+
+func TestPeerRegistry_PeerNameValidation(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	testCases := []struct {
+		name      string
+		peerName  string
+		shouldErr bool
+	}{
+		{"empty name allowed", "", false},
+		{"single char", "A", false},
+		{"simple name", "MyPeer", false},
+		{"name with hyphen", "my-peer", false},
+		{"name with underscore", "my_peer", false},
+		{"name with space", "My Peer", false},
+		{"name with numbers", "Peer123", false},
+		{"max length name", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB", false},
+		{"too long name", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABC", true},
+		{"starts with hyphen", "-peer", true},
+		{"ends with hyphen", "peer-", true},
+		{"special chars", "peer@host", true},
+		{"unicode chars", "peer\u0000name", true},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			peer := &Peer{
+				ID:   "test-peer-" + string(rune('A'+i)),
+				Name: tc.peerName,
+			}
+			err := pr.AddPeer(peer)
+			if tc.shouldErr && err == nil {
+				t.Errorf("expected error for name '%s' but got none", tc.peerName)
+			} else if !tc.shouldErr && err != nil {
+				t.Errorf("unexpected error for name '%s': %v", tc.peerName, err)
+			}
+			// Clean up for next test
+			if err == nil {
+				pr.RemovePeer(peer.ID)
+			}
+		})
+	}
+}
+
+func TestPeerRegistry_ScoreRecording(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	peer := &Peer{
+		ID:    "score-record-test",
+		Name:  "Score Peer",
+		Score: 50, // Start at neutral
+	}
+	pr.AddPeer(peer)
+
+	// Record successes - score should increase
+	for i := 0; i < 5; i++ {
+		pr.RecordSuccess("score-record-test")
+	}
+	updated := pr.GetPeer("score-record-test")
+	if updated.Score <= 50 {
+		t.Errorf("score should increase after successes, got %f", updated.Score)
+	}
+
+	// Record failures - score should decrease
+	initialScore := updated.Score
+	for i := 0; i < 3; i++ {
+		pr.RecordFailure("score-record-test")
+	}
+	updated = pr.GetPeer("score-record-test")
+	if updated.Score >= initialScore {
+		t.Errorf("score should decrease after failures, got %f (was %f)", updated.Score, initialScore)
+	}
+
+	// Record timeouts - score should decrease
+	initialScore = updated.Score
+	pr.RecordTimeout("score-record-test")
+	updated = pr.GetPeer("score-record-test")
+	if updated.Score >= initialScore {
+		t.Errorf("score should decrease after timeout, got %f (was %f)", updated.Score, initialScore)
+	}
+
+	// Score should be clamped to min/max
+	for i := 0; i < 100; i++ {
+		pr.RecordSuccess("score-record-test")
+	}
+	updated = pr.GetPeer("score-record-test")
+	if updated.Score > ScoreMaximum {
+		t.Errorf("score should be clamped to max %f, got %f", ScoreMaximum, updated.Score)
+	}
+
+	for i := 0; i < 100; i++ {
+		pr.RecordFailure("score-record-test")
+	}
+	updated = pr.GetPeer("score-record-test")
+	if updated.Score < ScoreMinimum {
+		t.Errorf("score should be clamped to min %f, got %f", ScoreMinimum, updated.Score)
+	}
+}
+
+func TestPeerRegistry_GetPeersByScore(t *testing.T) {
+	pr, cleanup := setupTestPeerRegistry(t)
+	defer cleanup()
+
+	// Add peers with different scores
+	peers := []*Peer{
+		{ID: "low-score", Name: "Low", Score: 20},
+		{ID: "high-score", Name: "High", Score: 90},
+		{ID: "mid-score", Name: "Mid", Score: 50},
+	}
+
+	for _, p := range peers {
+		pr.AddPeer(p)
+	}
+
+	sorted := pr.GetPeersByScore()
+	if len(sorted) != 3 {
+		t.Fatalf("expected 3 peers, got %d", len(sorted))
+	}
+
+	// Should be sorted by score descending
+	if sorted[0].ID != "high-score" {
+		t.Errorf("first peer should be high-score, got %s", sorted[0].ID)
+	}
+	if sorted[1].ID != "mid-score" {
+		t.Errorf("second peer should be mid-score, got %s", sorted[1].ID)
+	}
+	if sorted[2].ID != "low-score" {
+		t.Errorf("third peer should be low-score, got %s", sorted[2].ID)
+	}
+}

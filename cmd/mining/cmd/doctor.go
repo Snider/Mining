@@ -15,6 +15,23 @@ import (
 
 const signpostFilename = ".installed-miners"
 
+// validateConfigPath validates that a config path is within the expected XDG config directory
+// This prevents path traversal attacks via manipulated signpost files
+func validateConfigPath(configPath string) error {
+	// Get the expected XDG config base directory
+	expectedBase := filepath.Join(xdg.ConfigHome, "lethean-desktop")
+
+	// Clean and resolve the config path
+	cleanPath := filepath.Clean(configPath)
+
+	// Check if the path is within the expected directory
+	if !strings.HasPrefix(cleanPath, expectedBase+string(os.PathSeparator)) && cleanPath != expectedBase {
+		return fmt.Errorf("invalid config path: must be within %s", expectedBase)
+	}
+
+	return nil
+}
+
 // doctorCmd represents the doctor command
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -50,7 +67,12 @@ func loadAndDisplayCache() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not read signpost file: %w", err)
 	}
-	configPath := string(configPathBytes)
+	configPath := strings.TrimSpace(string(configPathBytes))
+
+	// Security: Validate that the config path is within the expected directory
+	if err := validateConfigPath(configPath); err != nil {
+		return false, fmt.Errorf("security error: %w", err)
+	}
 
 	cacheBytes, err := os.ReadFile(configPath)
 	if err != nil {
@@ -103,7 +125,7 @@ func saveResultsToCache(systemInfo *mining.SystemInfo) error {
 		return fmt.Errorf("could not marshal cache data: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("could not write cache file: %w", err)
 	}
 
@@ -112,7 +134,7 @@ func saveResultsToCache(systemInfo *mining.SystemInfo) error {
 		return fmt.Errorf("could not get home directory for signpost: %w", err)
 	}
 	signpostPath := filepath.Join(homeDir, signpostFilename)
-	if err := os.WriteFile(signpostPath, []byte(configPath), 0644); err != nil {
+	if err := os.WriteFile(signpostPath, []byte(configPath), 0600); err != nil {
 		return fmt.Errorf("could not write signpost file: %w", err)
 	}
 

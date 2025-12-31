@@ -208,7 +208,11 @@ func (da *DigestAuth) validateBasic(c *gin.Context, authHeader string) bool {
 // generateNonce creates a cryptographically random nonce
 func (da *DigestAuth) generateNonce() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Cryptographic failure is critical - fall back to time-based nonce
+		// This should never happen on a properly configured system
+		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	}
 	return hex.EncodeToString(b)
 }
 

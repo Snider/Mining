@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Note: findPeerByPartialID is defined in remote.go and used for peer lookup
+
 // peerCmd represents the peer parent command
 var peerCmd = &cobra.Command{
 	Use:   "peer",
@@ -114,24 +116,14 @@ var peerRemoveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		peerID := args[0]
 
+		peer := findPeerByPartialID(peerID)
+		if peer == nil {
+			return fmt.Errorf("peer not found: %s", peerID)
+		}
+
 		pr, err := getPeerRegistry()
 		if err != nil {
 			return fmt.Errorf("failed to get peer registry: %w", err)
-		}
-
-		peer := pr.GetPeer(peerID)
-		if peer == nil {
-			// Try partial match
-			for _, p := range pr.ListPeers() {
-				if len(p.ID) >= len(peerID) && p.ID[:len(peerID)] == peerID {
-					peer = p
-					break
-				}
-			}
-		}
-
-		if peer == nil {
-			return fmt.Errorf("peer not found: %s", peerID)
 		}
 
 		if err := pr.RemovePeer(peer.ID); err != nil {
@@ -152,22 +144,7 @@ var peerPingCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		peerID := args[0]
 
-		pr, err := getPeerRegistry()
-		if err != nil {
-			return fmt.Errorf("failed to get peer registry: %w", err)
-		}
-
-		peer := pr.GetPeer(peerID)
-		if peer == nil {
-			// Try partial match
-			for _, p := range pr.ListPeers() {
-				if len(p.ID) >= len(peerID) && p.ID[:len(peerID)] == peerID {
-					peer = p
-					break
-				}
-			}
-		}
-
+		peer := findPeerByPartialID(peerID)
 		if peer == nil {
 			return fmt.Errorf("peer not found: %s", peerID)
 		}

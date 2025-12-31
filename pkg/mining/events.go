@@ -182,6 +182,8 @@ func (h *EventHub) Run() {
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				client.safeClose()
+				// Decrement WebSocket connection metrics
+				RecordWSConnection(false)
 			}
 			h.mu.Unlock()
 			logging.Debug("client disconnected", logging.Fields{"total": len(h.clients)})
