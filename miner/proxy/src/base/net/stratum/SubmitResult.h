@@ -47,6 +47,8 @@ public:
     {}
 
     inline void done() { elapsed = Chrono::steadyMSecs() - m_start; }
+    // SECURITY FIX (HIGH-017): Public getter for timeout cleanup
+    inline uint64_t start() const { return m_start; }
 
     int64_t reqId           = 0;
     int64_t seq             = 0;

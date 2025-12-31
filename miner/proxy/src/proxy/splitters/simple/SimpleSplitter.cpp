@@ -105,19 +105,25 @@ void xmrig::SimpleSplitter::tick(uint64_t ticks)
     }
     m_released.clear();
 
+    // SECURITY FIX (HIGH-020): Collect pointers before iterating to prevent
+    // iterator invalidation if tick() or stop() modifies m_upstreams
+    std::vector<SimpleMapper *> toTick;
+    toTick.reserve(m_upstreams.size());
+
     for (auto const &kv : m_upstreams) {
         if (kv.second->idleTime() > m_reuseTimeout) {
             m_released.push_back(kv.second);
-            continue;
+        } else {
+            toTick.push_back(kv.second);
         }
-
-        kv.second->tick(ticks, now);
     }
 
-    if (m_released.empty()) {
-        return;
+    // Process ticks on collected pointers (safe from iterator invalidation)
+    for (SimpleMapper *mapper : toTick) {
+        mapper->tick(ticks, now);
     }
 
+    // Stop released mappers
     for (SimpleMapper *mapper : m_released) {
         stop(mapper);
     }

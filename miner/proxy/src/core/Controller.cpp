@@ -66,7 +66,10 @@ void xmrig::Controller::start()
 {
     Base::start();
 
-    proxy()->connect();
+    // SECURITY FIX (MED-006): Null check before accessing proxy
+    if (m_proxy) {
+        proxy()->connect();
+    }
 }
 
 
@@ -82,14 +85,18 @@ void xmrig::Controller::stop()
 const xmrig::StatsData &xmrig::Controller::statsData() const
 {
     assert(m_proxy != nullptr && "Controller not initialized");
-    return proxy()->statsData();
+    // SECURITY FIX (MED-006): Return empty static object if proxy is null
+    static const StatsData empty;
+    return m_proxy ? proxy()->statsData() : empty;
 }
 
 
 const std::vector<xmrig::Worker> &xmrig::Controller::workers() const
 {
     assert(m_proxy != nullptr && "Controller not initialized");
-    return proxy()->workers();
+    // SECURITY FIX (MED-006): Return empty static object if proxy is null
+    static const std::vector<Worker> empty;
+    return m_proxy ? proxy()->workers() : empty;
 }
 
 
@@ -102,12 +109,25 @@ xmrig::Proxy *xmrig::Controller::proxy() const
 std::vector<xmrig::Miner*> xmrig::Controller::miners() const
 {
     assert(m_proxy != nullptr && "Controller not initialized");
-    return proxy()->miners();
+    // SECURITY FIX (MED-006): Return empty vector if proxy is null
+    return m_proxy ? proxy()->miners() : std::vector<Miner*>();
 }
 
 
 void xmrig::Controller::execCommand(char command)
 {
+    // SECURITY FIX (MED-006): Handle config commands even if proxy is null
+    if (command == 'v' || command == 'V') {
+        config()->toggleVerbose();
+        LOG_NOTICE("%s " WHITE_BOLD("verbose: ") CYAN_BOLD("%d"), Tags::config(), config()->isVerbose());
+        return;
+    }
+
+    // All other commands require proxy
+    if (!m_proxy) {
+        return;
+    }
+
     switch (command) {
 #   ifdef APP_DEVEL
     case 's':
@@ -115,12 +135,6 @@ void xmrig::Controller::execCommand(char command)
         proxy()->printState();
         break;
 #   endif
-
-    case 'v':
-    case 'V':
-        config()->toggleVerbose();
-        LOG_NOTICE("%s " WHITE_BOLD("verbose: ") CYAN_BOLD("%d"), Tags::config(), config()->isVerbose());
-        break;
 
     case 'h':
     case 'H':

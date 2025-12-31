@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <csignal>
 #include <cerrno>
+#include <cstring>
 #include <unistd.h>
 
 
@@ -43,6 +44,8 @@ bool xmrig::App::background(int &rc)
 
     int i = fork();
     if (i < 0) {
+        // SECURITY FIX (MED-004): Log fork() failure for debugging
+        LOG_ERR("fork() failed (errno = %d: %s)", errno, strerror(errno));
         rc = 1;
 
         return true;

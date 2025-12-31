@@ -159,7 +159,10 @@ void xmrig::Config::toggleVerbose()
 
 void xmrig::Config::setCustomDiff(uint64_t diff)
 {
-    if (diff >= 100 && diff < INT_MAX) {
+    // SECURITY FIX (MED-001): Use explicit uint64_t max instead of platform-dependent INT_MAX
+    // Maximum reasonable difficulty is 2^63-1 (prevents overflow in calculations)
+    constexpr uint64_t kMaxDiff = static_cast<uint64_t>(1) << 63;
+    if (diff >= 100 && diff < kMaxDiff) {
         m_diff = diff;
     }
 }

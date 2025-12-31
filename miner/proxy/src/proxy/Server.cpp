@@ -23,6 +23,8 @@
  */
 
 
+#include <new>
+
 #include "proxy/Server.h"
 #include "base/io/log/Log.h"
 #include "base/tools/Handle.h"
@@ -86,8 +88,10 @@ void xmrig::Server::create(uv_stream_t *server, int status)
         return;
     }
 
-    auto miner = new Miner(m_ctx, m_port, m_strictTls);
+    // SECURITY FIX (HIGH-027): Use std::nothrow so null check is meaningful
+    auto miner = new (std::nothrow) Miner(m_ctx, m_port, m_strictTls);
     if (!miner) {
+        LOG_ERR("[%s:%u] failed to allocate Miner object", m_host.data(), m_port);
         return;
     }
 

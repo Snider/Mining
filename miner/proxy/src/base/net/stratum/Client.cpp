@@ -293,16 +293,34 @@ void xmrig::Client::tick(uint64_t now)
         else if (m_keepAlive && now > m_keepAlive) {
             ping();
         }
-
-        return;
     }
-
-    if (m_state == ReconnectingState && m_expire && now > m_expire) {
+    else if (m_state == ReconnectingState && m_expire && now > m_expire) {
         return connect();
     }
-
-    if (m_state == ConnectingState && m_expire && now > m_expire) {
+    else if (m_state == ConnectingState && m_expire && now > m_expire) {
         close();
+    }
+
+    // SECURITY FIX (HIGH-017): Clean up stale entries from results and callbacks maps
+    // to prevent unbounded memory growth if pool never responds
+    constexpr uint64_t kStaleTimeout = 60000; // 60 seconds
+
+    // Clean up stale submit results
+    for (auto it = m_results.begin(); it != m_results.end(); ) {
+        if (now > it->second.start() + kStaleTimeout) {
+            it = m_results.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Clean up stale callbacks
+    for (auto it = m_callbacks.begin(); it != m_callbacks.end(); ) {
+        if (now > it->second.ts + kStaleTimeout) {
+            it = m_callbacks.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 

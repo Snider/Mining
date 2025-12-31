@@ -283,27 +283,34 @@ void xmrig::EthStratumClient::parseNotification(const char *method, const rapidj
             Buffer buf = Cvt::fromHex(blob.c_str(), blob.length());
 
             // Get height from coinbase
+            // SECURITY FIX (HIGH-022): Add bounds checking for buffer access
             {
-                uint8_t* p = buf.data() + 32;
-                uint8_t* m = p + 128;
+                job.setHeight(0);  // Default if parsing fails
 
-                while ((p < m) && (*p != 0xff)) ++p;
-                while ((p < m) && (*p == 0xff)) ++p;
+                // Need at least 160 bytes (32 offset + 128 scan range)
+                if (buf.size() >= 160) {
+                    uint8_t* base = buf.data();
+                    uint8_t* p = base + 32;
+                    uint8_t* m = base + 160;  // Use fixed end based on buffer size check
+                    uint8_t* end = base + buf.size();
 
-                if ((p < m) && (*(p - 1) == 0xff) && (*(p - 2) == 0xff)) {
-                    uint32_t height = *reinterpret_cast<uint16_t*>(p + 2);
-                    switch (*(p + 1)) {
-                    case 4:
-                        height += *reinterpret_cast<uint16_t*>(p + 4) * 0x10000UL;
-                        break;
-                    case 3:
-                        height += *(p + 4) * 0x10000UL;
-                        break;
+                    while ((p < m) && (*p != 0xff)) ++p;
+                    while ((p < m) && (*p == 0xff)) ++p;
+
+                    // Ensure p-2 is valid (p >= base + 34) and p+5 is within buffer
+                    if ((p < m) && (p >= base + 34) && (p + 5 <= end) &&
+                        (*(p - 1) == 0xff) && (*(p - 2) == 0xff)) {
+                        uint32_t height = *reinterpret_cast<uint16_t*>(p + 2);
+                        switch (*(p + 1)) {
+                        case 4:
+                            height += *reinterpret_cast<uint16_t*>(p + 4) * 0x10000UL;
+                            break;
+                        case 3:
+                            height += *(p + 4) * 0x10000UL;
+                            break;
+                        }
+                        job.setHeight(height);
                     }
-                    job.setHeight(height);
-                }
-                else {
-                    job.setHeight(0);
                 }
             }
 

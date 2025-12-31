@@ -263,17 +263,15 @@ void xmrig::NonceMapper::onVerifyAlgorithm(IStrategy *strategy, const IClient *c
 
 xmrig::SubmitCtx xmrig::NonceMapper::submitCtx(int64_t seq)
 {
-    if (!m_results.count(seq)) {
+    // SECURITY FIX (MED-008): Use single find() instead of count() + at() + find()
+    auto it = m_results.find(seq);
+    if (it == m_results.end()) {
         return {};
     }
 
-    SubmitCtx ctx = m_results.at(seq);
+    SubmitCtx ctx = it->second;
     ctx.miner = m_storage->miner(ctx.minerId);
-
-    auto it = m_results.find(seq);
-    if (it != m_results.end()) {
-        m_results.erase(it);
-    }
+    m_results.erase(it);
 
     return ctx;
 }
