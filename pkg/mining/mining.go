@@ -13,20 +13,45 @@ const (
 )
 
 // Miner defines the standard interface for a cryptocurrency miner.
+// The interface is logically grouped into focused capabilities:
+//
+// Lifecycle - Installation and process management:
+//   - Install, Uninstall, Start, Stop
+//
+// Stats - Performance metrics collection:
+//   - GetStats
+//
+// Info - Miner identification and installation details:
+//   - GetName, GetPath, GetBinaryPath, CheckInstallation, GetLatestVersion
+//
+// History - Hashrate history management:
+//   - GetHashrateHistory, AddHashratePoint, ReduceHashrateHistory
+//
+// IO - Interactive input/output:
+//   - GetLogs, WriteStdin
 type Miner interface {
+	// Lifecycle operations
 	Install() error
 	Uninstall() error
 	Start(config *Config) error
 	Stop() error
+
+	// Stats operations
 	GetStats(ctx context.Context) (*PerformanceMetrics, error)
+
+	// Info operations
 	GetName() string
 	GetPath() string
 	GetBinaryPath() string
 	CheckInstallation() (*InstallationDetails, error)
 	GetLatestVersion() (string, error)
+
+	// History operations
 	GetHashrateHistory() []HashratePoint
 	AddHashratePoint(point HashratePoint)
 	ReduceHashrateHistory(now time.Time)
+
+	// IO operations
 	GetLogs() []string
 	WriteStdin(input string) error
 }
