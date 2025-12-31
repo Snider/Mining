@@ -91,6 +91,8 @@ func NewPeerRegistryWithPath(peersPath string) (*PeerRegistry, error) {
 }
 
 // AddPeer adds a new peer to the registry.
+// Note: Persistence is debounced (writes batched every 5s). Call Close() to ensure
+// all changes are flushed to disk before shutdown.
 func (r *PeerRegistry) AddPeer(peer *Peer) error {
 	r.mu.Lock()
 
@@ -120,6 +122,7 @@ func (r *PeerRegistry) AddPeer(peer *Peer) error {
 }
 
 // UpdatePeer updates an existing peer's information.
+// Note: Persistence is debounced. Call Close() to flush before shutdown.
 func (r *PeerRegistry) UpdatePeer(peer *Peer) error {
 	r.mu.Lock()
 
@@ -136,6 +139,7 @@ func (r *PeerRegistry) UpdatePeer(peer *Peer) error {
 }
 
 // RemovePeer removes a peer from the registry.
+// Note: Persistence is debounced. Call Close() to flush before shutdown.
 func (r *PeerRegistry) RemovePeer(id string) error {
 	r.mu.Lock()
 
@@ -180,6 +184,7 @@ func (r *PeerRegistry) ListPeers() []*Peer {
 }
 
 // UpdateMetrics updates a peer's performance metrics.
+// Note: Persistence is debounced. Call Close() to flush before shutdown.
 func (r *PeerRegistry) UpdateMetrics(id string, pingMS, geoKM float64, hops int) error {
 	r.mu.Lock()
 
@@ -201,6 +206,7 @@ func (r *PeerRegistry) UpdateMetrics(id string, pingMS, geoKM float64, hops int)
 }
 
 // UpdateScore updates a peer's reliability score.
+// Note: Persistence is debounced. Call Close() to flush before shutdown.
 func (r *PeerRegistry) UpdateScore(id string, score float64) error {
 	r.mu.Lock()
 

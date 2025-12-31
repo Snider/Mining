@@ -13,18 +13,22 @@ import (
 
 // Start launches the TT-Miner with the given configuration.
 func (m *TTMiner) Start(config *Config) error {
+	// Check installation BEFORE acquiring lock (CheckInstallation takes its own locks)
+	m.mu.RLock()
+	needsInstallCheck := m.MinerBinary == ""
+	m.mu.RUnlock()
+
+	if needsInstallCheck {
+		if _, err := m.CheckInstallation(); err != nil {
+			return err // Propagate the detailed error from CheckInstallation
+		}
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.Running {
 		return errors.New("miner is already running")
-	}
-
-	// If the binary path isn't set, run CheckInstallation to find it.
-	if m.MinerBinary == "" {
-		if _, err := m.CheckInstallation(); err != nil {
-			return err // Propagate the detailed error from CheckInstallation
-		}
 	}
 
 	if m.API != nil && config.HTTPPort != 0 {

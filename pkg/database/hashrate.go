@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -163,7 +164,10 @@ func GetLatestHashrate(minerName string) (*HashratePoint, error) {
 	`, minerName).Scan(&point.Timestamp, &point.Hashrate)
 
 	if err != nil {
-		return nil, nil // Not found is not an error
+		if err == sql.ErrNoRows {
+			return nil, nil // No data found is not an error
+		}
+		return nil, fmt.Errorf("failed to get latest hashrate: %w", err)
 	}
 
 	return &point, nil
