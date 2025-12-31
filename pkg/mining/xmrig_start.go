@@ -64,7 +64,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	addCliArgs(config, &args)
 
-	logging.Info("executing XMRig command", logging.Fields{"binary": m.MinerBinary, "args": strings.Join(args, " ")})
+	logging.Info("executing miner command", logging.Fields{"binary": m.MinerBinary, "args": strings.Join(args, " ")})
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 

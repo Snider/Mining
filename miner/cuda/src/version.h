@@ -1,6 +1,6 @@
-/* XMRig
- * Copyright (c) 2018-2025 SChernykh   <https://github.com/SChernykh>
- * Copyright (c) 2016-2025 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
+/* Miner Platform - CUDA Plugin
+ * Copyright (c) 2025 Lethean         <https://lethean.io>
+ * Based on XMRig-CUDA by SChernykh and XMRig team (GPL-3.0-or-later)
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef XMRIG_VERSION_H
-#define XMRIG_VERSION_H
+#ifndef MINER_VERSION_H
+#define MINER_VERSION_H
 
 #define APP_ID        "miner-cuda"
 #define APP_NAME      "Miner"
@@ -33,4 +33,4 @@
 
 #define API_VERSION    4
 
-#endif /* XMRIG_VERSION_H */
+#endif /* MINER_VERSION_H */

@@ -118,7 +118,7 @@ set(SOURCES
     src/net/Network.cpp
     src/net/strategies/DonateStrategy.cpp
     src/Summary.cpp
-    src/xmrig.cpp
+    src/miner.cpp
    )
 
 set(SOURCES_CRYPTO

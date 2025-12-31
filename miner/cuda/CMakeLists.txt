@@ -80,8 +80,8 @@ set(SOURCES
     src/crypto/common/Algorithm.cpp
     src/crypto/common/Algorithm.h
     src/version.h
-    src/xmrig-cuda.cpp
-    src/xmrig-cuda.h
+    src/miner-cuda.cpp
+    src/miner-cuda.h
     )
 
 

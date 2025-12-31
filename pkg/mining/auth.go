@@ -169,8 +169,8 @@ func (da *DigestAuth) validateDigest(c *gin.Context, authHeader string) bool {
 		return false
 	}
 
-	// Validate username
-	if params["username"] != da.config.Username {
+	// Validate username with constant-time comparison to prevent timing attacks
+	if subtle.ConstantTimeCompare([]byte(params["username"]), []byte(da.config.Username)) != 1 {
 		return false
 	}
 

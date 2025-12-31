@@ -45,8 +45,8 @@ func TestNewXMRigMiner_Good(t *testing.T) {
 	if miner == nil {
 		t.Fatal("NewXMRigMiner returned nil")
 	}
-	if miner.Name != "xmrig" {
-		t.Errorf("Expected miner name to be 'xmrig', got '%s'", miner.Name)
+	if miner.Name != "miner" {
+		t.Errorf("Expected miner name to be 'miner', got '%s'", miner.Name)
 	}
 	if miner.Version != "latest" {
 		t.Errorf("Expected miner version to be 'latest', got '%s'", miner.Version)
@@ -58,8 +58,8 @@ func TestNewXMRigMiner_Good(t *testing.T) {
 
 func TestXMRigMiner_GetName_Good(t *testing.T) {
 	miner := NewXMRigMiner()
-	if name := miner.GetName(); name != "xmrig" {
-		t.Errorf("Expected GetName() to return 'xmrig', got '%s'", name)
+	if name := miner.GetName(); name != "miner" {
+		t.Errorf("Expected GetName() to return 'miner', got '%s'", name)
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 // It also temporarily modifies the PATH to include the dummy executable's directory.
 func setupTestManager(t *testing.T) *Manager {
 	dummyDir := t.TempDir()
-	executableName := "xmrig"
+	executableName := "miner"
 	if runtime.GOOS == "windows" {
 		executableName += ".exe"
 	}

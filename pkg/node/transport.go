@@ -161,8 +161,8 @@ type PeerConnection struct {
 	LastActivity time.Time
 	writeMu      sync.Mutex // Serialize WebSocket writes
 	transport    *Transport
-	closeOnce    sync.Once           // Ensure Close() is only called once
-	rateLimiter  *PeerRateLimiter    // Per-peer message rate limiting
+	closeOnce    sync.Once        // Ensure Close() is only called once
+	rateLimiter  *PeerRateLimiter // Per-peer message rate limiting
 }
 
 // NewTransport creates a new WebSocket transport.
@@ -343,11 +343,16 @@ func (t *Transport) Send(peerID string, msg *Message) error {
 	return pc.Send(msg)
 }
 
-// Broadcast sends a message to all connected peers.
+// Broadcast sends a message to all connected peers except the sender.
+// The sender is identified by msg.From and excluded to prevent echo.
 func (t *Transport) Broadcast(msg *Message) error {
 	t.mu.RLock()
 	conns := make([]*PeerConnection, 0, len(t.conns))
 	for _, pc := range t.conns {
+		// Exclude sender from broadcast to prevent echo (P2P-MED-6)
+		if pc.Peer != nil && pc.Peer.ID == msg.From {
+			continue
+		}
 		conns = append(conns, pc)
 	}
 	t.mu.RUnlock()
@@ -423,6 +428,29 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	var payload HandshakePayload
 	if err := msg.ParsePayload(&payload); err != nil {
+		conn.Close()
+		return
+	}
+
+	// Check protocol version compatibility (P2P-MED-1)
+	if !IsProtocolVersionSupported(payload.Version) {
+		logging.Warn("peer connection rejected: incompatible protocol version", logging.Fields{
+			"peer_version":       payload.Version,
+			"supported_versions": SupportedProtocolVersions,
+			"peer_id":            payload.Identity.ID,
+		})
+		identity := t.node.GetIdentity()
+		if identity != nil {
+			rejectPayload := HandshakeAckPayload{
+				Identity: *identity,
+				Accepted: false,
+				Reason:   fmt.Sprintf("incompatible protocol version %s, supported: %v", payload.Version, SupportedProtocolVersions),
+			}
+			rejectMsg, _ := NewMessage(MsgHandshakeAck, identity.ID, payload.Identity.ID, rejectPayload)
+			if rejectData, err := MarshalJSON(rejectMsg); err == nil {
+				conn.WriteMessage(websocket.TextMessage, rejectData)
+			}
+		}
 		conn.Close()
 		return
 	}
@@ -566,7 +594,7 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 	payload := HandshakePayload{
 		Identity:  *identity,
 		Challenge: challenge,
-		Version:   "1.0",
+		Version:   ProtocolVersion,
 	}
 
 	msg, err := NewMessage(MsgHandshake, identity.ID, pc.Peer.ID, payload)

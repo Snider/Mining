@@ -110,7 +110,7 @@ set(SOURCES
     src/proxy/workers/Worker.cpp
     src/proxy/workers/Workers.cpp
     src/Summary.cpp
-    src/xmrig.cpp
+    src/miner.cpp
    )
 
 if (WIN32)

@@ -1,12 +1,12 @@
-/* XMRig
- * Copyright (c) 2018-2025 SChernykh   <https://github.com/SChernykh>
- * Copyright (c) 2016-2025 XMRig       <https://github.com/xmrig>, <support@xmrig.com>
+/* Miner Platform
+ * Copyright (c) 2025 Lethean         <https://lethean.io>
+ * Based on XMRig by SChernykh and XMRig team (GPL-3.0-or-later)
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#ifndef XMRIG_VERSION_H
-#define XMRIG_VERSION_H
+#ifndef MINER_VERSION_H
+#define MINER_VERSION_H
 
 #define APP_ID        "miner"
 #define APP_NAME      "Miner"
@@ -84,4 +84,4 @@
 #   define APP_BITS "32 bit"
 #endif
 
-#endif // XMRIG_VERSION_H
+#endif // MINER_VERSION_H

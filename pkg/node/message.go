@@ -7,6 +7,28 @@ import (
 	"github.com/google/uuid"
 )
 
+// Protocol version constants
+const (
+	// ProtocolVersion is the current protocol version
+	ProtocolVersion = "1.0"
+	// MinProtocolVersion is the minimum supported version
+	MinProtocolVersion = "1.0"
+)
+
+// SupportedProtocolVersions lists all protocol versions this node supports.
+// Used for version negotiation during handshake.
+var SupportedProtocolVersions = []string{"1.0"}
+
+// IsProtocolVersionSupported checks if a given version is supported.
+func IsProtocolVersionSupported(version string) bool {
+	for _, v := range SupportedProtocolVersions {
+		if v == version {
+			return true
+		}
+	}
+	return false
+}
+
 // MessageType defines the type of P2P message.
 type MessageType string
 

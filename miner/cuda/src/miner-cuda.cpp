@@ -26,7 +26,7 @@
 #include "cryptonight.h"
 #include "cuda_device.hpp"
 #include "version.h"
-#include "xmrig-cuda.h"
+#include "miner-cuda.h"
 
 
 #include <map>

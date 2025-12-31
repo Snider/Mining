@@ -64,6 +64,13 @@ type wsClient struct {
 	closeOnce sync.Once
 }
 
+// safeClose closes the send channel exactly once to prevent panic on double close
+func (c *wsClient) safeClose() {
+	c.closeOnce.Do(func() {
+		close(c.send)
+	})
+}
+
 // StateProvider is a function that returns the current state for sync
 type StateProvider func() interface{}
 
@@ -128,7 +135,7 @@ func (h *EventHub) Run() {
 			// Close all client connections
 			h.mu.Lock()
 			for client := range h.clients {
-				close(client.send)
+				client.safeClose()
 				delete(h.clients, client)
 			}
 			h.mu.Unlock()
@@ -174,7 +181,7 @@ func (h *EventHub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				client.safeClose()
 			}
 			h.mu.Unlock()
 			logging.Debug("client disconnected", logging.Fields{"total": len(h.clients)})

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -46,6 +47,34 @@ const (
 	PeerAuthAllowlist
 )
 
+// Peer name validation constants
+const (
+	PeerNameMinLength = 1
+	PeerNameMaxLength = 64
+)
+
+// peerNameRegex validates peer names: alphanumeric, hyphens, underscores, and spaces
+var peerNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_ ]{0,62}[a-zA-Z0-9]$|^[a-zA-Z0-9]$`)
+
+// validatePeerName checks if a peer name is valid.
+// Peer names must be 1-64 characters, start and end with alphanumeric,
+// and contain only alphanumeric, hyphens, underscores, and spaces.
+func validatePeerName(name string) error {
+	if name == "" {
+		return nil // Empty names are allowed (optional field)
+	}
+	if len(name) < PeerNameMinLength {
+		return fmt.Errorf("peer name too short (min %d characters)", PeerNameMinLength)
+	}
+	if len(name) > PeerNameMaxLength {
+		return fmt.Errorf("peer name too long (max %d characters)", PeerNameMaxLength)
+	}
+	if !peerNameRegex.MatchString(name) {
+		return fmt.Errorf("peer name contains invalid characters (use alphanumeric, hyphens, underscores, spaces)")
+	}
+	return nil
+}
+
 // PeerRegistry manages known peers with KD-tree based selection.
 type PeerRegistry struct {
 	peers  map[string]*Peer
@@ -54,9 +83,9 @@ type PeerRegistry struct {
 	mu     sync.RWMutex
 
 	// Authentication settings
-	authMode           PeerAuthMode      // How to handle unknown peers
-	allowedPublicKeys  map[string]bool   // Allowlist of public keys (when authMode is Allowlist)
-	allowedPublicKeyMu sync.RWMutex      // Protects allowedPublicKeys
+	authMode           PeerAuthMode    // How to handle unknown peers
+	allowedPublicKeys  map[string]bool // Allowlist of public keys (when authMode is Allowlist)
+	allowedPublicKeyMu sync.RWMutex    // Protects allowedPublicKeys
 
 	// Debounce disk writes
 	dirty        bool          // Whether there are unsaved changes
@@ -194,6 +223,12 @@ func (r *PeerRegistry) AddPeer(peer *Peer) error {
 	if peer.ID == "" {
 		r.mu.Unlock()
 		return fmt.Errorf("peer ID is required")
+	}
+
+	// Validate peer name (P2P-LOW-3)
+	if err := validatePeerName(peer.Name); err != nil {
+		r.mu.Unlock()
+		return err
 	}
 
 	if _, exists := r.peers[peer.ID]; exists {

@@ -35,7 +35,7 @@ rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)
 
 ## Architecture Overview
 
-XMRig Proxy is a high-performance CryptoNote stratum protocol proxy that can handle 100K+ miner connections while maintaining minimal pool-side connections through nonce splitting.
+Miner Proxy is a high-performance CryptoNote stratum protocol proxy that can handle 100K+ miner connections while maintaining minimal pool-side connections through nonce splitting.
 
 ### Data Flow
 
@@ -112,13 +112,13 @@ Extensions in `doc/STRATUM_EXT.md`: algorithm negotiation, rig identifiers, Nice
 ### Key Defines
 
 ```cpp
-XMRIG_PROXY_PROJECT     // Proxy-specific code paths
-XMRIG_FORCE_TLS         // TLS enforcement
+MINER_PROXY_PROJECT     // Proxy-specific code paths
+MINER_FORCE_TLS         // TLS enforcement
 APP_DEVEL               // Development features (enables printState())
 APP_DEBUG               // Debug logging (set via WITH_DEBUG_LOG)
-XMRIG_ALGO_RANDOMX      // Algorithm support flags
-XMRIG_FEATURE_HTTP      // HTTP API enabled
-XMRIG_FEATURE_API       // REST API enabled
+MINER_ALGO_RANDOMX      // Algorithm support flags
+MINER_FEATURE_HTTP      // HTTP API enabled
+MINER_FEATURE_API       // REST API enabled
 ```
 
 ## Configuration

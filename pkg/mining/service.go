@@ -118,6 +118,55 @@ func isRetryableError(status int) bool {
 		status == http.StatusGatewayTimeout
 }
 
+// securityHeadersMiddleware adds security headers to all responses.
+// This helps protect against common web vulnerabilities.
+func securityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Prevent MIME type sniffing
+		c.Header("X-Content-Type-Options", "nosniff")
+		// Prevent clickjacking
+		c.Header("X-Frame-Options", "DENY")
+		// Enable XSS filter in older browsers
+		c.Header("X-XSS-Protection", "1; mode=block")
+		// Restrict referrer information
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		// Content Security Policy for API responses
+		c.Header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		c.Next()
+	}
+}
+
+// contentTypeValidationMiddleware ensures POST/PUT requests have proper Content-Type.
+func contentTypeValidationMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		method := c.Request.Method
+		if method != http.MethodPost && method != http.MethodPut && method != http.MethodPatch {
+			c.Next()
+			return
+		}
+
+		// Skip if no body expected
+		if c.Request.ContentLength == 0 {
+			c.Next()
+			return
+		}
+
+		contentType := c.GetHeader("Content-Type")
+		// Allow JSON and form data
+		if strings.HasPrefix(contentType, "application/json") ||
+			strings.HasPrefix(contentType, "application/x-www-form-urlencoded") ||
+			strings.HasPrefix(contentType, "multipart/form-data") {
+			c.Next()
+			return
+		}
+
+		respondWithError(c, http.StatusUnsupportedMediaType, ErrCodeInvalidInput,
+			"Unsupported Content-Type",
+			"Use application/json for API requests")
+		c.Abort()
+	}
+}
+
 // requestIDMiddleware adds a unique request ID to each request for tracing
 func requestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -447,6 +496,12 @@ func (s *Service) InitRouter() {
 		MaxAge:           12 * time.Hour,
 	}
 	s.Router.Use(cors.New(corsConfig))
+
+	// Add security headers (SEC-LOW-4)
+	s.Router.Use(securityHeadersMiddleware())
+
+	// Add Content-Type validation for POST/PUT (API-MED-8)
+	s.Router.Use(contentTypeValidationMiddleware())
 
 	// Add request body size limit middleware (1MB max)
 	s.Router.Use(func(c *gin.Context) {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-miner-cuda (xmrig-cuda fork) is a CUDA plugin for XMRig cryptocurrency miner, providing NVIDIA GPU acceleration. It compiles to a shared library (`libminer-cuda.so` on Linux, `miner-cuda.dll` on Windows) that XMRig loads at runtime.
+miner-cuda is a CUDA plugin for Miner Platform, providing NVIDIA GPU acceleration. It compiles to a shared library (`libminer-cuda.so` on Linux, `miner-cuda.dll` on Windows) that the miner loads at runtime.
 
 ## Build Commands
 
@@ -39,9 +39,9 @@ cmake -DCUDA_COMPILER=clang ..
 
 ## Architecture
 
-### Plugin Interface (`src/xmrig-cuda.h`)
+### Plugin Interface (`src/miner-cuda.h`)
 
-C-linkage API that XMRig calls. Key functions:
+C-linkage API that the miner calls. Key functions:
 - `alloc()`/`release()` - GPU context lifecycle
 - `deviceInfo()`/`deviceInit()` - GPU detection and initialization
 - `setJob()` - Configure algorithm and job data
@@ -86,15 +86,15 @@ Automatically configured based on CUDA toolkit version:
 | `WITH_CN_FEMTO` | ON | CryptoNight-UPX2 algorithm |
 | `WITH_ARGON2` | OFF | Argon2 family (unsupported) |
 | `CUDA_ARCH` | auto | GPU compute capabilities to target |
-| `XMRIG_LARGEGRID` | ON | Support >128 CUDA blocks |
+| `MINER_LARGEGRID` | ON | Support >128 CUDA blocks |
 | `CUDA_COMPILER` | nvcc | CUDA compiler (nvcc or clang) |
 
 ## File Layout
 
 ```
 src/
-├── xmrig-cuda.cpp     # Main plugin implementation
-├── xmrig-cuda.h       # C API header (exported functions)
+├── miner-cuda.cpp     # Main plugin implementation
+├── miner-cuda.h       # C API header (exported functions)
 ├── cryptonight.h      # nvid_ctx struct and GPU context
 ├── cuda_core.cu       # Core CUDA kernels
 ├── cuda_extra.cu      # CUDA utilities and memory management
