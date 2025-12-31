@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"time"
 )
 
@@ -17,7 +18,7 @@ type Miner interface {
 	Uninstall() error
 	Start(config *Config) error
 	Stop() error
-	GetStats() (*PerformanceMetrics, error)
+	GetStats(ctx context.Context) (*PerformanceMetrics, error)
 	GetName() string
 	GetPath() string
 	GetBinaryPath() string

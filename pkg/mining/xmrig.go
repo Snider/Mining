@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -22,8 +23,23 @@ type XMRigMiner struct {
 	FullStats *XMRigSummary `json:"full_stats,omitempty"`
 }
 
-var httpClient = &http.Client{
-	Timeout: 30 * time.Second,
+var (
+	httpClient   = &http.Client{Timeout: 30 * time.Second}
+	httpClientMu sync.RWMutex
+)
+
+// getHTTPClient returns the HTTP client with proper synchronization
+func getHTTPClient() *http.Client {
+	httpClientMu.RLock()
+	defer httpClientMu.RUnlock()
+	return httpClient
+}
+
+// setHTTPClient sets the HTTP client (for testing)
+func setHTTPClient(client *http.Client) {
+	httpClientMu.Lock()
+	defer httpClientMu.Unlock()
+	httpClient = client
 }
 
 // NewXMRigMiner creates a new XMRig miner instance with default settings.
@@ -70,7 +86,7 @@ var getXMRigConfigPath = func(instanceName string) (string, error) {
 
 // GetLatestVersion fetches the latest version of XMRig from the GitHub API.
 func (m *XMRigMiner) GetLatestVersion() (string, error) {
-	resp, err := httpClient.Get("https://api.github.com/repos/xmrig/xmrig/releases/latest")
+	resp, err := getHTTPClient().Get("https://api.github.com/repos/xmrig/xmrig/releases/latest")
 	if err != nil {
 		return "", err
 	}

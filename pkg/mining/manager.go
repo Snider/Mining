@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -443,9 +444,19 @@ func (m *Manager) collectMinerStats() {
 
 	now := time.Now()
 	for _, miner := range minersToCollect {
-		stats, err := miner.GetStats()
+		minerName := miner.GetName()
+
+		// Verify miner still exists before collecting stats
+		m.mu.RLock()
+		_, stillExists := m.miners[minerName]
+		m.mu.RUnlock()
+		if !stillExists {
+			continue // Miner was removed, skip it
+		}
+
+		stats, err := miner.GetStats(context.Background())
 		if err != nil {
-			log.Printf("Error getting stats for miner %s: %v\n", miner.GetName(), err)
+			log.Printf("Error getting stats for miner %s: %v\n", minerName, err)
 			continue
 		}
 
@@ -460,7 +471,6 @@ func (m *Manager) collectMinerStats() {
 
 		// Persist to database if enabled
 		if m.dbEnabled {
-			minerName := miner.GetName()
 			minerType := minerTypes[minerName]
 			dbPoint := database.HashratePoint{
 				Timestamp: point.Timestamp,

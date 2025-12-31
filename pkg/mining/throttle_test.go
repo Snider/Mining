@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"runtime"
 	"testing"
 	"time"
@@ -201,7 +202,7 @@ func TestMinerResourceIsolation(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	// Get baseline hashrate for miner 1 alone
-	stats1Alone, err := miner1.GetStats()
+	stats1Alone, err := miner1.GetStats(context.Background())
 	if err != nil {
 		t.Logf("Warning: couldn't get stats for miner 1: %v", err)
 	}
@@ -226,11 +227,11 @@ func TestMinerResourceIsolation(t *testing.T) {
 	time.Sleep(15 * time.Second)
 
 	// Check both miners are running and producing hashrate
-	stats1, err := miner1.GetStats()
+	stats1, err := miner1.GetStats(context.Background())
 	if err != nil {
 		t.Logf("Warning: couldn't get stats for miner 1: %v", err)
 	}
-	stats2, err := miner2.GetStats()
+	stats2, err := miner2.GetStats(context.Background())
 	if err != nil {
 		t.Logf("Warning: couldn't get stats for miner 2: %v", err)
 	}

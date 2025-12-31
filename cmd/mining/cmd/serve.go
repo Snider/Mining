@@ -119,7 +119,7 @@ var serveCmd = &cobra.Command{
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Error getting miner status: %v\n", err)
 						} else {
-							stats, err := miner.GetStats()
+							stats, err := miner.GetStats(context.Background())
 							if err != nil {
 								fmt.Fprintf(os.Stderr, "Error getting miner stats: %v\n", err)
 							} else {

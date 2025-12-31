@@ -87,11 +87,16 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	m.Running = true
 
+	// Capture cmd locally to avoid race with Stop()
+	cmd := m.cmd
 	go func() {
-		m.cmd.Wait()
+		cmd.Wait()
 		m.mu.Lock()
-		m.Running = false
-		m.cmd = nil
+		// Only clear if this is still the same command (not restarted)
+		if m.cmd == cmd {
+			m.Running = false
+			m.cmd = nil
+		}
 		m.mu.Unlock()
 	}()
 

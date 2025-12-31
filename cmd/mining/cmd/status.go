@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("failed to get miner: %w", err)
 		}
 
-		stats, err := miner.GetStats()
+		stats, err := miner.GetStats(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to get miner stats: %w", err)
 		}

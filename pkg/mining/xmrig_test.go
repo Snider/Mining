@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,8 +64,8 @@ func TestXMRigMiner_GetName_Good(t *testing.T) {
 }
 
 func TestXMRigMiner_GetLatestVersion_Good(t *testing.T) {
-	originalClient := httpClient
-	httpClient = newTestClient(func(req *http.Request) *http.Response {
+	originalClient := getHTTPClient()
+	setHTTPClient(newTestClient(func(req *http.Request) *http.Response {
 		if req.URL.String() != "https://api.github.com/repos/xmrig/xmrig/releases/latest" {
 			return &http.Response{
 				StatusCode: http.StatusNotFound,
@@ -77,8 +78,8 @@ func TestXMRigMiner_GetLatestVersion_Good(t *testing.T) {
 			Body:       io.NopCloser(strings.NewReader(`{"tag_name": "v6.18.0"}`)),
 			Header:     make(http.Header),
 		}
-	})
-	defer func() { httpClient = originalClient }()
+	}))
+	defer setHTTPClient(originalClient)
 
 	miner := NewXMRigMiner()
 	version, err := miner.GetLatestVersion()
@@ -91,15 +92,15 @@ func TestXMRigMiner_GetLatestVersion_Good(t *testing.T) {
 }
 
 func TestXMRigMiner_GetLatestVersion_Bad(t *testing.T) {
-	originalClient := httpClient
-	httpClient = newTestClient(func(req *http.Request) *http.Response {
+	originalClient := getHTTPClient()
+	setHTTPClient(newTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: http.StatusNotFound,
 			Body:       io.NopCloser(strings.NewReader("Not Found")),
 			Header:     make(http.Header),
 		}
-	})
-	defer func() { httpClient = originalClient }()
+	}))
+	defer setHTTPClient(originalClient)
 
 	miner := NewXMRigMiner()
 	_, err := miner.GetLatestVersion()
@@ -197,9 +198,9 @@ func TestXMRigMiner_GetStats_Good(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalHTTPClient := httpClient
-	httpClient = server.Client()
-	defer func() { httpClient = originalHTTPClient }()
+	originalHTTPClient := getHTTPClient()
+	setHTTPClient(server.Client())
+	defer setHTTPClient(originalHTTPClient)
 
 	miner := NewXMRigMiner()
 	miner.Running = true // Mock running state
@@ -209,7 +210,7 @@ func TestXMRigMiner_GetStats_Good(t *testing.T) {
 	miner.API.ListenHost = parts[0]
 	fmt.Sscanf(parts[1], "%d", &miner.API.ListenPort)
 
-	stats, err := miner.GetStats()
+	stats, err := miner.GetStats(context.Background())
 	if err != nil {
 		t.Fatalf("GetStats() returned an error: %v", err)
 	}
@@ -237,7 +238,7 @@ func TestXMRigMiner_GetStats_Bad(t *testing.T) {
 	miner.API.ListenHost = "127.0.0.1"
 	miner.API.ListenPort = 9999 // A port that is unlikely to be in use
 
-	_, err := miner.GetStats()
+	_, err := miner.GetStats(context.Background())
 	if err == nil {
 		t.Fatalf("GetStats() did not return an error")
 	}

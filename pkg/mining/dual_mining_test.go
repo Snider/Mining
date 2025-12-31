@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -46,7 +47,7 @@ func TestDualMiningCPUAndGPU(t *testing.T) {
 	time.Sleep(20 * time.Second)
 
 	// Get stats
-	stats, err := minerInstance.GetStats()
+	stats, err := minerInstance.GetStats(context.Background())
 	if err != nil {
 		t.Logf("Warning: couldn't get stats: %v", err)
 	} else {

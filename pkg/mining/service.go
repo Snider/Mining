@@ -483,7 +483,7 @@ func (s *Service) handleGetMinerStats(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
 		return
 	}
-	stats, err := miner.GetStats()
+	stats, err := miner.GetStats(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

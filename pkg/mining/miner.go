@@ -132,9 +132,9 @@ func (b *BaseMiner) GetBinaryPath() string {
 // It first tries SIGTERM to allow cleanup, then SIGKILL if needed.
 func (b *BaseMiner) Stop() error {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	if !b.Running || b.cmd == nil {
+		b.mu.Unlock()
 		return errors.New("miner is not running")
 	}
 
@@ -144,25 +144,27 @@ func (b *BaseMiner) Stop() error {
 		b.stdinPipe = nil
 	}
 
-	// Helper to clean up state
-	cleanup := func() {
-		b.Running = false
-		b.cmd = nil
-	}
+	// Capture cmd locally to avoid race with Wait() goroutine
+	cmd := b.cmd
+	process := cmd.Process
+
+	// Mark as not running immediately to prevent concurrent Stop() calls
+	b.Running = false
+	b.cmd = nil
+	b.mu.Unlock()
 
 	// Try graceful shutdown with SIGTERM first (Unix only)
 	if runtime.GOOS != "windows" {
-		if err := b.cmd.Process.Signal(syscall.SIGTERM); err == nil {
+		if err := process.Signal(syscall.SIGTERM); err == nil {
 			// Wait up to 3 seconds for graceful shutdown
 			done := make(chan struct{})
 			go func() {
-				b.cmd.Process.Wait()
+				process.Wait()
 				close(done)
 			}()
 
 			select {
 			case <-done:
-				cleanup()
 				return nil
 			case <-time.After(3 * time.Second):
 				// Process didn't exit gracefully, force kill below
@@ -171,14 +173,12 @@ func (b *BaseMiner) Stop() error {
 	}
 
 	// Force kill and wait for process to exit
-	if err := b.cmd.Process.Kill(); err != nil {
-		cleanup()
+	if err := process.Kill(); err != nil {
 		return err
 	}
 
 	// Wait for process to fully terminate to avoid zombies
-	b.cmd.Process.Wait()
-	cleanup()
+	process.Wait()
 	return nil
 }
 
@@ -214,7 +214,7 @@ func (b *BaseMiner) InstallFromURL(url string) error {
 	defer os.Remove(tmpfile.Name())
 	defer tmpfile.Close()
 
-	resp, err := httpClient.Get(url)
+	resp, err := getHTTPClient().Get(url)
 	if err != nil {
 		return err
 	}

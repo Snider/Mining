@@ -64,11 +64,16 @@ func (m *TTMiner) Start(config *Config) error {
 
 	m.Running = true
 
-	// Monitor the process in a goroutine
+	// Capture cmd locally to avoid race with Stop()
+	cmd := m.cmd
 	go func() {
-		err := m.cmd.Wait()
+		err := cmd.Wait()
 		m.mu.Lock()
-		m.Running = false
+		// Only clear if this is still the same command (not restarted)
+		if m.cmd == cmd {
+			m.Running = false
+			m.cmd = nil
+		}
 		m.mu.Unlock()
 		if err != nil {
 			log.Printf("TT-Miner exited with error: %v", err)

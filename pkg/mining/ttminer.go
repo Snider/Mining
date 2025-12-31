@@ -85,7 +85,7 @@ func getTTMinerConfigPath() (string, error) {
 
 // GetLatestVersion fetches the latest version of TT-Miner from the GitHub API.
 func (m *TTMiner) GetLatestVersion() (string, error) {
-	resp, err := httpClient.Get("https://api.github.com/repos/TrailingStop/TT-Miner-release/releases/latest")
+	resp, err := getHTTPClient().Get("https://api.github.com/repos/TrailingStop/TT-Miner-release/releases/latest")
 	if err != nil {
 		return "", err
 	}

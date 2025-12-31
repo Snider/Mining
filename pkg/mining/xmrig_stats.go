@@ -1,25 +1,44 @@
 package mining
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-// GetStats retrieves the performance statistics from the running XMRig miner.
-func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+// statsTimeout is the timeout for stats HTTP requests (shorter than general timeout)
+const statsTimeout = 5 * time.Second
 
+// GetStats retrieves the performance statistics from the running XMRig miner.
+func (m *XMRigMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
+	// Read state under RLock, then release before HTTP call
+	m.mu.RLock()
 	if !m.Running {
+		m.mu.RUnlock()
 		return nil, errors.New("miner is not running")
 	}
 	if m.API == nil || m.API.ListenPort == 0 {
+		m.mu.RUnlock()
 		return nil, errors.New("miner API not configured or port is zero")
 	}
+	host := m.API.ListenHost
+	port := m.API.ListenPort
+	m.mu.RUnlock()
 
-	resp, err := httpClient.Get(fmt.Sprintf("http://%s:%d/2/summary", m.API.ListenHost, m.API.ListenPort))
+	// Create request with context and timeout
+	reqCtx, cancel := context.WithTimeout(ctx, statsTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "GET", fmt.Sprintf("http://%s:%d/2/summary", host, port), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// HTTP call outside the lock to avoid blocking other operations
+	resp, err := getHTTPClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +53,10 @@ func (m *XMRigMiner) GetStats() (*PerformanceMetrics, error) {
 		return nil, err
 	}
 
-	// Store the full summary in the miner struct
+	// Store the full summary in the miner struct (requires lock)
+	m.mu.Lock()
 	m.FullStats = &summary
+	m.mu.Unlock()
 
 	var hashrate int
 	if len(summary.Hashrate.Total) > 0 {
