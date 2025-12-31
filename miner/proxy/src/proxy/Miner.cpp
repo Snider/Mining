@@ -55,8 +55,8 @@
 
 
 namespace xmrig {
-    static int64_t nextId = 0;
-    char Miner::m_sendBuf[16384] = { 0 };
+    // THREAD SAFETY FIX: Use atomic for thread-safe ID generation
+    std::atomic<int64_t> Miner::s_nextId{0};
     Storage<Miner> Miner::m_storage;
 }
 
@@ -65,7 +65,7 @@ xmrig::Miner::Miner(const TlsContext *ctx, uint16_t port, bool strictTls) :
     m_strictTls(strictTls),
     m_rpcId(Cvt::toHex(Cvt::randomBytes(8))),
     m_tlsCtx(ctx),
-    m_id(++nextId),
+    m_id(s_nextId.fetch_add(1, std::memory_order_relaxed)),  // THREAD SAFETY FIX: Atomic increment
     m_localPort(port),
     m_expire(Chrono::currentMSecsSinceEpoch() + kLoginTimeout),
     m_timestamp(Chrono::currentMSecsSinceEpoch())

@@ -42,7 +42,11 @@ xmrig::Controller::Controller(Process *process)
 
 xmrig::Controller::~Controller()
 {
-    delete m_proxy;
+    // SECURITY FIX: Check for null to prevent double-free if stop() was called
+    if (m_proxy) {
+        delete m_proxy;
+        m_proxy = nullptr;
+    }
 }
 
 
@@ -77,12 +81,14 @@ void xmrig::Controller::stop()
 
 const xmrig::StatsData &xmrig::Controller::statsData() const
 {
+    assert(m_proxy != nullptr && "Controller not initialized");
     return proxy()->statsData();
 }
 
 
 const std::vector<xmrig::Worker> &xmrig::Controller::workers() const
 {
+    assert(m_proxy != nullptr && "Controller not initialized");
     return proxy()->workers();
 }
 
@@ -95,6 +101,7 @@ xmrig::Proxy *xmrig::Controller::proxy() const
 
 std::vector<xmrig::Miner*> xmrig::Controller::miners() const
 {
+    assert(m_proxy != nullptr && "Controller not initialized");
     return proxy()->miners();
 }
 

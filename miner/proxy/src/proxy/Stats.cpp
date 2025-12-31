@@ -135,6 +135,11 @@ void xmrig::Stats::accept(const AcceptEvent *event)
         std::sort(m_data.topDiff.rbegin(), m_data.topDiff.rend());
     }
 
+    // MEMORY SAFETY FIX: Implement rolling window to prevent unbounded growth
+    // Remove oldest entries when at capacity (keeps recent samples for accurate median)
+    if (m_data.latency.size() >= MAX_LATENCY_SAMPLES) {
+        m_data.latency.erase(m_data.latency.begin(), m_data.latency.begin() + (MAX_LATENCY_SAMPLES / 10));
+    }
     m_data.latency.push_back(event->result.elapsed > 0xFFFF ? 0xFFFF : (uint16_t) event->result.elapsed);
 }
 

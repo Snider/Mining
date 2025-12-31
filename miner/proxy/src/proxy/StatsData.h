@@ -37,6 +37,10 @@
 
 namespace xmrig {
 
+// MEMORY SAFETY FIX: Limit latency history to prevent unbounded growth
+// 10000 samples is enough for accurate median calculation while bounding memory
+static constexpr size_t MAX_LATENCY_SAMPLES = 10000;
+
 
 class StatsData
 {

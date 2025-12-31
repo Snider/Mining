@@ -36,6 +36,11 @@ static llhttp_settings_t http_settings;
 static std::map<uint64_t, HttpContext *> storage;
 static uint64_t SEQUENCE = 0;
 
+// SECURITY FIX: Add size limits to prevent DoS via memory exhaustion
+static constexpr size_t MAX_HTTP_BODY_SIZE   = 1024 * 1024;  // 1 MB
+static constexpr size_t MAX_HTTP_HEADER_SIZE = 8192;         // 8 KB per header
+static constexpr size_t MAX_HTTP_URL_SIZE    = 8192;         // 8 KB
+
 
 class HttpWriteBaton : public Baton<uv_write_t>
 {
@@ -195,6 +200,11 @@ int xmrig::HttpContext::onHeaderField(llhttp_t *parser, const char *at, size_t l
 {
     auto ctx = static_cast<HttpContext*>(parser->data);
 
+    // SECURITY FIX: Limit header field size to prevent memory exhaustion
+    if (ctx->m_lastHeaderField.size() + length > MAX_HTTP_HEADER_SIZE) {
+        return HPE_USER;
+    }
+
     if (ctx->m_wasHeaderValue) {
         if (!ctx->m_lastHeaderField.empty()) {
             ctx->setHeader();
@@ -213,6 +223,11 @@ int xmrig::HttpContext::onHeaderField(llhttp_t *parser, const char *at, size_t l
 int xmrig::HttpContext::onHeaderValue(llhttp_t *parser, const char *at, size_t length)
 {
     auto ctx = static_cast<HttpContext*>(parser->data);
+
+    // SECURITY FIX: Limit header value size to prevent memory exhaustion
+    if (ctx->m_lastHeaderValue.size() + length > MAX_HTTP_HEADER_SIZE) {
+        return HPE_USER;
+    }
 
     if (!ctx->m_wasHeaderValue) {
         ctx->m_lastHeaderValue = std::string(at, length);
@@ -234,6 +249,10 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
     settings->on_url = [](llhttp_t *parser, const char *at, size_t length) -> int
     {
+        // SECURITY FIX: Limit URL size to prevent memory exhaustion
+        if (length > MAX_HTTP_URL_SIZE) {
+            return HPE_USER;
+        }
         static_cast<HttpContext*>(parser->data)->url = std::string(at, length);
         return 0;
     };
@@ -258,8 +277,14 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
     settings->on_body = [](llhttp_t *parser, const char *at, size_t len) -> int
     {
-        static_cast<HttpContext*>(parser->data)->body.append(at, len);
+        auto ctx = static_cast<HttpContext*>(parser->data);
 
+        // SECURITY FIX: Limit body size to prevent memory exhaustion (DoS)
+        if (ctx->body.size() + len > MAX_HTTP_BODY_SIZE) {
+            return HPE_USER;
+        }
+
+        ctx->body.append(at, len);
         return 0;
     };
 

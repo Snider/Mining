@@ -64,12 +64,32 @@ xmrig::BindHost::BindHost(const rapidjson::Value &object) :
     m_version(0),
     m_port(0)
 {
+    // SECURITY FIX: Validate JSON structure before accessing members
+    if (!object.IsObject()) {
+        return;
+    }
+
+    // Validate "host" field exists and is a string
+    if (!object.HasMember("host") || !object["host"].IsString()) {
+        return;
+    }
+
     if (!parseHost(object["host"].GetString())) {
         return;
     }
 
-    m_port = object["port"].GetUint();
-    m_tls  = object["tls"].GetBool();
+    // Validate "port" field exists and is a number
+    if (object.HasMember("port") && object["port"].IsUint()) {
+        const uint32_t port = object["port"].GetUint();
+        if (port <= 65535) {
+            m_port = static_cast<uint16_t>(port);
+        }
+    }
+
+    // Validate "tls" field exists and is a boolean
+    if (object.HasMember("tls") && object["tls"].IsBool()) {
+        m_tls = object["tls"].GetBool();
+    }
 }
 
 
@@ -133,7 +153,13 @@ void xmrig::BindHost::parseIPv4(const char *addr)
     memcpy(host, addr, size - 1);
 
     m_host = host;
-    m_port = static_cast<uint16_t>(strtol(port, nullptr, 10));
+
+    // SECURITY FIX: Validate strtol result
+    char *endptr = nullptr;
+    const long portVal = strtol(port, &endptr, 10);
+    if (endptr != port && portVal > 0 && portVal <= 65535) {
+        m_port = static_cast<uint16_t>(portVal);
+    }
 }
 
 
@@ -155,5 +181,11 @@ void xmrig::BindHost::parseIPv6(const char *addr)
     memcpy(host, addr + 1, size - 1);
 
     m_host = host;
-    m_port = static_cast<uint16_t>(strtol(port + 1, nullptr, 10));
+
+    // SECURITY FIX: Validate strtol result
+    char *endptr = nullptr;
+    const long portVal = strtol(port + 1, &endptr, 10);
+    if (endptr != (port + 1) && portVal > 0 && portVal <= 65535) {
+        m_port = static_cast<uint16_t>(portVal);
+    }
 }

@@ -142,7 +142,7 @@ void xmrig::ApiRouter::getMiners(rapidjson::Value &reply, rapidjson::Document &d
         value.PushBack(miner->state(),             allocator);
         value.PushBack(miner->diff(),              allocator);
         value.PushBack(miner->user().toJSON(),     allocator);
-        value.PushBack(miner->password().toJSON(), allocator);
+        value.PushBack("********",                 allocator);  // Password redacted for security
         value.PushBack(miner->rigId().toJSON(),    allocator);
         value.PushBack(miner->agent().toJSON(),    allocator);
 

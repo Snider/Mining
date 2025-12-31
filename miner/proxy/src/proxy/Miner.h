@@ -27,6 +27,7 @@
 
 
 #include <algorithm>
+#include <atomic>
 #include <bitset>
 #include <uv.h>
 
@@ -161,7 +162,11 @@ private:
     uintptr_t m_key;
     uv_tcp_t *m_socket;
 
-    static char m_sendBuf[16384];
+    // THREAD SAFETY FIX: Per-instance send buffer instead of static shared buffer
+    // This prevents race conditions with 100K+ concurrent miners
+    char m_sendBuf[16384]{};
+
+    static std::atomic<int64_t> s_nextId;
     static Storage<Miner> m_storage;
 };
 

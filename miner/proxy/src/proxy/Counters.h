@@ -25,52 +25,57 @@
 #define __COUNTERS_H__
 
 
-#include <stdint.h>
+#include <atomic>
+#include <cstdint>
 
 
+// THREAD SAFETY FIX: All counters are now atomic to prevent race conditions
+// with 100K+ concurrent miner connections
 class Counters
 {
 public:
     static inline void reset()
     {
-        m_added   = 0;
-        m_removed = 0;
-        accepted  = 0;
+        m_added.store(0, std::memory_order_relaxed);
+        m_removed.store(0, std::memory_order_relaxed);
+        accepted.store(0, std::memory_order_relaxed);
     }
 
 
     static inline void add()
     {
-        m_miners++;
-        m_added++;
+        uint64_t current = m_miners.fetch_add(1, std::memory_order_relaxed) + 1;
+        m_added.fetch_add(1, std::memory_order_relaxed);
 
-        if (m_miners > m_maxMiners) {
-            m_maxMiners = m_miners;
+        // Thread-safe max update using compare-and-swap
+        uint64_t maxVal = m_maxMiners.load(std::memory_order_relaxed);
+        while (current > maxVal && !m_maxMiners.compare_exchange_weak(maxVal, current, std::memory_order_relaxed)) {
+            // maxVal is updated by compare_exchange_weak on failure
         }
     }
 
 
     static inline void remove()
     {
-        m_miners--;
-        m_removed++;
+        m_miners.fetch_sub(1, std::memory_order_relaxed);
+        m_removed.fetch_add(1, std::memory_order_relaxed);
     }
 
 
-    static inline uint32_t added()     { return m_added; }
-    static inline uint32_t removed()   { return m_removed; }
-    static inline uint64_t maxMiners() { return m_maxMiners; }
-    static inline uint64_t miners()    { return m_miners; }
+    static inline uint32_t added()     { return m_added.load(std::memory_order_relaxed); }
+    static inline uint32_t removed()   { return m_removed.load(std::memory_order_relaxed); }
+    static inline uint64_t maxMiners() { return m_maxMiners.load(std::memory_order_relaxed); }
+    static inline uint64_t miners()    { return m_miners.load(std::memory_order_relaxed); }
 
-    static uint64_t accepted;
-    static uint64_t connections;
-    static uint64_t expired;
+    static std::atomic<uint64_t> accepted;
+    static std::atomic<uint64_t> connections;
+    static std::atomic<uint64_t> expired;
 
 private:
-    static uint32_t m_added;
-    static uint32_t m_removed;
-    static uint64_t m_maxMiners;
-    static uint64_t m_miners;
+    static std::atomic<uint32_t> m_added;
+    static std::atomic<uint32_t> m_removed;
+    static std::atomic<uint64_t> m_maxMiners;
+    static std::atomic<uint64_t> m_miners;
 };
 
 #endif /* __COUNTERS_H__ */
