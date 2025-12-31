@@ -253,6 +253,107 @@ func TestFileRepository_Path(t *testing.T) {
 	}
 }
 
+func TestFileRepository_UpdateWithLoadError(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "corrupt.json")
+	repo := NewFileRepository[testData](path)
+
+	// Write invalid JSON
+	if err := os.WriteFile(path, []byte(`{invalid}`), 0600); err != nil {
+		t.Fatalf("Failed to write corrupt file: %v", err)
+	}
+
+	// Update should fail to load the corrupt file
+	err := repo.Update(func(data *testData) error {
+		data.Value = 999
+		return nil
+	})
+	if err == nil {
+		t.Error("Expected error for corrupt file during Update")
+	}
+}
+
+func TestFileRepository_SaveToReadOnlyDirectory(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("Test skipped when running as root")
+	}
+
+	tmpDir := t.TempDir()
+	readOnlyDir := filepath.Join(tmpDir, "readonly")
+	if err := os.Mkdir(readOnlyDir, 0555); err != nil {
+		t.Fatalf("Failed to create readonly dir: %v", err)
+	}
+	defer os.Chmod(readOnlyDir, 0755) // Restore permissions for cleanup
+
+	path := filepath.Join(readOnlyDir, "test.json")
+	repo := NewFileRepository[testData](path)
+
+	// Save should fail due to permission denied
+	err := repo.Save(testData{Name: "test", Value: 1})
+	if err == nil {
+		t.Error("Expected error when saving to read-only directory")
+	}
+}
+
+func TestFileRepository_DeleteNonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "nonexistent.json")
+	repo := NewFileRepository[testData](path)
+
+	// Delete on non-existent file should not error
+	if err := repo.Delete(); err != nil {
+		t.Errorf("Delete on non-existent file should not error: %v", err)
+	}
+}
+
+func TestFileRepository_ExistsOnInvalidPath(t *testing.T) {
+	// Use a path that definitely doesn't exist
+	repo := NewFileRepository[testData]("/nonexistent/path/to/file.json")
+
+	if repo.Exists() {
+		t.Error("Exists should return false for invalid path")
+	}
+}
+
+func TestFileRepository_ConcurrentUpdates(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "concurrent.json")
+	repo := NewFileRepository[testData](path, WithDefaults(func() testData {
+		return testData{Name: "initial", Value: 0}
+	}))
+
+	// Run multiple concurrent updates
+	const numUpdates = 10
+	done := make(chan bool)
+
+	for i := 0; i < numUpdates; i++ {
+		go func() {
+			err := repo.Update(func(data *testData) error {
+				data.Value++
+				return nil
+			})
+			if err != nil {
+				t.Logf("Concurrent update error: %v", err)
+			}
+			done <- true
+		}()
+	}
+
+	// Wait for all updates
+	for i := 0; i < numUpdates; i++ {
+		<-done
+	}
+
+	// Verify final value equals number of updates
+	data, err := repo.Load()
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if data.Value != numUpdates {
+		t.Errorf("Expected value %d after concurrent updates, got %d", numUpdates, data.Value)
+	}
+}
+
 // Test with slice data
 func TestFileRepository_SliceData(t *testing.T) {
 	type item struct {

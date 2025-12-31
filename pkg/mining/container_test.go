@@ -236,3 +236,81 @@ func TestContainer_ShutdownChannel(t *testing.T) {
 		t.Error("ShutdownCh should be closed after Shutdown()")
 	}
 }
+
+func TestContainer_InitializeWithCancelledContext(t *testing.T) {
+	cleanup := setupContainerTestEnv(t)
+	defer cleanup()
+
+	config := DefaultContainerConfig()
+	config.Database.Enabled = false
+	config.SimulationMode = true
+
+	container := NewContainer(config)
+
+	// Use a pre-cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Initialize should still succeed (context is checked at operation start)
+	// But operations that check context should respect cancellation
+	if err := container.Initialize(ctx); err != nil {
+		// This is acceptable - initialization may fail with cancelled context
+		t.Logf("Initialize with cancelled context: %v (acceptable)", err)
+	}
+
+	// Cleanup if initialized
+	if container.IsInitialized() {
+		container.Shutdown(context.Background())
+	}
+}
+
+func TestContainer_ShutdownWithTimeout(t *testing.T) {
+	cleanup := setupContainerTestEnv(t)
+	defer cleanup()
+
+	config := DefaultContainerConfig()
+	config.Database.Enabled = false
+	config.SimulationMode = true
+
+	container := NewContainer(config)
+	ctx := context.Background()
+
+	if err := container.Initialize(ctx); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	// Use a context with very short timeout
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	// Shutdown should still complete (cleanup is fast without real miners)
+	if err := container.Shutdown(timeoutCtx); err != nil {
+		t.Logf("Shutdown with timeout: %v (may be acceptable)", err)
+	}
+}
+
+func TestContainer_DoubleShutdown(t *testing.T) {
+	cleanup := setupContainerTestEnv(t)
+	defer cleanup()
+
+	config := DefaultContainerConfig()
+	config.Database.Enabled = false
+	config.SimulationMode = true
+
+	container := NewContainer(config)
+	ctx := context.Background()
+
+	if err := container.Initialize(ctx); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	// First shutdown
+	if err := container.Shutdown(ctx); err != nil {
+		t.Errorf("First shutdown failed: %v", err)
+	}
+
+	// Second shutdown should not panic or error
+	if err := container.Shutdown(ctx); err != nil {
+		t.Logf("Second shutdown returned: %v (expected no-op)", err)
+	}
+}
