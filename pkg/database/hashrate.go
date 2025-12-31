@@ -132,8 +132,9 @@ func GetHashrateStats(minerName string) (*HashrateStats, error) {
 	var stats HashrateStats
 	stats.MinerName = minerName
 
-	// SQLite returns timestamps as strings, so scan them as strings first
+	// SQLite returns timestamps as strings and AVG as float64, so scan them appropriately
 	var firstSeenStr, lastSeenStr string
+	var avgRate float64
 	err = db.QueryRow(`
 		SELECT
 			COUNT(*),
@@ -146,12 +147,13 @@ func GetHashrateStats(minerName string) (*HashrateStats, error) {
 		WHERE miner_name = ?
 	`, minerName).Scan(
 		&stats.TotalPoints,
-		&stats.AverageRate,
+		&avgRate,
 		&stats.MaxRate,
 		&stats.MinRate,
 		&firstSeenStr,
 		&lastSeenStr,
 	)
+	stats.AverageRate = int(avgRate)
 
 	if err != nil {
 		return nil, err
@@ -195,10 +197,11 @@ func GetAllMinerStats() ([]HashrateStats, error) {
 	for rows.Next() {
 		var stats HashrateStats
 		var firstSeenStr, lastSeenStr string
+		var avgRate float64
 		if err := rows.Scan(
 			&stats.MinerName,
 			&stats.TotalPoints,
-			&stats.AverageRate,
+			&avgRate,
 			&stats.MaxRate,
 			&stats.MinRate,
 			&firstSeenStr,
@@ -206,6 +209,7 @@ func GetAllMinerStats() ([]HashrateStats, error) {
 		); err != nil {
 			return nil, err
 		}
+		stats.AverageRate = int(avgRate)
 		// Parse timestamps using helper that logs errors
 		stats.FirstSeen = parseSQLiteTimestamp(firstSeenStr)
 		stats.LastSeen = parseSQLiteTimestamp(lastSeenStr)

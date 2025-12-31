@@ -22,8 +22,8 @@ func TestCPUThrottleSingleMiner(t *testing.T) {
 		t.Skip("XMRig not installed, skipping throttle test")
 	}
 
-	// Use the manager to start miner (handles API port assignment)
-	manager := NewManager()
+	// Use simulation manager to avoid autostart conflicts
+	manager := NewManagerForSimulation()
 	defer manager.Stop()
 
 	// Configure miner to use only 10% of CPU
@@ -31,7 +31,7 @@ func TestCPUThrottleSingleMiner(t *testing.T) {
 		Pool:              "stratum+tcp://pool.supportxmr.com:3333",
 		Wallet:            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		CPUMaxThreadsHint: 10, // 10% CPU usage
-		Algo:              "rx/0",
+		Algo:              "throttle-single",
 	}
 
 	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)
@@ -68,7 +68,8 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 		t.Skip("XMRig not installed, skipping throttle test")
 	}
 
-	manager := NewManager()
+	// Use simulation manager to avoid autostart conflicts
+	manager := NewManagerForSimulation()
 	defer manager.Stop()
 
 	// Start first miner at 10% CPU with RandomX
@@ -76,7 +77,7 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 		Pool:              "stratum+tcp://pool.supportxmr.com:3333",
 		Wallet:            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		CPUMaxThreadsHint: 10,
-		Algo:              "rx/0",
+		Algo:              "throttle-dual-1",
 	}
 
 	miner1Instance, err := manager.StartMiner(context.Background(), "xmrig", config1)
@@ -90,7 +91,7 @@ func TestCPUThrottleDualMiners(t *testing.T) {
 		Pool:              "stratum+tcp://pool.supportxmr.com:5555",
 		Wallet:            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		CPUMaxThreadsHint: 10,
-		Algo:              "gr", // GhostRider algo
+		Algo:              "throttle-dual-2",
 	}
 
 	miner2Instance, err := manager.StartMiner(context.Background(), "xmrig", config2)
@@ -135,8 +136,8 @@ func TestCPUThrottleThreadCount(t *testing.T) {
 		t.Skip("XMRig not installed, skipping throttle test")
 	}
 
-	// Use the manager to start miner (handles API port assignment)
-	manager := NewManager()
+	// Use simulation manager to avoid autostart conflicts
+	manager := NewManagerForSimulation()
 	defer manager.Stop()
 
 	numCPU := runtime.NumCPU()
@@ -147,7 +148,7 @@ func TestCPUThrottleThreadCount(t *testing.T) {
 		Pool:    "stratum+tcp://pool.supportxmr.com:3333",
 		Wallet:  "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		Threads: targetThreads,
-		Algo:    "rx/0",
+		Algo:    "throttle-thread",
 	}
 
 	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)
@@ -183,7 +184,8 @@ func TestMinerResourceIsolation(t *testing.T) {
 		t.Skip("XMRig not installed, skipping test")
 	}
 
-	manager := NewManager()
+	// Use simulation manager to avoid autostart conflicts
+	manager := NewManagerForSimulation()
 	defer manager.Stop()
 
 	// Start first miner
@@ -191,7 +193,7 @@ func TestMinerResourceIsolation(t *testing.T) {
 		Pool:              "stratum+tcp://pool.supportxmr.com:3333",
 		Wallet:            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		CPUMaxThreadsHint: 25,
-		Algo:              "rx/0",
+		Algo:              "isolation-1",
 	}
 
 	miner1, err := manager.StartMiner(context.Background(), "xmrig", config1)
@@ -216,7 +218,7 @@ func TestMinerResourceIsolation(t *testing.T) {
 		Pool:              "stratum+tcp://pool.supportxmr.com:5555",
 		Wallet:            "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A",
 		CPUMaxThreadsHint: 25,
-		Algo:              "gr",
+		Algo:              "isolation-2",
 	}
 
 	miner2, err := manager.StartMiner(context.Background(), "xmrig", config2)

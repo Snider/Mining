@@ -148,3 +148,208 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Expected default retention 30, got %d", cfg.RetentionDays)
 	}
 }
+
+func TestCleanupRetention(t *testing.T) {
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	minerName := "retention-test"
+	minerType := "xmrig"
+	now := time.Now()
+
+	// Insert data at various ages:
+	// - 35 days old (should be deleted with 30-day retention)
+	// - 25 days old (should be kept with 30-day retention)
+	// - 5 days old (should be kept)
+	oldPoint := HashratePoint{
+		Timestamp: now.AddDate(0, 0, -35),
+		Hashrate:  100,
+	}
+	midPoint := HashratePoint{
+		Timestamp: now.AddDate(0, 0, -25),
+		Hashrate:  200,
+	}
+	newPoint := HashratePoint{
+		Timestamp: now.AddDate(0, 0, -5),
+		Hashrate:  300,
+	}
+
+	// Insert all points
+	if err := InsertHashratePoint(minerName, minerType, oldPoint, ResolutionHigh); err != nil {
+		t.Fatalf("Failed to insert old point: %v", err)
+	}
+	if err := InsertHashratePoint(minerName, minerType, midPoint, ResolutionHigh); err != nil {
+		t.Fatalf("Failed to insert mid point: %v", err)
+	}
+	if err := InsertHashratePoint(minerName, minerType, newPoint, ResolutionHigh); err != nil {
+		t.Fatalf("Failed to insert new point: %v", err)
+	}
+
+	// Verify all 3 points exist
+	history, err := GetHashrateHistory(minerName, ResolutionHigh, now.AddDate(0, 0, -40), now)
+	if err != nil {
+		t.Fatalf("Failed to get history before cleanup: %v", err)
+	}
+	if len(history) != 3 {
+		t.Errorf("Expected 3 points before cleanup, got %d", len(history))
+	}
+
+	// Run cleanup with 30-day retention
+	if err := Cleanup(30); err != nil {
+		t.Fatalf("Cleanup failed: %v", err)
+	}
+
+	// Verify only 2 points remain (35-day old point should be deleted)
+	history, err = GetHashrateHistory(minerName, ResolutionHigh, now.AddDate(0, 0, -40), now)
+	if err != nil {
+		t.Fatalf("Failed to get history after cleanup: %v", err)
+	}
+	if len(history) != 2 {
+		t.Errorf("Expected 2 points after cleanup, got %d", len(history))
+	}
+
+	// Verify the remaining points are the mid and new ones
+	for _, point := range history {
+		if point.Hashrate == 100 {
+			t.Error("Old point (100 H/s) should have been deleted")
+		}
+	}
+}
+
+func TestGetHashrateHistoryTimeRange(t *testing.T) {
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	minerName := "timerange-test"
+	minerType := "xmrig"
+	now := time.Now()
+
+	// Insert points at specific times
+	times := []time.Duration{
+		-10 * time.Minute,
+		-8 * time.Minute,
+		-6 * time.Minute,
+		-4 * time.Minute,
+		-2 * time.Minute,
+	}
+
+	for i, offset := range times {
+		point := HashratePoint{
+			Timestamp: now.Add(offset),
+			Hashrate:  1000 + i*100,
+		}
+		if err := InsertHashratePoint(minerName, minerType, point, ResolutionHigh); err != nil {
+			t.Fatalf("Failed to insert point: %v", err)
+		}
+	}
+
+	// Query for middle range (should get 3 points: -8, -6, -4 minutes)
+	since := now.Add(-9 * time.Minute)
+	until := now.Add(-3 * time.Minute)
+	history, err := GetHashrateHistory(minerName, ResolutionHigh, since, until)
+	if err != nil {
+		t.Fatalf("Failed to get history: %v", err)
+	}
+
+	if len(history) != 3 {
+		t.Errorf("Expected 3 points in range, got %d", len(history))
+	}
+
+	// Query boundary condition - exact timestamp match
+	exactSince := now.Add(-6 * time.Minute)
+	exactUntil := now.Add(-6 * time.Minute).Add(time.Second)
+	history, err = GetHashrateHistory(minerName, ResolutionHigh, exactSince, exactUntil)
+	if err != nil {
+		t.Fatalf("Failed to get exact history: %v", err)
+	}
+
+	// Should get at least 1 point
+	if len(history) < 1 {
+		t.Error("Expected at least 1 point at exact boundary")
+	}
+}
+
+func TestMultipleMinerStats(t *testing.T) {
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	now := time.Now()
+
+	// Create data for multiple miners
+	miners := []struct {
+		name      string
+		hashrates []int
+	}{
+		{"miner-A", []int{1000, 1100, 1200}},
+		{"miner-B", []int{2000, 2100, 2200}},
+		{"miner-C", []int{3000, 3100, 3200}},
+	}
+
+	for _, m := range miners {
+		for i, hr := range m.hashrates {
+			point := HashratePoint{
+				Timestamp: now.Add(time.Duration(-i) * time.Minute),
+				Hashrate:  hr,
+			}
+			if err := InsertHashratePoint(m.name, "xmrig", point, ResolutionHigh); err != nil {
+				t.Fatalf("Failed to insert point for %s: %v", m.name, err)
+			}
+		}
+	}
+
+	// Get all miner stats
+	allStats, err := GetAllMinerStats()
+	if err != nil {
+		t.Fatalf("Failed to get all stats: %v", err)
+	}
+
+	if len(allStats) != 3 {
+		t.Errorf("Expected stats for 3 miners, got %d", len(allStats))
+	}
+
+	// Verify each miner's stats
+	statsMap := make(map[string]HashrateStats)
+	for _, s := range allStats {
+		statsMap[s.MinerName] = s
+	}
+
+	// Check miner-A: avg = (1000+1100+1200)/3 = 1100
+	if s, ok := statsMap["miner-A"]; ok {
+		if s.AverageRate != 1100 {
+			t.Errorf("miner-A: expected avg 1100, got %d", s.AverageRate)
+		}
+	} else {
+		t.Error("miner-A stats not found")
+	}
+
+	// Check miner-C: avg = (3000+3100+3200)/3 = 3100
+	if s, ok := statsMap["miner-C"]; ok {
+		if s.AverageRate != 3100 {
+			t.Errorf("miner-C: expected avg 3100, got %d", s.AverageRate)
+		}
+	} else {
+		t.Error("miner-C stats not found")
+	}
+}
+
+func TestIsInitialized(t *testing.T) {
+	// Before initialization
+	Close() // Ensure clean state
+	if isInitialized() {
+		t.Error("Should not be initialized before Initialize()")
+	}
+
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// After initialization
+	if !isInitialized() {
+		t.Error("Should be initialized after Initialize()")
+	}
+
+	// After close
+	Close()
+	if isInitialized() {
+		t.Error("Should not be initialized after Close()")
+	}
+}
