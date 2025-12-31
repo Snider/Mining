@@ -9,6 +9,7 @@
 [![codecov](https://codecov.io/gh/Snider/Mining/branch/main/graph/badge.svg)](https://codecov.io/gh/Snider/Mining)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg)](https://github.com/Snider/Mining/releases)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://snider.github.io/Mining/)
 
 A modern, modular cryptocurrency mining management platform with GPU support, RESTful API, and cross-platform desktop application.
 
