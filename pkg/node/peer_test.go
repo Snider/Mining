@@ -168,6 +168,9 @@ func TestPeerRegistry_UpdateMetrics(t *testing.T) {
 	}
 
 	updated := pr.GetPeer("metrics-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if updated.PingMS != 50.5 {
 		t.Errorf("expected ping 50.5, got %f", updated.PingMS)
 	}
@@ -197,6 +200,9 @@ func TestPeerRegistry_UpdateScore(t *testing.T) {
 	}
 
 	updated := pr.GetPeer("score-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if updated.Score != 85.5 {
 		t.Errorf("expected score 85.5, got %f", updated.Score)
 	}
@@ -208,6 +214,9 @@ func TestPeerRegistry_UpdateScore(t *testing.T) {
 	}
 
 	updated = pr.GetPeer("score-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if updated.Score != 100 {
 		t.Errorf("expected score clamped to 100, got %f", updated.Score)
 	}
@@ -219,6 +228,9 @@ func TestPeerRegistry_UpdateScore(t *testing.T) {
 	}
 
 	updated = pr.GetPeer("score-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if updated.Score != 0 {
 		t.Errorf("expected score clamped to 0, got %f", updated.Score)
 	}
@@ -239,6 +251,9 @@ func TestPeerRegistry_SetConnected(t *testing.T) {
 	pr.SetConnected("connect-test", true)
 
 	updated := pr.GetPeer("connect-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if !updated.Connected {
 		t.Error("peer should be connected")
 	}
@@ -248,6 +263,9 @@ func TestPeerRegistry_SetConnected(t *testing.T) {
 
 	pr.SetConnected("connect-test", false)
 	updated = pr.GetPeer("connect-test")
+	if updated == nil {
+		t.Fatal("expected peer to exist")
+	}
 	if updated.Connected {
 		t.Error("peer should be disconnected")
 	}

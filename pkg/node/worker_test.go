@@ -127,6 +127,9 @@ func TestWorker_HandlePing(t *testing.T) {
 
 	// Create a ping message
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	pingPayload := PingPayload{SentAt: time.Now().UnixMilli()}
 	pingMsg, err := NewMessage(MsgPing, "sender-id", identity.ID, pingPayload)
 	if err != nil {
@@ -183,6 +186,9 @@ func TestWorker_HandleGetStats(t *testing.T) {
 
 	// Create a get_stats message
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	msg, err := NewMessage(MsgGetStats, "sender-id", identity.ID, nil)
 	if err != nil {
 		t.Fatalf("failed to create get_stats message: %v", err)
@@ -238,6 +244,9 @@ func TestWorker_HandleStartMiner_NoManager(t *testing.T) {
 
 	// Create a start_miner message
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	payload := StartMinerPayload{ProfileID: "test-profile"}
 	msg, err := NewMessage(MsgStartMiner, "sender-id", identity.ID, payload)
 	if err != nil {
@@ -273,6 +282,9 @@ func TestWorker_HandleStopMiner_NoManager(t *testing.T) {
 
 	// Create a stop_miner message
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	payload := StopMinerPayload{MinerName: "test-miner"}
 	msg, err := NewMessage(MsgStopMiner, "sender-id", identity.ID, payload)
 	if err != nil {
@@ -308,6 +320,9 @@ func TestWorker_HandleGetLogs_NoManager(t *testing.T) {
 
 	// Create a get_logs message
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	payload := GetLogsPayload{MinerName: "test-miner", Lines: 100}
 	msg, err := NewMessage(MsgGetLogs, "sender-id", identity.ID, payload)
 	if err != nil {
@@ -343,6 +358,9 @@ func TestWorker_HandleDeploy_Profile(t *testing.T) {
 
 	// Create a deploy message for profile
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	payload := DeployPayload{
 		BundleType: "profile",
 		Data:       []byte(`{"id": "test", "name": "Test Profile"}`),
@@ -382,6 +400,9 @@ func TestWorker_HandleDeploy_UnknownType(t *testing.T) {
 
 	// Create a deploy message with unknown type
 	identity := nm.GetIdentity()
+	if identity == nil {
+		t.Fatal("expected identity to be generated")
+	}
 	payload := DeployPayload{
 		BundleType: "unknown",
 		Data:       []byte(`{}`),

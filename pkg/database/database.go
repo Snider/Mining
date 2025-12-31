@@ -28,8 +28,8 @@ type Config struct {
 	RetentionDays int `json:"retentionDays,omitempty"`
 }
 
-// DefaultConfig returns the default database configuration
-func DefaultConfig() Config {
+// defaultConfig returns the default database configuration
+func defaultConfig() Config {
 	return Config{
 		Enabled:       true,
 		Path:          "",
@@ -99,8 +99,8 @@ func Close() error {
 	return err
 }
 
-// IsInitialized returns true if the database is ready
-func IsInitialized() bool {
+// isInitialized returns true if the database is ready
+func isInitialized() bool {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
 	return db != nil
@@ -168,8 +168,8 @@ func Cleanup(retentionDays int) error {
 	return err
 }
 
-// VacuumDB optimizes the database file size
-func VacuumDB() error {
+// vacuumDB optimizes the database file size
+func vacuumDB() error {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
 

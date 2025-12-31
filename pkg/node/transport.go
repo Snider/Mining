@@ -327,6 +327,10 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 
 	// Send handshake acknowledgment
 	identity := t.node.GetIdentity()
+	if identity == nil {
+		conn.Close()
+		return
+	}
 	ackPayload := HandshakeAckPayload{
 		Identity: *identity,
 		Accepted: true,
@@ -380,6 +384,9 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 	}()
 
 	identity := t.node.GetIdentity()
+	if identity == nil {
+		return fmt.Errorf("node identity not initialized")
+	}
 
 	payload := HandshakePayload{
 		Identity: *identity,

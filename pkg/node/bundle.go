@@ -129,71 +129,6 @@ func CreateMinerBundle(minerPath string, profileJSON []byte, name string, passwo
 	}, nil
 }
 
-// CreateFullBundle creates an encrypted bundle with miners and all profiles.
-func CreateFullBundle(minerPaths []string, profiles [][]byte, name string, password string) (*Bundle, error) {
-	files := make(map[string][]byte)
-
-	// Add each miner
-	for _, minerPath := range minerPaths {
-		minerData, err := os.ReadFile(minerPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read miner %s: %w", minerPath, err)
-		}
-		files["miners/"+filepath.Base(minerPath)] = minerData
-	}
-
-	// Add each profile
-	for i, profile := range profiles {
-		profileName := fmt.Sprintf("profiles/profile_%d.json", i)
-		files[profileName] = profile
-	}
-
-	// Create tarball
-	tarData, err := createTarball(files)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tarball: %w", err)
-	}
-
-	// Create DataNode from tarball
-	dn, err := datanode.FromTar(tarData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create datanode: %w", err)
-	}
-
-	// Create TIM from DataNode
-	t, err := tim.FromDataNode(dn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TIM: %w", err)
-	}
-
-	// Create manifest as config
-	manifest := BundleManifest{
-		Type:       BundleFull,
-		Name:       name,
-		ProfileIDs: make([]string, len(profiles)),
-	}
-	manifestJSON, err := json.Marshal(manifest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create manifest: %w", err)
-	}
-	t.Config = manifestJSON
-
-	// Encrypt to STIM format
-	stimData, err := t.ToSigil(password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt bundle: %w", err)
-	}
-
-	checksum := calculateChecksum(stimData)
-
-	return &Bundle{
-		Type:     BundleFull,
-		Name:     name,
-		Data:     stimData,
-		Checksum: checksum,
-	}, nil
-}
-
 // ExtractProfileBundle decrypts and extracts a profile bundle.
 func ExtractProfileBundle(bundle *Bundle, password string) ([]byte, error) {
 	// Verify checksum first
@@ -241,39 +176,6 @@ func ExtractMinerBundle(bundle *Bundle, password string, destDir string) (string
 	}
 
 	return minerPath, t.Config, nil
-}
-
-// ExtractFullBundle decrypts and extracts a full bundle.
-func ExtractFullBundle(bundle *Bundle, password string, destDir string) (*BundleManifest, error) {
-	// Verify checksum
-	if calculateChecksum(bundle.Data) != bundle.Checksum {
-		return nil, fmt.Errorf("checksum mismatch - bundle may be corrupted")
-	}
-
-	// Decrypt STIM format
-	t, err := tim.FromSigil(bundle.Data, password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt bundle: %w", err)
-	}
-
-	// Parse manifest
-	var manifest BundleManifest
-	if err := json.Unmarshal(t.Config, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest: %w", err)
-	}
-
-	// Convert rootfs to tarball and extract
-	tarData, err := t.RootFS.ToTar()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert rootfs to tar: %w", err)
-	}
-
-	// Extract tarball to destination
-	if _, err := extractTarball(tarData, destDir); err != nil {
-		return nil, fmt.Errorf("failed to extract tarball: %w", err)
-	}
-
-	return &manifest, nil
 }
 
 // VerifyBundle checks if a bundle's checksum is valid.

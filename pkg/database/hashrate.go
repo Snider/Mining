@@ -1,15 +1,10 @@
 package database
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
 )
-
-// dbOperationTimeout is the maximum time for database operations
-const dbOperationTimeout = 30 * time.Second
 
 // parseSQLiteTimestamp parses timestamp strings from SQLite which may use various formats.
 // Logs a warning if parsing fails and returns zero time.
@@ -68,48 +63,6 @@ func InsertHashratePoint(minerName, minerType string, point HashratePoint, resol
 	return err
 }
 
-// InsertHashratePoints stores multiple hashrate measurements in a single transaction
-func InsertHashratePoints(minerName, minerType string, points []HashratePoint, resolution Resolution) error {
-	dbMu.RLock()
-	defer dbMu.RUnlock()
-
-	if db == nil {
-		return nil
-	}
-
-	if len(points) == 0 {
-		return nil
-	}
-
-	// Use context with timeout to prevent hanging on locked database
-	ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO hashrate_history (miner_name, miner_type, timestamp, hashrate, resolution)
-		VALUES (?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, point := range points {
-		_, err := stmt.ExecContext(ctx, minerName, minerType, point.Timestamp, point.Hashrate, string(resolution))
-		if err != nil {
-			return fmt.Errorf("failed to insert point: %w", err)
-		}
-	}
-
-	return tx.Commit()
-}
-
 // GetHashrateHistory retrieves hashrate history for a miner within a time range
 func GetHashrateHistory(minerName string, resolution Resolution, since, until time.Time) ([]HashratePoint, error) {
 	dbMu.RLock()
@@ -143,76 +96,6 @@ func GetHashrateHistory(minerName string, resolution Resolution, since, until ti
 	}
 
 	return points, rows.Err()
-}
-
-// GetLatestHashrate retrieves the most recent hashrate for a miner
-func GetLatestHashrate(minerName string) (*HashratePoint, error) {
-	dbMu.RLock()
-	defer dbMu.RUnlock()
-
-	if db == nil {
-		return nil, nil
-	}
-
-	var point HashratePoint
-	err := db.QueryRow(`
-		SELECT timestamp, hashrate
-		FROM hashrate_history
-		WHERE miner_name = ?
-		ORDER BY timestamp DESC
-		LIMIT 1
-	`, minerName).Scan(&point.Timestamp, &point.Hashrate)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // No data found is not an error
-		}
-		return nil, fmt.Errorf("failed to get latest hashrate: %w", err)
-	}
-
-	return &point, nil
-}
-
-// GetAverageHashrate calculates the average hashrate for a miner in a time range
-func GetAverageHashrate(minerName string, since, until time.Time) (int, error) {
-	dbMu.RLock()
-	defer dbMu.RUnlock()
-
-	if db == nil {
-		return 0, nil
-	}
-
-	var avg float64
-	err := db.QueryRow(`
-		SELECT COALESCE(AVG(hashrate), 0)
-		FROM hashrate_history
-		WHERE miner_name = ?
-		  AND timestamp >= ?
-		  AND timestamp <= ?
-	`, minerName, since, until).Scan(&avg)
-
-	return int(avg), err
-}
-
-// GetMaxHashrate retrieves the maximum hashrate for a miner in a time range
-func GetMaxHashrate(minerName string, since, until time.Time) (int, error) {
-	dbMu.RLock()
-	defer dbMu.RUnlock()
-
-	if db == nil {
-		return 0, nil
-	}
-
-	var max int
-	err := db.QueryRow(`
-		SELECT COALESCE(MAX(hashrate), 0)
-		FROM hashrate_history
-		WHERE miner_name = ?
-		  AND timestamp >= ?
-		  AND timestamp <= ?
-	`, minerName, since, until).Scan(&max)
-
-	return max, err
 }
 
 // GetHashrateStats retrieves aggregated stats for a miner
@@ -330,23 +213,4 @@ func GetAllMinerStats() ([]HashrateStats, error) {
 	}
 
 	return allStats, rows.Err()
-}
-
-// CleanupOldData removes hashrate data older than the specified duration
-func CleanupOldData(resolution Resolution, maxAge time.Duration) error {
-	dbMu.RLock()
-	defer dbMu.RUnlock()
-
-	if db == nil {
-		return nil
-	}
-
-	cutoff := time.Now().Add(-maxAge)
-	_, err := db.Exec(`
-		DELETE FROM hashrate_history
-		WHERE resolution = ?
-		  AND timestamp < ?
-	`, string(resolution), cutoff)
-
-	return err
 }

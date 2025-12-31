@@ -22,11 +22,6 @@ const (
 	EventMinerError     EventType = "miner.error"
 	EventMinerConnected EventType = "miner.connected"
 
-	// Profile events
-	EventProfileCreated EventType = "profile.created"
-	EventProfileUpdated EventType = "profile.updated"
-	EventProfileDeleted EventType = "profile.deleted"
-
 	// System events
 	EventPong EventType = "pong"
 )

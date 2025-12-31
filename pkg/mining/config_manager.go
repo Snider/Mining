@@ -28,8 +28,8 @@ type DatabaseConfig struct {
 	RetentionDays int `json:"retentionDays,omitempty"`
 }
 
-// DefaultDatabaseConfig returns the default database configuration.
-func DefaultDatabaseConfig() DatabaseConfig {
+// defaultDatabaseConfig returns the default database configuration.
+func defaultDatabaseConfig() DatabaseConfig {
 	return DatabaseConfig{
 		Enabled:       true,
 		RetentionDays: 30,
@@ -42,8 +42,8 @@ type MinersConfig struct {
 	Database DatabaseConfig         `json:"database"`
 }
 
-// GetMinersConfigPath returns the path to the miners configuration file.
-func GetMinersConfigPath() (string, error) {
+// getMinersConfigPath returns the path to the miners configuration file.
+func getMinersConfigPath() (string, error) {
 	return xdg.ConfigFile("lethean-desktop/miners/config.json")
 }
 
@@ -52,7 +52,7 @@ func LoadMinersConfig() (*MinersConfig, error) {
 	configMu.RLock()
 	defer configMu.RUnlock()
 
-	configPath, err := GetMinersConfigPath()
+	configPath, err := getMinersConfigPath()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine miners config path: %w", err)
 	}
@@ -63,7 +63,7 @@ func LoadMinersConfig() (*MinersConfig, error) {
 			// Return empty config with defaults if file doesn't exist
 			return &MinersConfig{
 				Miners:   []MinerAutostartConfig{},
-				Database: DefaultDatabaseConfig(),
+				Database: defaultDatabaseConfig(),
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to read miners config file: %w", err)
@@ -76,7 +76,7 @@ func LoadMinersConfig() (*MinersConfig, error) {
 
 	// Apply default database config if not set (for backwards compatibility)
 	if cfg.Database.RetentionDays == 0 {
-		cfg.Database = DefaultDatabaseConfig()
+		cfg.Database = defaultDatabaseConfig()
 	}
 
 	return &cfg, nil
@@ -88,7 +88,7 @@ func SaveMinersConfig(cfg *MinersConfig) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	configPath, err := GetMinersConfigPath()
+	configPath, err := getMinersConfigPath()
 	if err != nil {
 		return fmt.Errorf("could not determine miners config path: %w", err)
 	}

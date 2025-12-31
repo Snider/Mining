@@ -111,6 +111,9 @@ func (c *Controller) sendRequest(peerID string, msg *Message, timeout time.Durat
 // GetRemoteStats requests miner statistics from a remote peer.
 func (c *Controller) GetRemoteStats(peerID string) (*StatsPayload, error) {
 	identity := c.node.GetIdentity()
+	if identity == nil {
+		return nil, fmt.Errorf("node identity not initialized")
+	}
 
 	msg, err := NewMessage(MsgGetStats, identity.ID, peerID, nil)
 	if err != nil {
@@ -145,6 +148,9 @@ func (c *Controller) GetRemoteStats(peerID string) (*StatsPayload, error) {
 // StartRemoteMiner requests a remote peer to start a miner with a given profile.
 func (c *Controller) StartRemoteMiner(peerID, profileID string, configOverride json.RawMessage) error {
 	identity := c.node.GetIdentity()
+	if identity == nil {
+		return fmt.Errorf("node identity not initialized")
+	}
 
 	payload := StartMinerPayload{
 		ProfileID: profileID,
@@ -188,6 +194,9 @@ func (c *Controller) StartRemoteMiner(peerID, profileID string, configOverride j
 // StopRemoteMiner requests a remote peer to stop a miner.
 func (c *Controller) StopRemoteMiner(peerID, minerName string) error {
 	identity := c.node.GetIdentity()
+	if identity == nil {
+		return fmt.Errorf("node identity not initialized")
+	}
 
 	payload := StopMinerPayload{
 		MinerName: minerName,
@@ -230,6 +239,9 @@ func (c *Controller) StopRemoteMiner(peerID, minerName string) error {
 // GetRemoteLogs requests console logs from a remote miner.
 func (c *Controller) GetRemoteLogs(peerID, minerName string, lines int) ([]string, error) {
 	identity := c.node.GetIdentity()
+	if identity == nil {
+		return nil, fmt.Errorf("node identity not initialized")
+	}
 
 	payload := GetLogsPayload{
 		MinerName: minerName,
@@ -266,51 +278,6 @@ func (c *Controller) GetRemoteLogs(peerID, minerName string, lines int) ([]strin
 	return logs.Lines, nil
 }
 
-// DeployProfile sends a profile configuration to a remote peer.
-func (c *Controller) DeployProfile(peerID string, bundleData []byte, name string, checksum string) error {
-	identity := c.node.GetIdentity()
-
-	payload := DeployPayload{
-		BundleType: "profile",
-		Data:       bundleData,
-		Checksum:   checksum,
-		Name:       name,
-	}
-
-	msg, err := NewMessage(MsgDeploy, identity.ID, peerID, payload)
-	if err != nil {
-		return fmt.Errorf("failed to create message: %w", err)
-	}
-
-	resp, err := c.sendRequest(peerID, msg, 60*time.Second)
-	if err != nil {
-		return err
-	}
-
-	if resp.Type == MsgError {
-		var errPayload ErrorPayload
-		if err := resp.ParsePayload(&errPayload); err != nil {
-			return fmt.Errorf("remote error (unable to parse)")
-		}
-		return fmt.Errorf("remote error: %s", errPayload.Message)
-	}
-
-	if resp.Type != MsgDeployAck {
-		return fmt.Errorf("unexpected response type: %s", resp.Type)
-	}
-
-	var ack DeployAckPayload
-	if err := resp.ParsePayload(&ack); err != nil {
-		return fmt.Errorf("failed to parse ack: %w", err)
-	}
-
-	if !ack.Success {
-		return fmt.Errorf("deployment failed: %s", ack.Error)
-	}
-
-	return nil
-}
-
 // GetAllStats fetches stats from all connected peers.
 func (c *Controller) GetAllStats() map[string]*StatsPayload {
 	peers := c.peers.GetConnectedPeers()
@@ -336,26 +303,12 @@ func (c *Controller) GetAllStats() map[string]*StatsPayload {
 	return results
 }
 
-// GetTotalHashrate calculates total hashrate across all connected peers.
-func (c *Controller) GetTotalHashrate() float64 {
-	allStats := c.GetAllStats()
-	var total float64
-
-	for _, stats := range allStats {
-		if stats == nil {
-			continue
-		}
-		for _, miner := range stats.Miners {
-			total += miner.Hashrate
-		}
-	}
-
-	return total
-}
-
 // PingPeer sends a ping to a peer and updates metrics.
 func (c *Controller) PingPeer(peerID string) (float64, error) {
 	identity := c.node.GetIdentity()
+	if identity == nil {
+		return 0, fmt.Errorf("node identity not initialized")
+	}
 	sentAt := time.Now()
 
 	payload := PingPayload{

@@ -83,14 +83,17 @@ func (w *Worker) HandleMessage(conn *PeerConnection, msg *Message) {
 
 	if err != nil {
 		// Send error response
-		errMsg, _ := NewErrorMessage(
-			w.node.GetIdentity().ID,
-			msg.From,
-			ErrCodeOperationFailed,
-			err.Error(),
-			msg.ID,
-		)
-		conn.Send(errMsg)
+		identity := w.node.GetIdentity()
+		if identity != nil {
+			errMsg, _ := NewErrorMessage(
+				identity.ID,
+				msg.From,
+				ErrCodeOperationFailed,
+				err.Error(),
+				msg.ID,
+			)
+			conn.Send(errMsg)
+		}
 		return
 	}
 
@@ -122,6 +125,9 @@ func (w *Worker) handlePing(msg *Message) (*Message, error) {
 // handleGetStats responds with current miner statistics.
 func (w *Worker) handleGetStats(msg *Message) (*Message, error) {
 	identity := w.node.GetIdentity()
+	if identity == nil {
+		return nil, fmt.Errorf("node identity not initialized")
+	}
 
 	stats := StatsPayload{
 		NodeID:   identity.ID,

@@ -10,3 +10,13 @@ var (
 func GetVersion() string {
 	return version
 }
+
+// GetCommit returns the git commit hash
+func GetCommit() string {
+	return commit
+}
+
+// GetBuildDate returns the build date
+func GetBuildDate() string {
+	return date
+}

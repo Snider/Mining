@@ -171,16 +171,6 @@ func (n *NodeManager) DeriveSharedSecret(peerPubKeyBase64 string) ([]byte, error
 	return hash[:], nil
 }
 
-// GetPublicKey returns the node's public key in base64 format.
-func (n *NodeManager) GetPublicKey() string {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	if n.identity == nil {
-		return ""
-	}
-	return n.identity.PublicKey
-}
-
 // savePrivateKey saves the private key to disk with restricted permissions.
 func (n *NodeManager) savePrivateKey() error {
 	// Ensure directory exists
@@ -247,32 +237,6 @@ func (n *NodeManager) loadIdentity() error {
 	n.keyPair = keyPair
 
 	return nil
-}
-
-// UpdateName updates the node's display name.
-func (n *NodeManager) UpdateName(name string) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.identity == nil {
-		return fmt.Errorf("node identity not initialized")
-	}
-
-	n.identity.Name = name
-	return n.saveIdentity()
-}
-
-// UpdateRole updates the node's operational role.
-func (n *NodeManager) UpdateRole(role NodeRole) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.identity == nil {
-		return fmt.Errorf("node identity not initialized")
-	}
-
-	n.identity.Role = role
-	return n.saveIdentity()
 }
 
 // Delete removes the node identity and keys from disk.
