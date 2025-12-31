@@ -420,14 +420,9 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 	}
 
 	for _, availableMiner := range s.Manager.ListAvailableMiners() {
-		var miner Miner
-		switch availableMiner.Name {
-		case "xmrig":
-			miner = NewXMRigMiner()
-		case "tt-miner":
-			miner = NewTTMiner()
-		default:
-			continue
+		miner, err := CreateMiner(availableMiner.Name)
+		if err != nil {
+			continue // Skip unsupported miner types
 		}
 		details, err := miner.CheckInstallation()
 		if err != nil {
@@ -483,14 +478,9 @@ func (s *Service) handleDoctor(c *gin.Context) {
 func (s *Service) handleUpdateCheck(c *gin.Context) {
 	updates := make(map[string]string)
 	for _, availableMiner := range s.Manager.ListAvailableMiners() {
-		var miner Miner
-		switch availableMiner.Name {
-		case "xmrig":
-			miner = NewXMRigMiner()
-		case "tt-miner":
-			miner = NewTTMiner()
-		default:
-			continue
+		miner, err := CreateMiner(availableMiner.Name)
+		if err != nil {
+			continue // Skip unsupported miner types
 		}
 
 		details, err := miner.CheckInstallation()
@@ -580,13 +570,8 @@ func (s *Service) handleListAvailableMiners(c *gin.Context) {
 // @Router /miners/{miner_type}/install [post]
 func (s *Service) handleInstallMiner(c *gin.Context) {
 	minerType := c.Param("miner_name")
-	var miner Miner
-	switch minerType {
-	case "xmrig":
-		miner = NewXMRigMiner()
-	case "tt-miner":
-		miner = NewTTMiner()
-	default:
+	miner, err := CreateMiner(minerType)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown miner type"})
 		return
 	}

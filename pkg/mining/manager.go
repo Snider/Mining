@@ -239,14 +239,9 @@ func (m *Manager) StartMiner(ctx context.Context, minerType string, config *Conf
 		config = &Config{}
 	}
 
-	var miner Miner
-	switch strings.ToLower(minerType) {
-	case "xmrig":
-		miner = NewXMRigMiner()
-	case "tt-miner", "ttminer":
-		miner = NewTTMiner()
-	default:
-		return nil, fmt.Errorf("unsupported miner type: %s", minerType)
+	miner, err := CreateMiner(minerType)
+	if err != nil {
+		return nil, err
 	}
 
 	instanceName := miner.GetName()
@@ -358,14 +353,9 @@ func (m *Manager) UninstallMiner(ctx context.Context, minerType string) error {
 		}
 	}
 
-	var miner Miner
-	switch strings.ToLower(minerType) {
-	case "xmrig":
-		miner = NewXMRigMiner()
-	case "tt-miner", "ttminer":
-		miner = NewTTMiner()
-	default:
-		return fmt.Errorf("unsupported miner type: %s", minerType)
+	miner, err := CreateMiner(minerType)
+	if err != nil {
+		return err
 	}
 
 	if err := miner.Uninstall(); err != nil {
