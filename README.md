@@ -37,6 +37,22 @@ A modern, modular cryptocurrency mining management platform with GPU support, RE
 - **Web Dashboard**: Embeddable Angular web component for any application
 - **Desktop Application**: Native cross-platform app built with Wails v3
 - **Mobile Responsive**: Touch-friendly UI with drawer navigation
+- **Simulation Mode**: Test the UI without real mining hardware
+
+### Why Mining Platform?
+
+| Feature | Mining Platform | NiceHash | HiveOS | Manual XMRig |
+|---------|:---------------:|:--------:|:------:|:------------:|
+| Open Source | ✅ | ❌ | ❌ | ✅ |
+| No Fees | ✅ | ❌ (2%+) | ❌ ($3/mo) | ✅ |
+| Multi-Algorithm | ✅ | ✅ | ✅ | ❌ |
+| GUI Dashboard | ✅ | ✅ | ✅ | ❌ |
+| Profile Management | ✅ | ❌ | ✅ | ❌ |
+| Dual Mining | ✅ | ❌ | ✅ | ❌ |
+| Desktop App | ✅ | ❌ | ❌ | ❌ |
+| Embeddable Component | ✅ | ❌ | ❌ | ❌ |
+| Self-Hosted | ✅ | ❌ | ❌ | ✅ |
+| Simulation Mode | ✅ | ❌ | ❌ | ❌ |
 
 ### Mining Software
 
