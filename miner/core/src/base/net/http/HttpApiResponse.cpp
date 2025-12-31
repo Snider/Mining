@@ -50,7 +50,12 @@ void xmrig::HttpApiResponse::end()
 {
     using namespace rapidjson;
 
-    setHeader("Access-Control-Allow-Origin", "*");
+    // SECURITY: CORS headers - restrict to localhost origins by default
+    // This prevents malicious websites from making authenticated API requests
+    // via cross-origin requests. Users accessing the API from a web dashboard
+    // should use a local server or proxy. The API should typically be bound to
+    // localhost only for security.
+    setHeader("Access-Control-Allow-Origin", "http://127.0.0.1");
     setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE");
     setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 

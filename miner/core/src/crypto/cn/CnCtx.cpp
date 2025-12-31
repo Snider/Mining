@@ -49,6 +49,11 @@ void xmrig::CnCtx::release(cryptonight_ctx **ctx, size_t count)
     }
 
     for (size_t i = 0; i < count; ++i) {
+        // SECURITY: Free executable memory to prevent memory leak
+        // Each context allocates 0x4000 (16KB) of executable memory via mmap/VirtualAlloc
+        if (ctx[i] && ctx[i]->generated_code) {
+            VirtualMemory::freeLargePagesMemory(reinterpret_cast<void*>(ctx[i]->generated_code), 0x4000);
+        }
         _mm_free(ctx[i]);
     }
 }

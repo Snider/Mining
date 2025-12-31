@@ -21,6 +21,7 @@
 #include "base/net/tools/LineReader.h"
 #include "base/kernel/constants.h"
 #include "base/kernel/interfaces/ILineListener.h"
+#include "base/io/log/Log.h"
 #include "base/net/tools/NetBuffer.h"
 
 #include <cassert>
@@ -57,7 +58,11 @@ void xmrig::LineReader::reset()
 void xmrig::LineReader::add(const char *data, size_t size)
 {
     if (size + m_pos > XMRIG_NET_BUFFER_CHUNK_SIZE) {
-        // it breaks correctness silently for long lines
+        // SECURITY: Log buffer overflow attempt instead of silent drop
+        // This could indicate a protocol error or potential attack
+        LOG_ERR("LineReader buffer overflow: line too long (%zu + %zu > %zu), dropping data",
+                m_pos, size, static_cast<size_t>(XMRIG_NET_BUFFER_CHUNK_SIZE));
+        reset();
         return;
     }
 

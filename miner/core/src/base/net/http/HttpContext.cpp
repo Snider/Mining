@@ -21,6 +21,7 @@
 #include "base/net/http/HttpContext.h"
 #include "3rdparty/llhttp/llhttp.h"
 #include "base/kernel/interfaces/IHttpListener.h"
+#include "base/net/tools/TcpServer.h"
 #include "base/tools/Baton.h"
 #include "base/tools/Chrono.h"
 
@@ -96,6 +97,11 @@ xmrig::HttpContext::HttpContext(int parser_type, const std::weak_ptr<IHttpListen
 
 xmrig::HttpContext::~HttpContext()
 {
+    // SECURITY: Release the per-IP connection slot
+    if (!m_peerIP.empty()) {
+        TcpServer::releaseConnection(m_peerIP);
+    }
+
     delete m_tcp;
     delete m_parser;
 }
@@ -193,6 +199,9 @@ void xmrig::HttpContext::closeAll()
 
 int xmrig::HttpContext::onHeaderField(llhttp_t *parser, const char *at, size_t length)
 {
+    // SECURITY: Limit header field name size to prevent memory exhaustion DoS
+    constexpr size_t MAX_HEADER_FIELD_LENGTH = 8192; // 8KB limit
+
     auto ctx = static_cast<HttpContext*>(parser->data);
 
     if (ctx->m_wasHeaderValue) {
@@ -200,9 +209,15 @@ int xmrig::HttpContext::onHeaderField(llhttp_t *parser, const char *at, size_t l
             ctx->setHeader();
         }
 
+        if (length > MAX_HEADER_FIELD_LENGTH) {
+            return -1; // Abort parsing - header field too long
+        }
         ctx->m_lastHeaderField = std::string(at, length);
         ctx->m_wasHeaderValue  = false;
     } else {
+        if (ctx->m_lastHeaderField.size() + length > MAX_HEADER_FIELD_LENGTH) {
+            return -1; // Abort parsing - header field too long
+        }
         ctx->m_lastHeaderField += std::string(at, length);
     }
 
@@ -212,12 +227,21 @@ int xmrig::HttpContext::onHeaderField(llhttp_t *parser, const char *at, size_t l
 
 int xmrig::HttpContext::onHeaderValue(llhttp_t *parser, const char *at, size_t length)
 {
+    // SECURITY: Limit header value size to prevent memory exhaustion DoS
+    constexpr size_t MAX_HEADER_VALUE_LENGTH = 16384; // 16KB limit
+
     auto ctx = static_cast<HttpContext*>(parser->data);
 
     if (!ctx->m_wasHeaderValue) {
+        if (length > MAX_HEADER_VALUE_LENGTH) {
+            return -1; // Abort parsing - header value too long
+        }
         ctx->m_lastHeaderValue = std::string(at, length);
         ctx->m_wasHeaderValue  = true;
     } else {
+        if (ctx->m_lastHeaderValue.size() + length > MAX_HEADER_VALUE_LENGTH) {
+            return -1; // Abort parsing - header value too long
+        }
         ctx->m_lastHeaderValue += std::string(at, length);
     }
 
@@ -234,6 +258,11 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
     settings->on_url = [](llhttp_t *parser, const char *at, size_t length) -> int
     {
+        // SECURITY: Limit URL length to prevent memory exhaustion
+        constexpr size_t MAX_URL_LENGTH = 8192; // 8KB limit
+        if (length > MAX_URL_LENGTH) {
+            return -1; // Abort parsing - URL too long
+        }
         static_cast<HttpContext*>(parser->data)->url = std::string(at, length);
         return 0;
     };
@@ -258,7 +287,15 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
     settings->on_body = [](llhttp_t *parser, const char *at, size_t len) -> int
     {
-        static_cast<HttpContext*>(parser->data)->body.append(at, len);
+        // SECURITY: Limit request body size to prevent memory exhaustion DoS
+        constexpr size_t MAX_BODY_SIZE = 1024 * 1024; // 1MB limit
+        auto ctx = static_cast<HttpContext*>(parser->data);
+
+        if (ctx->body.size() + len > MAX_BODY_SIZE) {
+            return -1; // Abort parsing - body too large
+        }
+
+        ctx->body.append(at, len);
 
         return 0;
     };
@@ -281,6 +318,17 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 void xmrig::HttpContext::setHeader()
 {
     std::transform(m_lastHeaderField.begin(), m_lastHeaderField.end(), m_lastHeaderField.begin(), ::tolower);
+
+    // SECURITY: Validate header field and value for CRLF injection
+    // Remove any CR/LF characters that could enable header injection attacks
+    auto sanitize = [](std::string &str) {
+        str.erase(std::remove_if(str.begin(), str.end(), [](char c) {
+            return c == '\r' || c == '\n';
+        }), str.end());
+    };
+    sanitize(m_lastHeaderField);
+    sanitize(m_lastHeaderValue);
+
     headers.insert({ m_lastHeaderField, m_lastHeaderValue });
 
     m_lastHeaderField.clear();

@@ -43,7 +43,13 @@ xmrig::Console::Console(IConsoleListener *listener)
 
 xmrig::Console::~Console()
 {
-    uv_tty_reset_mode();
+    // SECURITY: Check return value - failure could leave terminal in raw mode
+    const int rc = uv_tty_reset_mode();
+    if (rc < 0) {
+        // Note: Can't use LOG here as it may already be destroyed
+        // Best effort: write to stderr directly
+        fprintf(stderr, "Warning: uv_tty_reset_mode() failed: %s\n", uv_strerror(rc));
+    }
 
     Handle::close(m_tty);
 }
@@ -67,7 +73,13 @@ void xmrig::Console::onAllocBuffer(uv_handle_t *handle, size_t, uv_buf_t *buf)
 void xmrig::Console::onRead(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
     if (nread < 0) {
-        return uv_close(reinterpret_cast<uv_handle_t*>(stream), nullptr);
+        // SECURITY: Check if already closing to prevent double-close
+        // Handle::close() checks uv_is_closing() but explicit check is clearer
+        uv_handle_t *handle = reinterpret_cast<uv_handle_t*>(stream);
+        if (!uv_is_closing(handle)) {
+            uv_close(handle, nullptr);
+        }
+        return;
     }
 
     if (nread == 1) {

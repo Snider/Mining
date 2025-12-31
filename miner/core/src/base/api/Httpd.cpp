@@ -26,6 +26,10 @@
 #include "core/config/Config.h"
 #include "core/Controller.h"
 
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 
 #ifdef XMRIG_FEATURE_TLS
 #   include "base/net/https/HttpsServer.h"
@@ -37,6 +41,12 @@
 namespace xmrig {
 
 static const char *kAuthorization = "authorization";
+
+// SECURITY: Simple rate limiting to slow down brute-force authentication attempts
+static std::atomic<uint32_t> s_failedAuthAttempts{0};
+static std::atomic<int64_t> s_lastFailedAttempt{0};
+static constexpr uint32_t kMaxFailedAttempts = 5;
+static constexpr int64_t kRateLimitWindowMs = 60000; // 1 minute window
 
 #ifdef _WIN32
 static const char *favicon = nullptr;
@@ -175,9 +185,38 @@ void xmrig::Httpd::onHttpData(const HttpData &data)
 }
 
 
+// SECURITY: Constant-time comparison to prevent timing attacks on authentication
+static bool constantTimeCompare(const char *a, const char *b, size_t len)
+{
+    volatile unsigned char result = 0;
+    for (size_t i = 0; i < len; i++) {
+        result |= static_cast<unsigned char>(a[i]) ^ static_cast<unsigned char>(b[i]);
+    }
+    return result == 0;
+}
+
+
 int xmrig::Httpd::auth(const HttpData &req) const
 {
     const Http &config = m_base->config()->http();
+
+    // SECURITY: Rate limiting - check if we're being brute-forced
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    const auto lastFailed = s_lastFailedAttempt.load();
+
+    // Reset counter if window has passed
+    if (now - lastFailed > kRateLimitWindowMs) {
+        s_failedAuthAttempts.store(0);
+    }
+
+    // Add progressive delay if too many failed attempts
+    const auto failedAttempts = s_failedAuthAttempts.load();
+    if (failedAttempts >= kMaxFailedAttempts) {
+        // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms (capped at 2s)
+        const auto delayMs = std::min(100u << (failedAttempts - kMaxFailedAttempts), 2000u);
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+    }
 
     if (!req.headers.count(kAuthorization)) {
         return config.isAuthRequired() ? 401 /* UNAUTHORIZED */ : 200;
@@ -190,9 +229,30 @@ int xmrig::Httpd::auth(const HttpData &req) const
     const std::string &token = req.headers.at(kAuthorization);
     const size_t size        = token.size();
 
-    if (token.size() < 8 || config.token().size() != size - 7 || memcmp("Bearer ", token.c_str(), 7) != 0) {
+    // SECURITY: Validate token format first (non-timing-sensitive checks)
+    if (token.size() < 8 || config.token().size() != size - 7) {
+        s_failedAuthAttempts.fetch_add(1);
+        s_lastFailedAttempt.store(now);
         return 403 /* FORBIDDEN */;
     }
 
-    return strncmp(config.token().data(), token.c_str() + 7, config.token().size()) == 0 ? 200 : 403 /* FORBIDDEN */;
+    // SECURITY: Use constant-time comparison for everything including "Bearer " prefix
+    // to prevent timing attacks that could leak information about the token format
+    static const char kBearerPrefix[] = "Bearer ";
+    volatile unsigned char prefixResult = 0;
+    for (size_t i = 0; i < 7; ++i) {
+        prefixResult |= static_cast<unsigned char>(token[i]) ^ static_cast<unsigned char>(kBearerPrefix[i]);
+    }
+
+    const bool tokenValid = constantTimeCompare(config.token().data(), token.c_str() + 7, config.token().size());
+    const bool valid = (prefixResult == 0) && tokenValid;
+    if (!valid) {
+        s_failedAuthAttempts.fetch_add(1);
+        s_lastFailedAttempt.store(now);
+        return 403 /* FORBIDDEN */;
+    }
+
+    // Reset counter on successful auth
+    s_failedAuthAttempts.store(0);
+    return 200;
 }

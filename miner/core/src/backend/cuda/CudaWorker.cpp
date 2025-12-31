@@ -171,6 +171,11 @@ bool xmrig::CudaWorker::consumeJob()
         return false;
     }
 
+    // SECURITY: Check for null runner to prevent crash
+    if (!m_runner) {
+        return false;
+    }
+
     m_job.add(m_miner->job(), intensity(), Nonce::CUDA);
 
     return m_runner->set(m_job.currentJob(), m_job.blob());

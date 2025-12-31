@@ -130,9 +130,17 @@ static void patchCode(T dst, U src, const uint32_t iterations, const uint32_t ma
     }
 #   endif
 
+    // SECURITY: Limit search to prevent reading beyond valid memory
+    // 0x1000 (4KB) is a reasonable upper bound for a single assembly function
+    constexpr size_t maxSearchSize = 0x1000;
     size_t size = 0;
-    while (*(uint32_t*)(p + size) != 0xDEADC0DE) {
+    while (size < maxSearchSize && *(uint32_t*)(p + size) != 0xDEADC0DE) {
         ++size;
+    }
+
+    // Check if sentinel was found
+    if (size >= maxSearchSize) {
+        return; // Sentinel not found within bounds - skip patching
     }
 
     size += sizeof(uint32_t);
@@ -158,6 +166,12 @@ static void patchAsmVariants()
 {
     constexpr size_t allocation_size = 0x20000;
     auto base = static_cast<uint8_t *>(VirtualMemory::allocateExecutableMemory(allocation_size, false));
+
+    // SECURITY: Check for allocation failure to prevent null pointer dereference
+    // If allocation fails, ASM variants will remain null and fallback implementations will be used
+    if (!base) {
+        return;
+    }
 
     cn_half_mainloop_ivybridge_asm              = reinterpret_cast<cn_mainloop_fun>         (base + 0x0000);
     cn_half_mainloop_ryzen_asm                  = reinterpret_cast<cn_mainloop_fun>         (base + 0x1000);

@@ -585,5 +585,16 @@ template class CpuWorker<4>;
 template class CpuWorker<5>;
 template class CpuWorker<8>;
 
+
+// SECURITY: Cleanup function for shared memory resources to prevent memory leaks
+void CpuWorker_cleanup()
+{
+#   ifdef XMRIG_ALGO_CN_HEAVY
+    std::lock_guard<std::mutex> lock(cn_heavyZen3MemoryMutex);
+    delete cn_heavyZen3Memory;
+    cn_heavyZen3Memory = nullptr;
+#   endif
+}
+
 } // namespace xmrig
 

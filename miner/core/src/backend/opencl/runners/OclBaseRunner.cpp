@@ -122,7 +122,11 @@ cl_mem xmrig::OclBaseRunner::createSubBuffer(cl_mem_flags flags, size_t size)
 {
     auto mem = OclLib::createSubBuffer(m_buffer, flags, m_offset, size);
 
-    m_offset += align(size);
+    // SECURITY: Only increment offset if sub-buffer creation succeeded
+    // to prevent buffer layout corruption on failure
+    if (mem) {
+        m_offset += align(size);
+    }
 
     return mem;
 }

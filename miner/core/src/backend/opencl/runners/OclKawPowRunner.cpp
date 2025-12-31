@@ -202,8 +202,16 @@ void xmrig::OclKawPowRunner::init()
 {
     OclBaseRunner::init();
 
+    // SECURITY: Exception-safe initialization - cleanup on partial failure
     m_controlQueue = OclLib::createCommandQueue(m_ctx, data().device.id());
-    m_stop = OclLib::createBuffer(m_ctx, CL_MEM_READ_ONLY, sizeof(uint32_t) * 2);
+    try {
+        m_stop = OclLib::createBuffer(m_ctx, CL_MEM_READ_ONLY, sizeof(uint32_t) * 2);
+    } catch (...) {
+        // Clean up controlQueue if buffer creation fails
+        OclLib::release(m_controlQueue);
+        m_controlQueue = nullptr;
+        throw;
+    }
 }
 
 } // namespace xmrig

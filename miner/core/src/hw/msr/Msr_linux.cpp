@@ -32,6 +32,7 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 
@@ -64,9 +65,34 @@ private:
         return file.good();
     }
 
+    // SECURITY: Use fork+execve instead of system() to prevent command injection
     inline bool msr_modprobe()
     {
-        return system("/sbin/modprobe msr allow_writes=on > /dev/null 2>&1") == 0;
+        pid_t pid = fork();
+        if (pid < 0) {
+            return false; // fork failed
+        }
+
+        if (pid == 0) {
+            // Child process - redirect stdout/stderr to /dev/null
+            int devnull = open("/dev/null", O_WRONLY);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                close(devnull);
+            }
+
+            // Use absolute path and execve to avoid PATH manipulation
+            const char *argv[] = {"/sbin/modprobe", "msr", "allow_writes=on", nullptr};
+            const char *envp[] = {nullptr}; // Empty environment for security
+            execve("/sbin/modprobe", const_cast<char *const *>(argv), const_cast<char *const *>(envp));
+            _exit(1); // execve failed
+        }
+
+        // Parent process - wait for child
+        int status;
+        waitpid(pid, &status, 0);
+        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
     }
 
     const bool m_available;

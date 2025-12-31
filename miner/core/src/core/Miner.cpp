@@ -17,6 +17,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <mutex>
 #include <thread>
 
@@ -70,6 +71,8 @@
 namespace xmrig {
 
 
+// NOTE: Global mutex shared across all Miner instances intentionally for job synchronization.
+// This design assumes single Controller/Miner per process which is the intended usage pattern.
 static std::mutex mutex;
 
 
@@ -120,7 +123,8 @@ public:
             Nonce::pause(true);
         }
 
-        if (reset) {
+        // SECURITY: Use atomic load for thread-safe read
+        if (reset.load(std::memory_order_acquire)) {
             Nonce::reset(job.index());
         }
 
@@ -207,8 +211,15 @@ public:
         total.PushBack(Hashrate::normalize(t[1]), allocator);
         total.PushBack(Hashrate::normalize(t[2]),  allocator);
 
+        // SECURITY: Copy maxHashrate under mutex to prevent race with onTimer()
+        double maxHashrateSnapshot;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            maxHashrateSnapshot = maxHashrate[algorithm];
+        }
+
         hashrate.AddMember("total",   total, allocator);
-        hashrate.AddMember("highest", Hashrate::normalize({ maxHashrate[algorithm] > 0.0, maxHashrate[algorithm] }), allocator);
+        hashrate.AddMember("highest", Hashrate::normalize({ maxHashrateSnapshot > 0.0, maxHashrateSnapshot }), allocator);
 
         if (version == 1) {
             hashrate.AddMember("threads", threads, allocator);
@@ -317,10 +328,19 @@ public:
 
         printProfile();
 
+        // SECURITY: Copy algorithm and maxHashrate under mutex to prevent race
+        Algorithm algoSnapshot;
+        double maxHashrateSnapshot;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            algoSnapshot = algorithm;
+            maxHashrateSnapshot = maxHashrate[algorithm];
+        }
+
         double scale  = 1.0;
         const char* h = "H/s";
 
-        if ((speed[0].second >= 1e6) || (speed[1].second >= 1e6) || (speed[2].second >= 1e6) || (maxHashrate[algorithm] >= 1e6)) {
+        if ((speed[0].second >= 1e6) || (speed[1].second >= 1e6) || (speed[2].second >= 1e6) || (maxHashrateSnapshot >= 1e6)) {
             scale = 1e-6;
 
             speed[0].second *= scale;
@@ -334,7 +354,7 @@ public:
         avg_hashrate_buf[0] = '\0';
 
 #       ifdef XMRIG_ALGO_GHOSTRIDER
-        if (algorithm.family() == Algorithm::GHOSTRIDER) {
+        if (algoSnapshot.family() == Algorithm::GHOSTRIDER) {
             snprintf(avg_hashrate_buf, sizeof(avg_hashrate_buf), " avg " CYAN_BOLD("%s %s"), Hashrate::format({ true, avg_hashrate * scale }, num + 16 * 4, 16), h);
         }
 #       endif
@@ -344,7 +364,7 @@ public:
                  Hashrate::format(speed[0],                 num,          16),
                  Hashrate::format(speed[1],                 num + 16,     16),
                  Hashrate::format(speed[2],                 num + 16 * 2, 16), h,
-                 Hashrate::format({ maxHashrate[algorithm] > 0.0, maxHashrate[algorithm] * scale },   num + 16 * 3, 16), h,
+                 Hashrate::format({ maxHashrateSnapshot > 0.0, maxHashrateSnapshot * scale },   num + 16 * 3, 16), h,
                  avg_hashrate_buf
                  );
 
@@ -366,16 +386,20 @@ public:
 #   endif
 
 
+    // SECURITY: Use atomic for thread-safe access from multiple threads
+    // (timer thread, main thread, API thread)
     Algorithm algorithm;
     Algorithms algorithms;
-    bool active         = false;
-    bool battery_power  = false;
-    bool user_active    = false;
-    bool enabled        = true;
-    int32_t auto_pause = 0;
-    bool reset          = true;
+    std::atomic<bool> active{false};
+    std::atomic<bool> battery_power{false};
+    std::atomic<bool> user_active{false};
+    std::atomic<bool> enabled{true};
+    std::atomic<int32_t> auto_pause{0};
+    // SECURITY: Use atomic for reset flag to prevent race between setJob() and handleJobChange()
+    std::atomic<bool> reset{true};
     Controller *controller;
     Job job;
+    // SECURITY: maxHashrate map requires mutex protection (uses main mutex)
     mutable std::map<Algorithm::Id, double> maxHashrate;
     std::vector<IBackend *> backends;
     String userJobId;
@@ -557,7 +581,13 @@ void xmrig::Miner::setJob(const Job &job, bool donate)
 
 #   ifdef XMRIG_ALGO_RANDOMX
     if (job.algorithm().family() == Algorithm::RANDOM_X && !Rx::isReady(job)) {
-        if (d_ptr->algorithm != job.algorithm()) {
+        // SECURITY: Read algorithm under mutex to prevent race with onTimer()
+        Algorithm currentAlgo;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            currentAlgo = d_ptr->algorithm;
+        }
+        if (currentAlgo != job.algorithm()) {
             stop();
         }
         else {
@@ -567,44 +597,48 @@ void xmrig::Miner::setJob(const Job &job, bool donate)
     }
 #   endif
 
-    d_ptr->algorithm = job.algorithm();
+    // SECURITY: Use RAII lock_guard for exception safety - prevents deadlock if code throws
+    bool ready;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
 
-    mutex.lock();
+        // SECURITY: Set algorithm under mutex to prevent race with onTimer() reads
+        d_ptr->algorithm = job.algorithm();
 
-    const uint8_t index = donate ? 1 : 0;
+        const uint8_t index = donate ? 1 : 0;
 
-    d_ptr->reset = !(d_ptr->job.index() == 1 && index == 0 && d_ptr->userJobId == job.id());
+        // SECURITY: Use atomic store for thread-safe write (release pairs with acquire in handleJobChange)
+        d_ptr->reset.store(!(d_ptr->job.index() == 1 && index == 0 && d_ptr->userJobId == job.id()), std::memory_order_release);
 
-    // Don't reset nonce if pool sends the same hashing blob again, but with different difficulty (for example)
-    if (d_ptr->job.isEqualBlob(job)) {
-        d_ptr->reset = false;
-    }
+        // Don't reset nonce if pool sends the same hashing blob again, but with different difficulty (for example)
+        if (d_ptr->job.isEqualBlob(job)) {
+            d_ptr->reset.store(false, std::memory_order_release);
+        }
 
-    d_ptr->job   = job;
-    d_ptr->job.setIndex(index);
+        d_ptr->job   = job;
+        d_ptr->job.setIndex(index);
 
-    if (index == 0) {
-        d_ptr->userJobId = job.id();
-    }
+        if (index == 0) {
+            d_ptr->userJobId = job.id();
+        }
 
 #   ifdef XMRIG_ALGO_RANDOMX
-    const bool ready = d_ptr->initRX();
+        ready = d_ptr->initRX();
 
-    // Always reset nonce on RandomX dataset change
-    if (!ready) {
-        d_ptr->reset = true;
-    }
+        // Always reset nonce on RandomX dataset change
+        if (!ready) {
+            d_ptr->reset.store(true, std::memory_order_release);
+        }
 #   else
-    constexpr const bool ready = true;
+        ready = true;
 #   endif
 
 #   ifdef XMRIG_ALGO_GHOSTRIDER
-    if (job.algorithm().family() == Algorithm::GHOSTRIDER) {
-        d_ptr->initGhostRider();
-    }
+        if (job.algorithm().family() == Algorithm::GHOSTRIDER) {
+            d_ptr->initGhostRider();
+        }
 #   endif
-
-    mutex.unlock();
+    } // mutex automatically released here
 
     d_ptr->active = true;
     d_ptr->m_taskbar.setActive(true);
@@ -666,7 +700,12 @@ void xmrig::Miner::onTimer(const Timer *)
         }
     }
 
-    d_ptr->maxHashrate[d_ptr->algorithm] = std::max(d_ptr->maxHashrate[d_ptr->algorithm], maxHashrate);
+    // SECURITY: Use mutex to protect algorithm and maxHashrate map access
+    // to prevent race with setJob() which modifies algorithm under the same mutex
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        d_ptr->maxHashrate[d_ptr->algorithm] = std::max(d_ptr->maxHashrate[d_ptr->algorithm], maxHashrate);
+    }
 
     const auto printTime = config->printTime();
     if (printTime && d_ptr->ticks && (d_ptr->ticks % (printTime * 2)) == 0) {
@@ -675,14 +714,19 @@ void xmrig::Miner::onTimer(const Timer *)
 
     d_ptr->ticks++;
 
-    auto autoPause = [this](bool &state, bool pause, const char *pauseMessage, const char *activeMessage)
+    // SECURITY: Use compare_exchange to atomically check-and-update state
+    // This prevents race conditions when multiple threads call autoPause
+    auto autoPause = [this](std::atomic<bool> &state, bool pause, const char *pauseMessage, const char *activeMessage)
     {
-        if ((pause && !state) || (!pause && state)) {
+        bool expected = !pause;  // We expect the opposite of what we want to set
+        if (state.compare_exchange_strong(expected, pause)) {
+            // State was successfully changed from !pause to pause
             LOG_INFO("%s %s", Tags::miner(), pause ? pauseMessage : activeMessage);
 
-            state = pause;
-            d_ptr->auto_pause += pause ? 1 : -1;
-            setEnabled(d_ptr->auto_pause == 0);
+            // Use fetch_add for atomic increment/decrement
+            int32_t oldValue = d_ptr->auto_pause.fetch_add(pause ? 1 : -1);
+            int32_t newValue = oldValue + (pause ? 1 : -1);
+            setEnabled(newValue == 0);
         }
     };
 

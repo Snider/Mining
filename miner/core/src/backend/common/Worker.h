@@ -22,6 +22,8 @@
 
 #include "backend/common/interfaces/IWorker.h"
 
+#include <atomic>
+
 
 namespace xmrig {
 
@@ -38,7 +40,9 @@ protected:
     inline size_t id() const override                       { return m_id; }
     inline uint32_t node() const                            { return m_node; }
 
-    uint64_t m_count                = 0;
+    // SECURITY: Use atomic to prevent data races when hashrate thread reads
+    // while worker thread increments. Uses relaxed ordering for performance.
+    std::atomic<uint64_t> m_count{0};
 
 private:
     const int64_t m_affinity;

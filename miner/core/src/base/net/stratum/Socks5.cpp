@@ -91,6 +91,19 @@ void xmrig::Client::Socks5::connect()
         memcpy(buf.data() + 4, &reinterpret_cast<sockaddr_in6 *>(&addr)->sin6_addr, 16);
     }
     else {
+        // SECURITY: Validate hostname length to prevent truncation
+        // SOCKS5 domain name field is limited to 255 bytes
+        if (host.size() > 255) {
+            m_client->close();
+            return;
+        }
+
+        // Check for potential integer overflow in buffer size calculation
+        if (host.size() > SIZE_MAX - 7) {
+            m_client->close();
+            return;
+        }
+
         buf.resize(host.size() + 7);
         buf[3] = 0x03;
         buf[4] = static_cast<uint8_t>(host.size());

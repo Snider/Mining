@@ -719,8 +719,87 @@ void xmrig::Client::parse(char *line, size_t len)
             return;
         }
 
+        // SECURITY: Validate redirect target to prevent SSRF attacks
+        const char *newHost = arr[0].GetString();
+        const char *newPort = arr[1].GetString();
+
+        // Validate port is numeric and in valid range
+        char *endptr = nullptr;
+        long port = strtol(newPort, &endptr, 10);
+        if (*endptr != '\0' || port <= 0 || port > 65535) {
+            LOG_ERR("%s " RED("client.reconnect blocked: invalid port '%s'"), tag(), newPort);
+            return;
+        }
+
+        // Block localhost/internal network redirects (SSRF protection)
+        // Check IPv4 private networks (RFC1918) and special addresses
+        bool blocked = false;
+        if (strncmp(newHost, "127.", 4) == 0 ||
+            strcmp(newHost, "localhost") == 0 ||
+            strncmp(newHost, "10.", 3) == 0 ||
+            strncmp(newHost, "192.168.", 8) == 0 ||
+            strcmp(newHost, "0.0.0.0") == 0 ||
+            strncmp(newHost, "169.254.", 8) == 0) {
+            blocked = true;
+        }
+
+        // Check 172.16.0.0/12 range (172.16.x.x - 172.31.x.x) properly
+        if (!blocked && strncmp(newHost, "172.", 4) == 0) {
+            char *endptr = nullptr;
+            long secondOctet = strtol(newHost + 4, &endptr, 10);
+            if (*endptr == '.' && secondOctet >= 16 && secondOctet <= 31) {
+                blocked = true;
+            }
+        }
+
+        // Check IPv6 localhost and internal addresses
+        if (!blocked && strchr(newHost, ':') != nullptr) {
+            // IPv6 localhost
+            if (strcmp(newHost, "::1") == 0 ||
+                strcmp(newHost, "[::1]") == 0) {
+                blocked = true;
+            }
+            // IPv4-mapped IPv6 addresses (::ffff:x.x.x.x)
+            else if (strncasecmp(newHost, "::ffff:", 7) == 0 ||
+                     strncasecmp(newHost, "[::ffff:", 8) == 0) {
+                const char *ipv4 = newHost + (newHost[0] == '[' ? 8 : 7);
+                if (strncmp(ipv4, "127.", 4) == 0 ||
+                    strncmp(ipv4, "10.", 3) == 0 ||
+                    strncmp(ipv4, "192.168.", 8) == 0 ||
+                    strncmp(ipv4, "169.254.", 8) == 0 ||
+                    strncmp(ipv4, "0.", 2) == 0) {
+                    blocked = true;
+                }
+                // Check 172.16-31.x.x in IPv4-mapped
+                if (!blocked && strncmp(ipv4, "172.", 4) == 0) {
+                    char *ep = nullptr;
+                    long oct2 = strtol(ipv4 + 4, &ep, 10);
+                    if (*ep == '.' && oct2 >= 16 && oct2 <= 31) {
+                        blocked = true;
+                    }
+                }
+            }
+            // Link-local (fe80::/10)
+            else if (strncasecmp(newHost, "fe80:", 5) == 0 ||
+                     strncasecmp(newHost, "[fe80:", 6) == 0) {
+                blocked = true;
+            }
+            // Unique Local Addresses (fc00::/7 = fc00:: to fdff::)
+            else if (strncasecmp(newHost, "fc", 2) == 0 ||
+                     strncasecmp(newHost, "fd", 2) == 0 ||
+                     strncasecmp(newHost, "[fc", 3) == 0 ||
+                     strncasecmp(newHost, "[fd", 3) == 0) {
+                blocked = true;
+            }
+        }
+
+        if (blocked) {
+            LOG_ERR("%s " RED("client.reconnect blocked: internal/localhost address '%s'"), tag(), newHost);
+            return;
+        }
+
         std::stringstream s;
-        s << arr[0].GetString() << ":" << arr[1].GetString();
+        s << newHost << ":" << newPort;
         LOG_WARN("%s " YELLOW("client.reconnect to %s"), tag(), s.str().c_str());
         setPoolUrl(s.str().c_str());
         return reconnect();
@@ -812,6 +891,13 @@ void xmrig::Client::parseResponse(int64_t id, const rapidjson::Value &result, co
     }
 
     if (error.IsObject()) {
+        // SECURITY: Validate field exists before accessing to prevent crash from malicious pools
+        if (!error.HasMember("message") || !error["message"].IsString()) {
+            LOG_ERR("%s " RED("invalid error response: missing or invalid 'message' field"), tag());
+            close();
+            return;
+        }
+
         const char *message = error["message"].GetString();
 
         if (!handleSubmitResponse(id, message) && !isQuiet()) {

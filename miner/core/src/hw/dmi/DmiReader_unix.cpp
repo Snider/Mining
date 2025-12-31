@@ -300,6 +300,10 @@ static off_t address_from_efi()
     address = EFI_NO_SMBIOS;
     while ((fgets(linebuf, sizeof(linebuf) - 1, efi_systab)) != nullptr) {
         char *addrp = strchr(linebuf, '=');
+        // SECURITY: Check for null before dereferencing to prevent crash on malformed input
+        if (addrp == nullptr) {
+            continue; // Skip malformed lines without '='
+        }
         *(addrp++) = '\0';
         if (strcmp(linebuf, "SMBIOS3") == 0 || strcmp(linebuf, "SMBIOS") == 0) {
             address = strtoull(addrp, nullptr, 0);

@@ -32,7 +32,27 @@ typedef void(*void_func)();
 #include "crypto/common/Assembly.h"
 #include "crypto/common/VirtualMemory.h"
 
+// SECURITY: Maximum size for JIT-generated code buffer (matches allocation in CnCtx.cpp)
+// This prevents buffer overflow if generated code exceeds expected size
+static constexpr size_t JIT_CODE_BUFFER_SIZE = 0x4000;  // 16KB
 
+// SECURITY: Track buffer bounds during JIT code generation
+// Returns false if adding the code would overflow the buffer
+static inline bool add_code_safe(uint8_t* &p, const uint8_t* p_end, void (*p1)(), void (*p2)())
+{
+    const ptrdiff_t size = reinterpret_cast<const uint8_t*>(p2) - reinterpret_cast<const uint8_t*>(p1);
+    if (size > 0) {
+        // SECURITY: Check bounds before writing
+        if (p + size > p_end) {
+            return false;  // Would overflow
+        }
+        memcpy(p, reinterpret_cast<void*>(p1), size);
+        p += size;
+    }
+    return true;
+}
+
+// Legacy version without bounds checking (for backwards compatibility)
 static inline void add_code(uint8_t* &p, void (*p1)(), void (*p2)())
 {
     const ptrdiff_t size = reinterpret_cast<const uint8_t*>(p2) - reinterpret_cast<const uint8_t*>(p1);
@@ -101,44 +121,70 @@ static inline void add_random_math(uint8_t* &p, const V4_Instruction* code, int 
 
 void v4_compile_code(const V4_Instruction* code, int code_size, void* machine_code, xmrig::Assembly ASM)
 {
+    // SECURITY: Check for null pointers to prevent crash
+    if (!code || !machine_code || code_size <= 0) {
+        return;
+    }
+
     uint8_t* p0 = reinterpret_cast<uint8_t*>(machine_code);
     uint8_t* p = p0;
+    // SECURITY: Define buffer end for bounds checking
+    const uint8_t* p_end = p0 + JIT_CODE_BUFFER_SIZE;
 
-    add_code(p, CryptonightR_template_part1, CryptonightR_template_part2);
+    if (!add_code_safe(p, p_end, CryptonightR_template_part1, CryptonightR_template_part2)) return;
     add_random_math(p, code, code_size, instructions, instructions_mov, false, ASM);
-    add_code(p, CryptonightR_template_part2, CryptonightR_template_part3);
+    // SECURITY: Check we haven't exceeded buffer after random_math
+    if (p > p_end) return;
+    if (!add_code_safe(p, p_end, CryptonightR_template_part2, CryptonightR_template_part3)) return;
     *(int*)(p - 4) = static_cast<int>((((const uint8_t*)CryptonightR_template_mainloop) - ((const uint8_t*)CryptonightR_template_part1)) - (p - p0));
-    add_code(p, CryptonightR_template_part3, CryptonightR_template_end);
+    if (!add_code_safe(p, p_end, CryptonightR_template_part3, CryptonightR_template_end)) return;
 
     xmrig::VirtualMemory::flushInstructionCache(machine_code, p - p0);
 }
 
 void v4_compile_code_double(const V4_Instruction* code, int code_size, void* machine_code, xmrig::Assembly ASM)
 {
+    // SECURITY: Check for null pointers to prevent crash
+    if (!code || !machine_code || code_size <= 0) {
+        return;
+    }
+
     uint8_t* p0 = reinterpret_cast<uint8_t*>(machine_code);
     uint8_t* p = p0;
+    // SECURITY: Define buffer end for bounds checking
+    const uint8_t* p_end = p0 + JIT_CODE_BUFFER_SIZE;
 
-    add_code(p, CryptonightR_template_double_part1, CryptonightR_template_double_part2);
+    if (!add_code_safe(p, p_end, CryptonightR_template_double_part1, CryptonightR_template_double_part2)) return;
     add_random_math(p, code, code_size, instructions, instructions_mov, false, ASM);
-    add_code(p, CryptonightR_template_double_part2, CryptonightR_template_double_part3);
+    if (p > p_end) return;
+    if (!add_code_safe(p, p_end, CryptonightR_template_double_part2, CryptonightR_template_double_part3)) return;
     add_random_math(p, code, code_size, instructions, instructions_mov, false, ASM);
-    add_code(p, CryptonightR_template_double_part3, CryptonightR_template_double_part4);
+    if (p > p_end) return;
+    if (!add_code_safe(p, p_end, CryptonightR_template_double_part3, CryptonightR_template_double_part4)) return;
     *(int*)(p - 4) = static_cast<int>((((const uint8_t*)CryptonightR_template_double_mainloop) - ((const uint8_t*)CryptonightR_template_double_part1)) - (p - p0));
-    add_code(p, CryptonightR_template_double_part4, CryptonightR_template_double_end);
+    if (!add_code_safe(p, p_end, CryptonightR_template_double_part4, CryptonightR_template_double_end)) return;
 
     xmrig::VirtualMemory::flushInstructionCache(machine_code, p - p0);
 }
 
 void v4_soft_aes_compile_code(const V4_Instruction* code, int code_size, void* machine_code, xmrig::Assembly ASM)
 {
+    // SECURITY: Check for null pointers to prevent crash
+    if (!code || !machine_code || code_size <= 0) {
+        return;
+    }
+
     uint8_t* p0 = reinterpret_cast<uint8_t*>(machine_code);
     uint8_t* p = p0;
+    // SECURITY: Define buffer end for bounds checking
+    const uint8_t* p_end = p0 + JIT_CODE_BUFFER_SIZE;
 
-    add_code(p, CryptonightR_soft_aes_template_part1, CryptonightR_soft_aes_template_part2);
+    if (!add_code_safe(p, p_end, CryptonightR_soft_aes_template_part1, CryptonightR_soft_aes_template_part2)) return;
     add_random_math(p, code, code_size, instructions, instructions_mov, false, ASM);
-    add_code(p, CryptonightR_soft_aes_template_part2, CryptonightR_soft_aes_template_part3);
+    if (p > p_end) return;
+    if (!add_code_safe(p, p_end, CryptonightR_soft_aes_template_part2, CryptonightR_soft_aes_template_part3)) return;
     *(int*)(p - 4) = static_cast<int>((((const uint8_t*)CryptonightR_soft_aes_template_mainloop) - ((const uint8_t*)CryptonightR_soft_aes_template_part1)) - (p - p0));
-    add_code(p, CryptonightR_soft_aes_template_part3, CryptonightR_soft_aes_template_end);
+    if (!add_code_safe(p, p_end, CryptonightR_soft_aes_template_part3, CryptonightR_soft_aes_template_end)) return;
 
     xmrig::VirtualMemory::flushInstructionCache(machine_code, p - p0);
 }

@@ -122,6 +122,10 @@ extern template class CpuWorker<5>;
 extern template class CpuWorker<8>;
 
 
+// SECURITY: Cleanup function for shared memory resources
+void CpuWorker_cleanup();
+
+
 } // namespace xmrig
 
 

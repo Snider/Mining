@@ -26,6 +26,7 @@
 #include "backend/common/Tags.h"
 #include "backend/common/Workers.h"
 #include "backend/cpu/Cpu.h"
+#include "backend/cpu/CpuWorker.h"
 #include "base/io/log/Log.h"
 #include "base/io/log/Tags.h"
 #include "base/net/stratum/Job.h"
@@ -83,6 +84,12 @@ public:
         m_threads      = threads.size();
         m_ways         = 0;
         m_ts           = Chrono::steadyMSecs();
+    }
+
+    // SECURITY: Clear worker memory set to prevent dangling pointers after workers are destroyed
+    inline void stop()
+    {
+        m_workersMemory.clear();
     }
 
     inline bool started(IWorker *worker, bool ready)
@@ -251,6 +258,9 @@ xmrig::CpuBackend::CpuBackend(Controller *controller) :
 xmrig::CpuBackend::~CpuBackend()
 {
     delete d_ptr;
+
+    // SECURITY: Cleanup shared memory resources to prevent memory leaks
+    CpuWorker_cleanup();
 }
 
 
@@ -404,6 +414,11 @@ void xmrig::CpuBackend::stop()
 
     d_ptr->workers.stop();
     d_ptr->threads.clear();
+
+    // SECURITY: Clear worker memory references to prevent dangling pointers
+    mutex.lock();
+    d_ptr->status.stop();
+    mutex.unlock();
 
     LOG_INFO("%s" YELLOW(" stopped") BLACK_BOLD(" (%" PRIu64 " ms)"), Tags::cpu(), Chrono::steadyMSecs() - ts);
 }

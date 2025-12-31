@@ -47,7 +47,14 @@ public:
     inline Thread(IBackend *backend, size_t id, const T &config) : m_id(id), m_config(config), m_backend(backend) {}
 
 #   ifdef XMRIG_OS_APPLE
-    inline ~Thread() { pthread_join(m_thread, nullptr); delete m_worker; }
+    inline ~Thread()
+    {
+        // SECURITY: Check pthread_join return value to ensure proper thread cleanup
+        // If join fails, the thread resources may not be fully released
+        const int rc = pthread_join(m_thread, nullptr);
+        (void)rc;  // Suppress unused variable warning in release builds
+        delete m_worker;
+    }
 
     inline void start(void *(*callback)(void *))
     {

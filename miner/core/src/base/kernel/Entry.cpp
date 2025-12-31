@@ -83,7 +83,13 @@ static int showVersion()
         printf("LibreSSL/%s\n", LIBRESSL_VERSION_TEXT + 9);
 #       elif defined(OPENSSL_VERSION_TEXT)
         constexpr const char *v = &OPENSSL_VERSION_TEXT[8];
-        printf("OpenSSL/%.*s\n", static_cast<int>(strchr(v, ' ') - v), v);
+        // SECURITY: Check for null to prevent undefined behavior if format changes
+        const char *space = strchr(v, ' ');
+        if (space) {
+            printf("OpenSSL/%.*s\n", static_cast<int>(space - v), v);
+        } else {
+            printf("OpenSSL/%s\n", v);
+        }
 #       endif
     }
 #   endif

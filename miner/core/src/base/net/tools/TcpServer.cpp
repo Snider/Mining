@@ -31,6 +31,10 @@
 
 static const xmrig::String kLocalHost("127.0.0.1");
 
+// SECURITY: Static storage for per-IP connection tracking
+std::map<std::string, uint32_t> xmrig::TcpServer::s_connectionCount;
+std::mutex xmrig::TcpServer::s_connectionMutex;
+
 
 xmrig::TcpServer::TcpServer(const String &host, uint16_t port, ITcpServerListener *listener) :
     m_host(host.isNull() ? kLocalHost : host),
@@ -83,6 +87,68 @@ int xmrig::TcpServer::bind()
     }
 
     return m_port;
+}
+
+
+// SECURITY: Get peer IP address from stream for connection tracking
+std::string xmrig::TcpServer::getPeerIP(uv_stream_t *stream)
+{
+    sockaddr_storage addr{};
+    int addrlen = sizeof(addr);
+
+    if (uv_tcp_getpeername(reinterpret_cast<uv_tcp_t*>(stream), reinterpret_cast<sockaddr*>(&addr), &addrlen) != 0) {
+        return "";
+    }
+
+    char ip[INET6_ADDRSTRLEN] = {0};
+    if (addr.ss_family == AF_INET) {
+        uv_ip4_name(reinterpret_cast<sockaddr_in*>(&addr), ip, sizeof(ip));
+    } else if (addr.ss_family == AF_INET6) {
+        uv_ip6_name(reinterpret_cast<sockaddr_in6*>(&addr), ip, sizeof(ip));
+    }
+
+    return ip;
+}
+
+
+// SECURITY: Check and increment connection count for an IP
+// Returns true if connection is allowed, false if limit exceeded
+bool xmrig::TcpServer::checkConnectionLimit(const std::string &ip)
+{
+    if (ip.empty()) {
+        return true;  // Allow if we can't determine IP
+    }
+
+    std::lock_guard<std::mutex> lock(s_connectionMutex);
+
+    auto &count = s_connectionCount[ip];
+    if (count >= kMaxConnectionsPerIP) {
+        return false;  // Limit exceeded
+    }
+
+    ++count;
+    return true;
+}
+
+
+// SECURITY: Release a connection slot for an IP (call when connection closes)
+void xmrig::TcpServer::releaseConnection(const std::string &ip)
+{
+    if (ip.empty()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(s_connectionMutex);
+
+    auto it = s_connectionCount.find(ip);
+    if (it != s_connectionCount.end()) {
+        if (it->second > 0) {
+            --it->second;
+        }
+        if (it->second == 0) {
+            s_connectionCount.erase(it);
+        }
+    }
 }
 
 

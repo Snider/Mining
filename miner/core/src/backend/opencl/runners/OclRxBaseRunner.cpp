@@ -170,11 +170,41 @@ void xmrig::OclRxBaseRunner::set(const Job &job, uint8_t *blob)
 
 size_t xmrig::OclRxBaseRunner::bufferSize() const
 {
+    // SECURITY: Check for integer overflow in buffer size calculations
+    const size_t l3Plus64 = m_algorithm.l3() + 64;
+    const size_t intensity = m_intensity;
+    const size_t maxSize = SIZE_MAX;
+
+    // Check for overflow in l3 + 64
+    if (l3Plus64 < m_algorithm.l3()) {
+        return 0;
+    }
+
+    // Check (l3 + 64) * intensity for overflow
+    if (intensity > 0 && l3Plus64 > maxSize / intensity) {
+        return 0;
+    }
+
+    // Check 64 * intensity for overflow
+    if (intensity > maxSize / 64) {
+        return 0;
+    }
+
+    // Check (128 + 2560) * intensity = 2688 * intensity for overflow
+    if (intensity > maxSize / 2688) {
+        return 0;
+    }
+
+    // Check sizeof(uint32_t) * intensity for overflow
+    if (intensity > maxSize / sizeof(uint32_t)) {
+        return 0;
+    }
+
     return OclBaseRunner::bufferSize() +
-           align((m_algorithm.l3() + 64) * m_intensity) +
-           align(64 * m_intensity) +
-           align((128 + 2560) * m_intensity) +
-           align(sizeof(uint32_t) * m_intensity);
+           align(l3Plus64 * intensity) +
+           align(64 * intensity) +
+           align(2688 * intensity) +
+           align(sizeof(uint32_t) * intensity);
 }
 
 

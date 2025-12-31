@@ -44,7 +44,14 @@ xmrig::Client::Tls::Tls(Client *client) :
 
     m_write = BIO_new(BIO_s_mem());
     m_read  = BIO_new(BIO_s_mem());
-    SSL_CTX_set_options(m_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    // SECURITY: Disable weak TLS versions (SSLv2, SSLv3, TLSv1.0, TLSv1.1)
+    SSL_CTX_set_options(m_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+
+    // SECURITY: Enable certificate verification by default
+    // Note: Fingerprint verification provides additional security layer
+    SSL_CTX_set_verify(m_ctx, SSL_VERIFY_PEER, nullptr);
+    SSL_CTX_set_default_verify_paths(m_ctx);
 }
 
 
@@ -127,7 +134,8 @@ void xmrig::Client::Tls::read(const char *data, size_t size)
       return;
     }
 
-    static char buf[16384]{};
+    // SECURITY: Use local buffer instead of static to be thread-safe
+    char buf[16384];
     int bytes_read = 0;
 
     while ((bytes_read = SSL_read(m_ssl, buf, sizeof(buf))) > 0) {
@@ -166,6 +174,22 @@ bool xmrig::Client::Tls::verify(X509 *cert)
 }
 
 
+// SECURITY: Constant-time comparison to prevent timing attacks
+static bool constantTimeCompareIgnoreCase(const char *a, const char *b, size_t len)
+{
+    volatile unsigned char result = 0;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char ca = static_cast<unsigned char>(a[i]);
+        unsigned char cb = static_cast<unsigned char>(b[i]);
+        // Convert to lowercase
+        if (ca >= 'A' && ca <= 'Z') ca += 32;
+        if (cb >= 'A' && cb <= 'Z') cb += 32;
+        result |= ca ^ cb;
+    }
+    return result == 0;
+}
+
+
 bool xmrig::Client::Tls::verifyFingerprint(X509 *cert)
 {
     const EVP_MD *digest = EVP_get_digestbyname("sha256");
@@ -183,5 +207,6 @@ bool xmrig::Client::Tls::verifyFingerprint(X509 *cert)
     Cvt::toHex(m_fingerprint, sizeof(m_fingerprint), md, 32);
     const char *fingerprint = m_client->m_pool.fingerprint();
 
-    return fingerprint == nullptr || strncasecmp(m_fingerprint, fingerprint, 64) == 0;
+    // SECURITY: Use constant-time comparison to prevent timing attacks
+    return fingerprint == nullptr || constantTimeCompareIgnoreCase(m_fingerprint, fingerprint, 64);
 }

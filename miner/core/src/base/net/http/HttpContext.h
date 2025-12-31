@@ -67,6 +67,9 @@ public:
     uint64_t elapsed() const;
     void close(int status = 0);
 
+    // SECURITY: Per-IP connection tracking
+    inline void setPeerIP(const std::string &ip) { m_peerIP = ip; }
+
     static HttpContext *get(uint64_t id);
     static void closeAll();
 
@@ -87,6 +90,7 @@ private:
     llhttp_t *m_parser;
     std::string m_lastHeaderField;
     std::string m_lastHeaderValue;
+    std::string m_peerIP;  // SECURITY: Store for connection release on close
     std::weak_ptr<IHttpListener> m_listener;
 };
 

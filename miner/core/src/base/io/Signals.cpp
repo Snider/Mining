@@ -60,6 +60,10 @@ xmrig::Signals::~Signals()
 
 void xmrig::Signals::onSignal(uv_signal_t *handle, int signum)
 {
+    // NOTE: This is safe because libuv defers signal handling to the event loop.
+    // This is NOT a raw POSIX signal handler - it runs in normal context.
+    // Logging here is acceptable, unlike in raw signal handlers.
+
     switch (signum)
     {
     case SIGHUP:

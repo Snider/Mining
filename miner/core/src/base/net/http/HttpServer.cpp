@@ -26,6 +26,7 @@
 #include "3rdparty/llhttp/llhttp.h"
 #include "base/net/http/HttpContext.h"
 #include "base/net/tools/NetBuffer.h"
+#include "base/net/tools/TcpServer.h"
 
 
 xmrig::HttpServer::HttpServer(const std::shared_ptr<IHttpListener> &listener) :
@@ -44,6 +45,17 @@ void xmrig::HttpServer::onConnection(uv_stream_t *stream, uint16_t)
 {
     auto ctx = new HttpContext(HTTP_REQUEST, m_listener);
     uv_accept(stream, ctx->stream());
+
+    // SECURITY: Check per-IP connection limit after accepting
+    std::string peerIP = ctx->ip();
+    if (!TcpServer::checkConnectionLimit(peerIP)) {
+        // Connection limit exceeded - close immediately
+        ctx->close();
+        return;
+    }
+
+    // Store IP for release when connection closes
+    ctx->setPeerIP(peerIP);
 
     uv_read_start(ctx->stream(), NetBuffer::onAlloc,
         [](uv_stream_t *tcp, ssize_t nread, const uv_buf_t *buf)

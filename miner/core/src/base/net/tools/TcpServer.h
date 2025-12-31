@@ -27,6 +27,9 @@
 
 
 #include <uv.h>
+#include <map>
+#include <mutex>
+#include <string>
 
 
 #include "base/tools/Object.h"
@@ -49,10 +52,20 @@ public:
 
     int bind();
 
+    // SECURITY: Per-IP connection tracking to prevent DoS
+    static void releaseConnection(const std::string &ip);
+    static bool checkConnectionLimit(const std::string &ip);
+    static constexpr uint32_t kMaxConnectionsPerIP = 10;
+
 private:
     void create(uv_stream_t *stream, int status);
+    static std::string getPeerIP(uv_stream_t *stream);
 
     static void onConnection(uv_stream_t *stream, int status);
+
+    // SECURITY: Static connection tracking shared across all TcpServer instances
+    static std::map<std::string, uint32_t> s_connectionCount;
+    static std::mutex s_connectionMutex;
 
     const String &m_host;
     int m_version   = 0;

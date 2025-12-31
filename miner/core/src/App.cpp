@@ -87,7 +87,12 @@ int xmrig::App::exec()
     m_controller->start();
 
     rc = uv_run(uv_default_loop(), UV_RUN_DEFAULT);
-    uv_loop_close(uv_default_loop());
+
+    // SECURITY: Check uv_loop_close return value to detect resource leaks
+    const int closeRc = uv_loop_close(uv_default_loop());
+    if (closeRc == UV_EBUSY) {
+        LOG_WARN("%s " YELLOW("event loop has unclosed handles (resource leak)"), Tags::signal());
+    }
 
     return rc;
 }

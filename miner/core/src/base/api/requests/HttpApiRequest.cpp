@@ -118,7 +118,9 @@ bool xmrig::HttpApiRequest::accept()
         }
 
         if (type() != REQ_JSON_RPC) {
-            reply().AddMember(StringRef(kError), StringRef(GetParseError_En(m_body.GetParseError())), doc().GetAllocator());
+            // SECURITY: Return generic error message to prevent information disclosure
+            // Detailed parse errors could reveal internal structure or help attackers
+            reply().AddMember(StringRef(kError), "Invalid JSON", doc().GetAllocator());
         }
 
         return false;

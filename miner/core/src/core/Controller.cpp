@@ -101,6 +101,12 @@ xmrig::Network *xmrig::Controller::network() const
 
 void xmrig::Controller::execCommand(char command) const
 {
-    miner()->execCommand(command);
-    network()->execCommand(command);
+    // SECURITY: Check for null to prevent use-after-free during shutdown
+    // assert() is compiled out in release builds, so explicit checks needed
+    if (m_miner) {
+        m_miner->execCommand(command);
+    }
+    if (m_network) {
+        m_network->execCommand(command);
+    }
 }

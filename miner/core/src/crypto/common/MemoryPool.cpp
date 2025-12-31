@@ -71,7 +71,28 @@ uint8_t *xmrig::MemoryPool::get(size_t size, uint32_t)
 {
     assert(!(size % pageSize));
 
-    if (!m_memory || (m_memory->size() - m_offset - m_alignOffset) < size) {
+    // SECURITY: Check for integer overflow before subtraction to prevent underflow
+    // The subtraction (m_memory->size() - m_offset - m_alignOffset) can wrap around
+    // if (m_offset + m_alignOffset) > m_memory->size()
+    if (!m_memory) {
+        return nullptr;
+    }
+
+    const size_t totalSize = m_memory->size();
+
+    // Check for overflow: ensure m_alignOffset doesn't exceed total size
+    if (m_alignOffset > totalSize) {
+        return nullptr;
+    }
+
+    // Check for overflow: ensure m_offset doesn't exceed remaining size
+    if (m_offset > totalSize - m_alignOffset) {
+        return nullptr;
+    }
+
+    // Now safe to compute remaining size
+    const size_t remaining = totalSize - m_alignOffset - m_offset;
+    if (remaining < size) {
         return nullptr;
     }
 

@@ -80,10 +80,31 @@ xmrig::OclCnRunner::~OclCnRunner()
 
 size_t xmrig::OclCnRunner::bufferSize() const
 {
+    // SECURITY: Check for integer overflow in buffer size calculations
+    const size_t l3 = m_algorithm.l3();
+    const size_t intensity = m_intensity;
+    const size_t maxSize = SIZE_MAX;
+
+    // Check l3 * intensity for overflow
+    if (intensity > 0 && l3 > maxSize / intensity) {
+        return 0; // Overflow would occur
+    }
+
+    // Check 200 * intensity for overflow
+    if (intensity > maxSize / 200) {
+        return 0;
+    }
+
+    // Check branch buffer size
+    const size_t branchSize = sizeof(cl_uint) * (intensity + 2);
+    if (intensity > SIZE_MAX - 2 || branchSize / sizeof(cl_uint) != intensity + 2) {
+        return 0;
+    }
+
     return OclBaseRunner::bufferSize() +
-           align(m_algorithm.l3() * m_intensity) +
-           align(200 * m_intensity) +
-           (align(sizeof(cl_uint) * (m_intensity + 2)) * BRANCH_MAX);
+           align(l3 * intensity) +
+           align(200 * intensity) +
+           (align(branchSize) * BRANCH_MAX);
 }
 
 
