@@ -1,4 +1,4 @@
-import { Component, signal, output, input, inject } from '@angular/core';
+import { Component, signal, output, input, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
@@ -14,24 +14,41 @@ interface NavItem {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <aside class="sidebar" [class.collapsed]="collapsed()">
+    <!-- Mobile menu button (visible on small screens) -->
+    <button class="mobile-menu-btn" (click)="toggleMobileMenu()">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+
+    <!-- Mobile backdrop -->
+    @if (mobileOpen()) {
+      <div class="mobile-backdrop" (click)="closeMobileMenu()"></div>
+    }
+
+    <aside class="sidebar" [class.collapsed]="collapsed()" [class.mobile-open]="mobileOpen()">
       <!-- Logo / Brand -->
       <div class="sidebar-header">
         <div class="logo">
           <svg class="w-8 h-8 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
           </svg>
-          @if (!collapsed()) {
+          @if (!collapsed() || mobileOpen()) {
             <span class="logo-text">Mining</span>
           }
         </div>
-        <button class="collapse-btn" (click)="toggleCollapse()">
+        <button class="collapse-btn desktop-only" (click)="toggleCollapse()">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             @if (collapsed()) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
             } @else {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
             }
+          </svg>
+        </button>
+        <button class="collapse-btn mobile-only" (click)="closeMobileMenu()">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
@@ -42,10 +59,10 @@ interface NavItem {
           <button
             class="nav-item"
             [class.active]="currentRoute() === item.route"
-            (click)="navigate(item.route)"
-            [title]="collapsed() ? item.label : ''">
+            (click)="navigateAndClose(item.route)"
+            [title]="collapsed() && !mobileOpen() ? item.label : ''">
             <span class="nav-icon" [innerHTML]="item.icon"></span>
-            @if (!collapsed()) {
+            @if (!collapsed() || mobileOpen()) {
               <span class="nav-label">{{ item.label }}</span>
             }
           </button>
@@ -54,7 +71,7 @@ interface NavItem {
 
       <!-- Footer with miner switcher placeholder -->
       <div class="sidebar-footer">
-        @if (!collapsed()) {
+        @if (!collapsed() || mobileOpen()) {
           <div class="miner-status">
             <div class="status-indicator online"></div>
             <span class="status-text">Mining Active</span>
@@ -66,6 +83,33 @@ interface NavItem {
     </aside>
   `,
   styles: [`
+    /* Mobile menu button */
+    .mobile-menu-btn {
+      display: none;
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 1001;
+      padding: 0.5rem;
+      background: var(--color-surface-200);
+      border: 1px solid rgb(37 37 66 / 0.3);
+      border-radius: 0.375rem;
+      color: white;
+      cursor: pointer;
+    }
+
+    .mobile-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+
+    .mobile-only {
+      display: none;
+    }
+
     .sidebar {
       display: flex;
       flex-direction: column;
@@ -73,7 +117,7 @@ interface NavItem {
       height: 100vh;
       background: var(--color-surface-200);
       border-right: 1px solid rgb(37 37 66 / 0.2);
-      transition: width 0.2s ease;
+      transition: width 0.2s ease, transform 0.3s ease;
     }
 
     .sidebar.collapsed {
@@ -208,14 +252,64 @@ interface NavItem {
       font-size: 0.75rem;
       color: #94a3b8;
     }
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      .mobile-backdrop {
+        display: block;
+      }
+
+      .desktop-only {
+        display: none;
+      }
+
+      .mobile-only {
+        display: flex;
+      }
+
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 1000;
+        width: 280px;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+
+      .sidebar.collapsed {
+        width: 280px;
+      }
+
+      .collapsed .nav-item {
+        justify-content: flex-start;
+        padding: 0.625rem 0.75rem;
+      }
+    }
   `]
 })
 export class SidebarComponent {
   private sanitizer = inject(DomSanitizer);
 
   collapsed = signal(false);
+  mobileOpen = signal(false);
   currentRoute = input<string>('dashboard');
   routeChange = output<string>();
+
+  @HostListener('window:resize')
+  onResize() {
+    // Close mobile menu on resize to larger screens
+    if (window.innerWidth > 768 && this.mobileOpen()) {
+      this.mobileOpen.set(false);
+    }
+  }
 
   navItems: NavItem[] = [
     {
@@ -270,7 +364,20 @@ export class SidebarComponent {
     this.collapsed.update(v => !v);
   }
 
+  toggleMobileMenu() {
+    this.mobileOpen.update(v => !v);
+  }
+
+  closeMobileMenu() {
+    this.mobileOpen.set(false);
+  }
+
   navigate(route: string) {
     this.routeChange.emit(route);
+  }
+
+  navigateAndClose(route: string) {
+    this.routeChange.emit(route);
+    this.closeMobileMenu();
   }
 }

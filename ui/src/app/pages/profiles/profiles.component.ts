@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MinerService } from '../../miner.service';
+import { NotificationService } from '../../notification.service';
 import { ProfileCreateComponent } from '../../profile-create.component';
 
 @Component({
@@ -31,54 +32,147 @@ import { ProfileCreateComponent } from '../../profile-create.component';
       @if (profiles().length > 0) {
         <div class="profiles-grid">
           @for (profile of profiles(); track profile.id) {
-            <div class="profile-card" [class.active]="isRunning(profile.id)">
-              <div class="profile-header">
-                <div class="profile-info">
-                  <h3>{{ profile.name }}</h3>
-                  <span class="profile-miner">{{ profile.minerType }}</span>
+            <div class="profile-card" [class.active]="isRunning(profile.id)" [class.editing]="editingProfileId() === profile.id">
+              @if (editingProfileId() === profile.id) {
+                <!-- Inline Edit Form -->
+                <div class="edit-form">
+                  <div class="form-group">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [value]="profile.name"
+                      #editName>
+                  </div>
+                  <div class="form-group">
+                    <label>Pool</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [value]="profile.config?.pool || ''"
+                      placeholder="stratum+tcp://pool.example.com:3333"
+                      #editPool>
+                  </div>
+                  <div class="form-group">
+                    <label>Wallet</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [value]="profile.config?.wallet || ''"
+                      placeholder="Your wallet address"
+                      #editWallet>
+                  </div>
+                  <div class="edit-actions">
+                    <button
+                      class="btn btn-primary"
+                      [disabled]="savingProfile() === profile.id"
+                      (click)="saveProfile(profile.id, editName.value, editPool.value, editWallet.value)">
+                      @if (savingProfile() === profile.id) {
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      } @else {
+                        Save
+                      }
+                    </button>
+                    <button class="btn btn-outline" (click)="cancelEdit()">Cancel</button>
+                  </div>
                 </div>
-                @if (isRunning(profile.id)) {
-                  <span class="running-badge">
-                    <div class="pulse-dot"></div>
-                    Running
-                  </span>
-                }
-              </div>
+              } @else {
+                <!-- Normal View -->
+                <div class="profile-header">
+                  <div class="profile-info">
+                    <h3>{{ profile.name }}</h3>
+                    <span class="profile-miner">{{ profile.minerType }}</span>
+                  </div>
+                  <div class="header-actions">
+                    @if (isRunning(profile.id)) {
+                      <span class="running-badge">
+                        <div class="pulse-dot"></div>
+                        Running
+                      </span>
+                    }
+                    <button
+                      class="icon-btn"
+                      title="Edit profile"
+                      [disabled]="isRunning(profile.id)"
+                      (click)="startEdit(profile.id)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
 
-              <div class="profile-details">
-                <div class="detail-row">
-                  <span class="detail-label">Pool</span>
-                  <span class="detail-value">{{ profile.config?.pool || 'Not set' }}</span>
+                <div class="profile-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Pool</span>
+                    <span class="detail-value">{{ profile.config?.pool || 'Not set' }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Wallet</span>
+                    <span class="detail-value">{{ profile.config?.wallet || 'Not set' }}</span>
+                  </div>
                 </div>
-                <div class="detail-row">
-                  <span class="detail-label">Wallet</span>
-                  <span class="detail-value">{{ profile.config?.wallet || 'Not set' }}</span>
-                </div>
-              </div>
 
-              <div class="profile-actions">
+                <div class="profile-actions">
                 @if (!isRunning(profile.id)) {
-                  <button class="action-btn start" (click)="startProfile(profile.id)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                    </svg>
-                    Start
+                  <button
+                    class="action-btn start"
+                    [disabled]="startingProfile() === profile.id"
+                    (click)="startProfile(profile.id)">
+                    @if (startingProfile() === profile.id) {
+                      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Starting...
+                    } @else {
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                      </svg>
+                      Start
+                    }
                   </button>
                 } @else {
-                  <button class="action-btn stop" (click)="stopProfile(profile.id)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
-                    </svg>
-                    Stop
+                  <button
+                    class="action-btn stop"
+                    [disabled]="stoppingProfile() === profile.id"
+                    (click)="stopProfile(profile.id)">
+                    @if (stoppingProfile() === profile.id) {
+                      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Stopping...
+                    } @else {
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                      </svg>
+                      Stop
+                    }
                   </button>
                 }
-                <button class="action-btn delete" (click)="deleteProfile(profile.id)" [disabled]="isRunning(profile.id)">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
+                <button
+                  class="action-btn delete"
+                  (click)="deleteProfile(profile.id)"
+                  [disabled]="isRunning(profile.id) || deletingProfile() === profile.id">
+                  @if (deletingProfile() === profile.id) {
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  } @else {
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  }
                 </button>
               </div>
+              } <!-- end of else block for normal view -->
             </div>
           }
         </div>
@@ -168,11 +262,100 @@ import { ProfileCreateComponent } from '../../profile-create.component';
       border-color: rgb(16 185 129 / 0.3);
     }
 
+    .profile-card.editing {
+      border-color: var(--color-accent-500);
+    }
+
     .profile-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       margin-bottom: 1rem;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: none;
+      border-radius: 0.25rem;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      background: rgb(37 37 66 / 0.5);
+      color: white;
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-input {
+      padding: 0.5rem 0.75rem;
+      background: var(--color-surface-200);
+      border: 1px solid rgb(37 37 66 / 0.3);
+      border-radius: 0.375rem;
+      color: white;
+      font-size: 0.875rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--color-accent-500);
+    }
+
+    .form-input::placeholder {
+      color: #64748b;
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid rgb(37 37 66 / 0.3);
+      color: #94a3b8;
+    }
+
+    .btn-outline:hover {
+      background: rgb(37 37 66 / 0.3);
+      color: white;
     }
 
     .profile-info h3 {
@@ -326,13 +509,65 @@ import { ProfileCreateComponent } from '../../profile-create.component';
     .mt-4 {
       margin-top: 1rem;
     }
+
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+      .page-header {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .page-header .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .profiles-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-actions {
+        flex-wrap: wrap;
+      }
+
+      .action-btn {
+        flex: 1;
+        min-width: 80px;
+        justify-content: center;
+      }
+
+      .action-btn.delete {
+        margin-left: 0;
+      }
+
+      .empty-state {
+        padding: 2rem 1rem;
+      }
+    }
   `]
 })
 export class ProfilesComponent {
   private minerService = inject(MinerService);
+  private notifications = inject(NotificationService);
   state = this.minerService.state;
 
   showCreateForm = signal(false);
+  editingProfileId = signal<string | null>(null);
+
+  // Loading states
+  startingProfile = signal<string | null>(null);
+  stoppingProfile = signal<string | null>(null);
+  deletingProfile = signal<string | null>(null);
+  savingProfile = signal<string | null>(null);
 
   profiles = () => this.state().profiles;
 
@@ -340,30 +575,102 @@ export class ProfilesComponent {
     return this.state().runningMiners.some(m => m.profile_id === profileId);
   }
 
+  getProfileName(profileId: string): string {
+    return this.state().profiles.find(p => p.id === profileId)?.name || 'Profile';
+  }
+
   startProfile(profileId: string) {
+    const name = this.getProfileName(profileId);
+    this.startingProfile.set(profileId);
     this.minerService.startMiner(profileId).subscribe({
-      error: (err) => console.error('Failed to start profile:', err)
+      next: () => {
+        this.startingProfile.set(null);
+        this.notifications.success(`${name} started successfully`, 'Miner Started');
+      },
+      error: (err) => {
+        this.startingProfile.set(null);
+        console.error('Failed to start profile:', err);
+        this.notifications.error(`Failed to start ${name}: ${err.message || 'Unknown error'}`, 'Start Failed');
+      }
     });
   }
 
   stopProfile(profileId: string) {
     const miner = this.state().runningMiners.find(m => m.profile_id === profileId);
     if (miner) {
+      this.stoppingProfile.set(profileId);
       this.minerService.stopMiner(miner.name).subscribe({
-        error: (err) => console.error('Failed to stop miner:', err)
+        next: () => {
+          this.stoppingProfile.set(null);
+          this.notifications.success(`${miner.name} stopped successfully`, 'Miner Stopped');
+        },
+        error: (err) => {
+          this.stoppingProfile.set(null);
+          console.error('Failed to stop miner:', err);
+          this.notifications.error(`Failed to stop ${miner.name}: ${err.message || 'Unknown error'}`, 'Stop Failed');
+        }
       });
     }
   }
 
   deleteProfile(profileId: string) {
+    const name = this.getProfileName(profileId);
     if (confirm('Are you sure you want to delete this profile?')) {
+      this.deletingProfile.set(profileId);
       this.minerService.deleteProfile(profileId).subscribe({
-        error: (err) => console.error('Failed to delete profile:', err)
+        next: () => {
+          this.deletingProfile.set(null);
+          this.notifications.success(`${name} deleted successfully`, 'Profile Deleted');
+        },
+        error: (err) => {
+          this.deletingProfile.set(null);
+          console.error('Failed to delete profile:', err);
+          this.notifications.error(`Failed to delete ${name}: ${err.message || 'Unknown error'}`, 'Delete Failed');
+        }
       });
     }
   }
 
   onProfileCreated() {
     this.showCreateForm.set(false);
+    this.notifications.success('Profile created successfully', 'Profile Created');
+  }
+
+  startEdit(profileId: string) {
+    this.editingProfileId.set(profileId);
+  }
+
+  cancelEdit() {
+    this.editingProfileId.set(null);
+  }
+
+  saveProfile(profileId: string, name: string, pool: string, wallet: string) {
+    const profile = this.state().profiles.find(p => p.id === profileId);
+    if (!profile) return;
+
+    this.savingProfile.set(profileId);
+
+    const updatedProfile = {
+      ...profile,
+      name: name.trim() || profile.name,
+      config: {
+        ...profile.config,
+        pool: pool.trim() || profile.config?.pool,
+        wallet: wallet.trim() || profile.config?.wallet
+      }
+    };
+
+    this.minerService.updateProfile(updatedProfile).subscribe({
+      next: () => {
+        this.savingProfile.set(null);
+        this.editingProfileId.set(null);
+        this.notifications.success(`${name} updated successfully`, 'Profile Updated');
+      },
+      error: (err) => {
+        this.savingProfile.set(null);
+        console.error('Failed to update profile:', err);
+        this.notifications.error(`Failed to update profile: ${err.message || 'Unknown error'}`, 'Update Failed');
+      }
+    });
   }
 }

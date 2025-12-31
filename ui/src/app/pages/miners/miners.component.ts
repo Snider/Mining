@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MinerService } from '../../miner.service';
+import { NotificationService } from '../../notification.service';
 
 @Component({
   selector: 'app-miners',
@@ -258,6 +259,34 @@ import { MinerService } from '../../miner.service';
       to { transform: rotate(360deg); }
     }
 
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+      .miners-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .miner-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .miner-actions {
+        flex-direction: row;
+        width: 100%;
+        margin-top: 0.75rem;
+      }
+
+      .miner-actions .btn {
+        flex: 1;
+        justify-content: center;
+      }
+
+      .installed-badge {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+
     .system-info-section {
       margin-top: 1rem;
       padding: 1.25rem;
@@ -301,6 +330,7 @@ import { MinerService } from '../../miner.service';
 })
 export class MinersComponent {
   private minerService = inject(MinerService);
+  private notifications = inject(NotificationService);
   state = this.minerService.state;
 
   installing = signal<string | null>(null);
@@ -344,10 +374,14 @@ export class MinersComponent {
   installMiner(type: string) {
     this.installing.set(type);
     this.minerService.installMiner(type).subscribe({
-      next: () => this.installing.set(null),
+      next: () => {
+        this.installing.set(null);
+        this.notifications.success(`${type} installed successfully`, 'Installation Complete');
+      },
       error: (err) => {
         console.error('Failed to install miner:', err);
         this.installing.set(null);
+        this.notifications.error(`Failed to install ${type}: ${err.message || 'Unknown error'}`, 'Installation Failed');
       }
     });
   }
@@ -355,7 +389,13 @@ export class MinersComponent {
   uninstallMiner(type: string) {
     if (confirm(`Are you sure you want to uninstall ${type}?`)) {
       this.minerService.uninstallMiner(type).subscribe({
-        error: (err) => console.error('Failed to uninstall miner:', err)
+        next: () => {
+          this.notifications.success(`${type} uninstalled successfully`, 'Uninstall Complete');
+        },
+        error: (err) => {
+          console.error('Failed to uninstall miner:', err);
+          this.notifications.error(`Failed to uninstall ${type}: ${err.message || 'Unknown error'}`, 'Uninstall Failed');
+        }
       });
     }
   }

@@ -6,6 +6,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
 import { StatsPanelComponent } from '../components/stats-panel/stats-panel.component';
 import { MinerSwitcherComponent } from '../components/miner-switcher/miner-switcher.component';
+import { ToastComponent } from '../components/toast/toast.component';
+import { ApiStatusComponent } from '../components/api-status/api-status.component';
 
 @Component({
   selector: 'app-main-layout',
@@ -16,8 +18,12 @@ import { MinerSwitcherComponent } from '../components/miner-switcher/miner-switc
     SidebarComponent,
     StatsPanelComponent,
     MinerSwitcherComponent,
+    ToastComponent,
+    ApiStatusComponent,
   ],
   template: `
+    <app-api-status></app-api-status>
+    <app-toast></app-toast>
     <div class="main-layout">
       <app-sidebar [currentRoute]="currentRoute()" (routeChange)="onRouteChange($event)"></app-sidebar>
 
@@ -64,6 +70,21 @@ import { MinerSwitcherComponent } from '../components/miner-switcher/miner-switc
       flex: 1;
       overflow-y: auto;
       padding: 1rem;
+    }
+
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+      .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        padding-left: 3.5rem; /* Space for hamburger menu */
+      }
+
+      .page-content {
+        padding: 0.75rem;
+      }
     }
   `]
 })

@@ -2,6 +2,7 @@ import { Component, inject, computed, signal, effect, OnDestroy } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MinerService } from '../../miner.service';
+import { NotificationService } from '../../notification.service';
 import { TerminalModalComponent } from '../../terminal-modal.component';
 
 export interface WorkerStats {
@@ -55,22 +56,38 @@ export interface WorkerStats {
           </select>
           <button
             class="btn btn-primary"
-            [disabled]="!selectedProfileId() || state().runningMiners.length > 0"
+            [disabled]="!selectedProfileId() || state().runningMiners.length > 0 || starting()"
             (click)="startMining()">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-            </svg>
-            Start
+            @if (starting()) {
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Starting...
+            } @else {
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+              </svg>
+              Start
+            }
           </button>
         </div>
 
         @if (workers().length > 0) {
-          <button class="btn btn-danger" (click)="stopAllWorkers()">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
-            </svg>
-            Stop All
+          <button class="btn btn-danger" [disabled]="stoppingAll()" (click)="stopAllWorkers()">
+            @if (stoppingAll()) {
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Stopping...
+            } @else {
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+              </svg>
+              Stop All
+            }
           </button>
         }
       </div>
@@ -130,10 +147,21 @@ export interface WorkerStats {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                       </svg>
                     </button>
-                    <button class="icon-btn icon-btn-danger" title="Stop worker" (click)="stopWorker(worker.name)">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
+                    <button
+                      class="icon-btn icon-btn-danger"
+                      title="Stop worker"
+                      [disabled]="stoppingWorker() === worker.name"
+                      (click)="stopWorker(worker.name)">
+                      @if (stoppingWorker() === worker.name) {
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      } @else {
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      }
                     </button>
                   </td>
                 </tr>
@@ -455,15 +483,68 @@ export interface WorkerStats {
       height: 64px;
       color: #475569;
     }
+
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+      .actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .profile-selector {
+        flex-direction: column;
+      }
+
+      .profile-select {
+        min-width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .workers-table-container {
+        overflow-x: auto;
+      }
+
+      .workers-table {
+        min-width: 600px;
+      }
+
+      .empty-state {
+        padding: 2rem 1rem;
+      }
+    }
   `]
 })
 export class WorkersComponent implements OnDestroy {
   private minerService = inject(MinerService);
+  private notifications = inject(NotificationService);
   state = this.minerService.state;
 
   selectedProfileId = signal<string | null>(null);
   terminalMinerName: string | null = null;
   firewallWarningDismissed = signal<boolean>(false);
+
+  // Loading states
+  starting = signal(false);
+  stoppingWorker = signal<string | null>(null);
+  stoppingAll = signal(false);
 
   firewallWarning = computed(() => {
     if (this.firewallWarningDismissed()) return false;
@@ -536,22 +617,65 @@ export class WorkersComponent implements OnDestroy {
   startMining() {
     const profileId = this.selectedProfileId();
     if (profileId) {
+      const profile = this.state().profiles.find(p => p.id === profileId);
+      const name = profile?.name || 'Miner';
+      this.starting.set(true);
       this.minerService.startMiner(profileId).subscribe({
-        error: (err) => console.error('Failed to start miner:', err)
+        next: () => {
+          this.starting.set(false);
+          this.notifications.success(`${name} started successfully`, 'Miner Started');
+        },
+        error: (err) => {
+          this.starting.set(false);
+          console.error('Failed to start miner:', err);
+          this.notifications.error(`Failed to start ${name}: ${err.message || 'Unknown error'}`, 'Start Failed');
+        }
       });
     }
   }
 
   stopWorker(name: string) {
+    this.stoppingWorker.set(name);
     this.minerService.stopMiner(name).subscribe({
-      error: (err) => console.error(`Failed to stop ${name}:`, err)
+      next: () => {
+        this.stoppingWorker.set(null);
+        this.notifications.success(`${name} stopped`, 'Worker Stopped');
+      },
+      error: (err) => {
+        this.stoppingWorker.set(null);
+        console.error(`Failed to stop ${name}:`, err);
+        this.notifications.error(`Failed to stop ${name}: ${err.message || 'Unknown error'}`, 'Stop Failed');
+      }
     });
   }
 
   stopAllWorkers() {
+    const workerCount = this.workers().length;
+    let stoppedCount = 0;
+    let errorCount = 0;
+
+    this.stoppingAll.set(true);
     this.workers().forEach(w => {
       this.minerService.stopMiner(w.name).subscribe({
-        error: (err) => console.error(`Failed to stop ${w.name}:`, err)
+        next: () => {
+          stoppedCount++;
+          if (stoppedCount + errorCount === workerCount) {
+            this.stoppingAll.set(false);
+            if (errorCount === 0) {
+              this.notifications.success(`All ${stoppedCount} workers stopped`, 'All Workers Stopped');
+            } else {
+              this.notifications.warning(`Stopped ${stoppedCount} workers, ${errorCount} failed`, 'Partial Stop');
+            }
+          }
+        },
+        error: (err) => {
+          console.error(`Failed to stop ${w.name}:`, err);
+          errorCount++;
+          if (stoppedCount + errorCount === workerCount) {
+            this.stoppingAll.set(false);
+            this.notifications.warning(`Stopped ${stoppedCount} workers, ${errorCount} failed`, 'Partial Stop');
+          }
+        }
       });
     });
   }
