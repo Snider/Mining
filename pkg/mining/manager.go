@@ -540,77 +540,95 @@ func (m *Manager) startStatsCollection() {
 const statsCollectionTimeout = 5 * time.Second
 
 // collectMinerStats iterates through active miners and collects their stats.
+// Stats are collected in parallel to reduce overall collection time.
 func (m *Manager) collectMinerStats() {
+	// Take a snapshot of miners under read lock - minimize lock duration
 	m.mu.RLock()
-	minersToCollect := make([]Miner, 0, len(m.miners))
-	minerTypes := make(map[string]string)
-	for name, miner := range m.miners {
-		minersToCollect = append(minersToCollect, miner)
-		// Determine miner type from name prefix
-		if strings.HasPrefix(name, "xmrig") {
-			minerTypes[name] = "xmrig"
-		} else if strings.HasPrefix(name, "tt-miner") || strings.HasPrefix(name, "ttminer") {
-			minerTypes[name] = "tt-miner"
-		} else {
-			minerTypes[name] = "unknown"
-		}
+	if len(m.miners) == 0 {
+		m.mu.RUnlock()
+		return
 	}
+
+	type minerInfo struct {
+		miner     Miner
+		minerType string
+	}
+	miners := make([]minerInfo, 0, len(m.miners))
+	for name, miner := range m.miners {
+		// Determine miner type from name prefix
+		var minerType string
+		if strings.HasPrefix(name, "xmrig") {
+			minerType = "xmrig"
+		} else if strings.HasPrefix(name, "tt-miner") || strings.HasPrefix(name, "ttminer") {
+			minerType = "tt-miner"
+		} else {
+			minerType = "unknown"
+		}
+		miners = append(miners, minerInfo{miner: miner, minerType: minerType})
+	}
+	dbEnabled := m.dbEnabled // Copy to avoid holding lock
 	m.mu.RUnlock()
 
 	now := time.Now()
-	for _, miner := range minersToCollect {
-		minerName := miner.GetName()
 
-		// Verify miner still exists before collecting stats
-		m.mu.RLock()
-		_, stillExists := m.miners[minerName]
-		m.mu.RUnlock()
-		if !stillExists {
-			continue // Miner was removed, skip it
-		}
-
-		// Use context with timeout to prevent hanging on unresponsive miner APIs
-		ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
-		stats, err := miner.GetStats(ctx)
-		cancel() // Release context resources immediately
-
-		if err != nil {
-			log.Printf("Error getting stats for miner %s: %v\n", minerName, err)
-			continue
-		}
-
-		point := HashratePoint{
-			Timestamp: now,
-			Hashrate:  stats.Hashrate,
-		}
-
-		// Add to in-memory history (rolling window)
-		miner.AddHashratePoint(point)
-		miner.ReduceHashrateHistory(now)
-
-		// Persist to database if enabled
-		if m.dbEnabled {
-			minerType := minerTypes[minerName]
-			dbPoint := database.HashratePoint{
-				Timestamp: point.Timestamp,
-				Hashrate:  point.Hashrate,
-			}
-			if err := database.InsertHashratePoint(minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
-				log.Printf("Warning: failed to persist hashrate for %s: %v", minerName, err)
-			}
-		}
-
-		// Emit stats event for real-time WebSocket updates
-		m.emitEvent(EventMinerStats, MinerStatsData{
-			Name:        minerName,
-			Hashrate:    stats.Hashrate,
-			Shares:      stats.Shares,
-			Rejected:    stats.Rejected,
-			Uptime:      stats.Uptime,
-			Algorithm:   stats.Algorithm,
-			DiffCurrent: stats.DiffCurrent,
-		})
+	// Collect stats from all miners in parallel
+	var wg sync.WaitGroup
+	for _, mi := range miners {
+		wg.Add(1)
+		go func(miner Miner, minerType string) {
+			defer wg.Done()
+			m.collectSingleMinerStats(miner, minerType, now, dbEnabled)
+		}(mi.miner, mi.minerType)
 	}
+	wg.Wait()
+}
+
+// collectSingleMinerStats collects stats from a single miner.
+// This is called concurrently for each miner.
+func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now time.Time, dbEnabled bool) {
+	minerName := miner.GetName()
+
+	// Use context with timeout to prevent hanging on unresponsive miner APIs
+	ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
+	stats, err := miner.GetStats(ctx)
+	cancel() // Release context resources immediately
+
+	if err != nil {
+		log.Printf("Error getting stats for miner %s: %v\n", minerName, err)
+		return
+	}
+
+	point := HashratePoint{
+		Timestamp: now,
+		Hashrate:  stats.Hashrate,
+	}
+
+	// Add to in-memory history (rolling window)
+	// Note: AddHashratePoint and ReduceHashrateHistory must be thread-safe
+	miner.AddHashratePoint(point)
+	miner.ReduceHashrateHistory(now)
+
+	// Persist to database if enabled
+	if dbEnabled {
+		dbPoint := database.HashratePoint{
+			Timestamp: point.Timestamp,
+			Hashrate:  point.Hashrate,
+		}
+		if err := database.InsertHashratePoint(minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
+			log.Printf("Warning: failed to persist hashrate for %s: %v", minerName, err)
+		}
+	}
+
+	// Emit stats event for real-time WebSocket updates
+	m.emitEvent(EventMinerStats, MinerStatsData{
+		Name:        minerName,
+		Hashrate:    stats.Hashrate,
+		Shares:      stats.Shares,
+		Rejected:    stats.Rejected,
+		Uptime:      stats.Uptime,
+		Algorithm:   stats.Algorithm,
+		DiffCurrent: stats.DiffCurrent,
+	})
 }
 
 // GetMinerHashrateHistory returns the hashrate history for a specific miner.
