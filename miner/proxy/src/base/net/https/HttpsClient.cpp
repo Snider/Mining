@@ -46,6 +46,14 @@ xmrig::HttpsClient::HttpsClient(const char *tag, FetchRequest &&req, const std::
     m_write = BIO_new(BIO_s_mem());
     m_read  = BIO_new(BIO_s_mem());
     SSL_CTX_set_options(m_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    // SECURITY FIX (HIGH-015): Enable certificate chain verification
+    // This works in conjunction with fingerprint verification in verify().
+    // If a fingerprint is configured, we accept the cert if EITHER:
+    // 1. The chain validates against system CA store, OR
+    // 2. The fingerprint matches (for self-signed certs in mining contexts)
+    SSL_CTX_set_default_verify_paths(m_ctx);
+    SSL_CTX_set_verify(m_ctx, SSL_VERIFY_PEER, nullptr);
 }
 
 
@@ -145,16 +153,38 @@ bool xmrig::HttpsClient::verify(X509 *cert)
         return false;
     }
 
-    if (!verifyFingerprint(cert)) {
-        if (!isQuiet()) {
-            LOG_ERR("[%s:%d] Failed to verify server certificate fingerprint", host(), port());
+    // SECURITY FIX (HIGH-015): Check both certificate chain and fingerprint
+    // For proper security, we verify:
+    // 1. Chain validation (done by OpenSSL with SSL_VERIFY_PEER)
+    // 2. Fingerprint match (for pinning or self-signed certs)
 
-            if (strlen(m_fingerprint) == 64 && !req().fingerprint.isNull()) {
-                LOG_ERR("\"%s\" was given", m_fingerprint);
-                LOG_ERR("\"%s\" was configured", req().fingerprint.data());
+    const long verifyResult = SSL_get_verify_result(m_ssl);
+    const bool chainValid = (verifyResult == X509_V_OK);
+    const bool fingerprintValid = verifyFingerprint(cert);
+
+    // If fingerprint is configured, it MUST match (certificate pinning)
+    if (!req().fingerprint.isNull()) {
+        if (!fingerprintValid) {
+            if (!isQuiet()) {
+                LOG_ERR("[%s:%d] Failed to verify server certificate fingerprint", host(), port());
+                if (strlen(m_fingerprint) == 64) {
+                    LOG_ERR("\"%s\" was given", m_fingerprint);
+                    LOG_ERR("\"%s\" was configured", req().fingerprint.data());
+                }
             }
+            return false;
         }
+        // Fingerprint matches - accept even if chain doesn't validate
+        // (supports self-signed certificates with known fingerprint)
+        return true;
+    }
 
+    // No fingerprint configured - require valid certificate chain
+    if (!chainValid) {
+        if (!isQuiet()) {
+            LOG_ERR("[%s:%d] Certificate chain verification failed: %s",
+                    host(), port(), X509_verify_cert_error_string(verifyResult));
+        }
         return false;
     }
 

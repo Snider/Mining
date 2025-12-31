@@ -179,8 +179,13 @@ void xmrig::keccak(const uint8_t *in, int inlen, uint8_t *md, int mdlen)
     memset(st, 0, sizeof(st));
 
     for ( ; inlen >= rsiz; inlen -= rsiz, in += rsiz) {
+        // SECURITY FIX (MED-005): Use memcpy for potentially unaligned input data
+        // Direct cast of uint8_t* to uint64_t* is undefined behavior on strict
+        // alignment architectures (ARM, SPARC). The temp buffer is aligned.
         for (i = 0; i < rsizw; i++) {
-            st[i] ^= ((uint64_t *) in)[i];
+            uint64_t val;
+            memcpy(&val, in + i * 8, sizeof(val));
+            st[i] ^= val;
         }
 
         xmrig::keccakf(st, KECCAK_ROUNDS);

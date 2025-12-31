@@ -349,6 +349,12 @@ void xmrig::Client::onResolved(const DnsRecords &records, int status, const char
 }
 
 
+// NOTE (HIGH-019): Thread safety of m_socket access
+// This function checks m_socket != nullptr then uses it, which appears to be
+// a TOCTOU (time-of-check-time-of-use) vulnerability. However, this is safe
+// because libuv uses a single-threaded event loop model - all callbacks and
+// operations on this Client run on the same thread. m_socket is only modified
+// by connect() and onClose(), both called from the event loop.
 bool xmrig::Client::close()
 {
     if (m_state == ClosingState) {
