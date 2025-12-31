@@ -614,7 +614,8 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 			Timestamp: point.Timestamp,
 			Hashrate:  point.Hashrate,
 		}
-		if err := database.InsertHashratePoint(minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
+		// Use nil context to let InsertHashratePoint use its default timeout
+		if err := database.InsertHashratePoint(nil, minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
 			logging.Warn("failed to persist hashrate", logging.Fields{"miner": minerName, "error": err})
 		}
 	}

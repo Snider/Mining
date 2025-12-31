@@ -334,7 +334,8 @@ func (ns *NodeService) handlePeerStats(c *gin.Context) {
 
 // RemoteStartRequest is the request body for starting a remote miner.
 type RemoteStartRequest struct {
-	ProfileID string          `json:"profileId" binding:"required"`
+	MinerType string          `json:"minerType" binding:"required"`
+	ProfileID string          `json:"profileId,omitempty"`
 	Config    json.RawMessage `json:"config,omitempty"`
 }
 
@@ -356,7 +357,7 @@ func (ns *NodeService) handleRemoteStart(c *gin.Context) {
 		return
 	}
 
-	if err := ns.controller.StartRemoteMiner(peerID, req.ProfileID, req.Config); err != nil {
+	if err := ns.controller.StartRemoteMiner(peerID, req.MinerType, req.ProfileID, req.Config); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -47,8 +48,12 @@ type HashratePoint struct {
 	Hashrate  int       `json:"hashrate"`
 }
 
-// InsertHashratePoint stores a hashrate measurement in the database
-func InsertHashratePoint(minerName, minerType string, point HashratePoint, resolution Resolution) error {
+// dbInsertTimeout is the maximum time to wait for a database insert operation
+const dbInsertTimeout = 5 * time.Second
+
+// InsertHashratePoint stores a hashrate measurement in the database.
+// If ctx is nil, a default timeout context will be used.
+func InsertHashratePoint(ctx context.Context, minerName, minerType string, point HashratePoint, resolution Resolution) error {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
 
@@ -56,7 +61,14 @@ func InsertHashratePoint(minerName, minerType string, point HashratePoint, resol
 		return nil // DB not enabled, silently skip
 	}
 
-	_, err := db.Exec(`
+	// Use provided context or create one with default timeout
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), dbInsertTimeout)
+		defer cancel()
+	}
+
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO hashrate_history (miner_name, miner_type, timestamp, hashrate, resolution)
 		VALUES (?, ?, ?, ?, ?)
 	`, minerName, minerType, point.Timestamp, point.Hashrate, string(resolution))

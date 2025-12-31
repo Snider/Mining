@@ -50,7 +50,7 @@ func TestConcurrentHashrateInserts(t *testing.T) {
 					Timestamp: time.Now().Add(time.Duration(-j) * time.Second),
 					Hashrate:  1000 + minerIndex*100 + j,
 				}
-				err := InsertHashratePoint(minerName, minerType, point, ResolutionHigh)
+				err := InsertHashratePoint(nil, minerName, minerType, point, ResolutionHigh)
 				if err != nil {
 					t.Errorf("Insert error for %s: %v", minerName, err)
 				}
@@ -95,7 +95,7 @@ func TestConcurrentInsertAndQuery(t *testing.T) {
 					Timestamp: time.Now(),
 					Hashrate:  1000 + i,
 				}
-				InsertHashratePoint("concurrent-test", "xmrig", point, ResolutionHigh)
+				InsertHashratePoint(nil, "concurrent-test", "xmrig", point, ResolutionHigh)
 				time.Sleep(time.Millisecond)
 			}
 		}
@@ -149,13 +149,13 @@ func TestConcurrentInsertAndCleanup(t *testing.T) {
 					Timestamp: time.Now().AddDate(0, 0, -10), // 10 days old
 					Hashrate:  500 + i,
 				}
-				InsertHashratePoint("cleanup-test", "xmrig", oldPoint, ResolutionHigh)
+				InsertHashratePoint(nil, "cleanup-test", "xmrig", oldPoint, ResolutionHigh)
 
 				newPoint := HashratePoint{
 					Timestamp: time.Now(),
 					Hashrate:  1000 + i,
 				}
-				InsertHashratePoint("cleanup-test", "xmrig", newPoint, ResolutionHigh)
+				InsertHashratePoint(nil, "cleanup-test", "xmrig", newPoint, ResolutionHigh)
 				time.Sleep(time.Millisecond)
 			}
 		}
@@ -197,7 +197,7 @@ func TestConcurrentStats(t *testing.T) {
 			Timestamp: time.Now().Add(time.Duration(-i) * time.Second),
 			Hashrate:  1000 + i*10,
 		}
-		InsertHashratePoint(minerName, "xmrig", point, ResolutionHigh)
+		InsertHashratePoint(nil, minerName, "xmrig", point, ResolutionHigh)
 	}
 
 	var wg sync.WaitGroup
@@ -238,7 +238,7 @@ func TestConcurrentGetAllStats(t *testing.T) {
 				Timestamp: time.Now().Add(time.Duration(-i) * time.Second),
 				Hashrate:  1000 + m*100 + i,
 			}
-			InsertHashratePoint(minerName, "xmrig", point, ResolutionHigh)
+			InsertHashratePoint(nil, minerName, "xmrig", point, ResolutionHigh)
 		}
 	}
 
@@ -267,7 +267,7 @@ func TestConcurrentGetAllStats(t *testing.T) {
 				Timestamp: time.Now(),
 				Hashrate:  2000 + i,
 			}
-			InsertHashratePoint("all-stats-new", "xmrig", point, ResolutionHigh)
+			InsertHashratePoint(nil, "all-stats-new", "xmrig", point, ResolutionHigh)
 		}
 	}()
 

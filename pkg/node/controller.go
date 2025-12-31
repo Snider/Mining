@@ -125,34 +125,27 @@ func (c *Controller) GetRemoteStats(peerID string) (*StatsPayload, error) {
 		return nil, err
 	}
 
-	if resp.Type == MsgError {
-		var errPayload ErrorPayload
-		if err := resp.ParsePayload(&errPayload); err != nil {
-			return nil, fmt.Errorf("remote error (unable to parse)")
-		}
-		return nil, fmt.Errorf("remote error: %s", errPayload.Message)
-	}
-
-	if resp.Type != MsgStats {
-		return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
-	}
-
 	var stats StatsPayload
-	if err := resp.ParsePayload(&stats); err != nil {
-		return nil, fmt.Errorf("failed to parse stats: %w", err)
+	if err := ParseResponse(resp, MsgStats, &stats); err != nil {
+		return nil, err
 	}
 
 	return &stats, nil
 }
 
 // StartRemoteMiner requests a remote peer to start a miner with a given profile.
-func (c *Controller) StartRemoteMiner(peerID, profileID string, configOverride json.RawMessage) error {
+func (c *Controller) StartRemoteMiner(peerID, minerType, profileID string, configOverride json.RawMessage) error {
 	identity := c.node.GetIdentity()
 	if identity == nil {
 		return fmt.Errorf("node identity not initialized")
 	}
 
+	if minerType == "" {
+		return fmt.Errorf("miner type is required")
+	}
+
 	payload := StartMinerPayload{
+		MinerType: minerType,
 		ProfileID: profileID,
 		Config:    configOverride,
 	}
@@ -167,21 +160,9 @@ func (c *Controller) StartRemoteMiner(peerID, profileID string, configOverride j
 		return err
 	}
 
-	if resp.Type == MsgError {
-		var errPayload ErrorPayload
-		if err := resp.ParsePayload(&errPayload); err != nil {
-			return fmt.Errorf("remote error (unable to parse)")
-		}
-		return fmt.Errorf("remote error: %s", errPayload.Message)
-	}
-
-	if resp.Type != MsgMinerAck {
-		return fmt.Errorf("unexpected response type: %s", resp.Type)
-	}
-
 	var ack MinerAckPayload
-	if err := resp.ParsePayload(&ack); err != nil {
-		return fmt.Errorf("failed to parse ack: %w", err)
+	if err := ParseResponse(resp, MsgMinerAck, &ack); err != nil {
+		return err
 	}
 
 	if !ack.Success {
@@ -212,21 +193,9 @@ func (c *Controller) StopRemoteMiner(peerID, minerName string) error {
 		return err
 	}
 
-	if resp.Type == MsgError {
-		var errPayload ErrorPayload
-		if err := resp.ParsePayload(&errPayload); err != nil {
-			return fmt.Errorf("remote error (unable to parse)")
-		}
-		return fmt.Errorf("remote error: %s", errPayload.Message)
-	}
-
-	if resp.Type != MsgMinerAck {
-		return fmt.Errorf("unexpected response type: %s", resp.Type)
-	}
-
 	var ack MinerAckPayload
-	if err := resp.ParsePayload(&ack); err != nil {
-		return fmt.Errorf("failed to parse ack: %w", err)
+	if err := ParseResponse(resp, MsgMinerAck, &ack); err != nil {
+		return err
 	}
 
 	if !ack.Success {
@@ -258,21 +227,9 @@ func (c *Controller) GetRemoteLogs(peerID, minerName string, lines int) ([]strin
 		return nil, err
 	}
 
-	if resp.Type == MsgError {
-		var errPayload ErrorPayload
-		if err := resp.ParsePayload(&errPayload); err != nil {
-			return nil, fmt.Errorf("remote error (unable to parse)")
-		}
-		return nil, fmt.Errorf("remote error: %s", errPayload.Message)
-	}
-
-	if resp.Type != MsgLogs {
-		return nil, fmt.Errorf("unexpected response type: %s", resp.Type)
-	}
-
 	var logs LogsPayload
-	if err := resp.ParsePayload(&logs); err != nil {
-		return nil, fmt.Errorf("failed to parse logs: %w", err)
+	if err := ParseResponse(resp, MsgLogs, &logs); err != nil {
+		return nil, err
 	}
 
 	return logs.Lines, nil
@@ -325,8 +282,8 @@ func (c *Controller) PingPeer(peerID string) (float64, error) {
 		return 0, err
 	}
 
-	if resp.Type != MsgPong {
-		return 0, fmt.Errorf("unexpected response type: %s", resp.Type)
+	if err := ValidateResponse(resp, MsgPong); err != nil {
+		return 0, err
 	}
 
 	// Calculate round-trip time

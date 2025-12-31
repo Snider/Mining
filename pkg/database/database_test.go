@@ -77,7 +77,7 @@ func TestHashrateStorage(t *testing.T) {
 	}
 
 	for _, p := range points {
-		if err := InsertHashratePoint(minerName, minerType, p, ResolutionHigh); err != nil {
+		if err := InsertHashratePoint(nil, minerName, minerType, p, ResolutionHigh); err != nil {
 			t.Fatalf("Failed to store hashrate point: %v", err)
 		}
 	}
@@ -109,7 +109,7 @@ func TestGetHashrateStats(t *testing.T) {
 	}
 
 	for _, p := range points {
-		if err := InsertHashratePoint(minerName, minerType, p, ResolutionHigh); err != nil {
+		if err := InsertHashratePoint(nil, minerName, minerType, p, ResolutionHigh); err != nil {
 			t.Fatalf("Failed to store point: %v", err)
 		}
 	}
@@ -175,13 +175,13 @@ func TestCleanupRetention(t *testing.T) {
 	}
 
 	// Insert all points
-	if err := InsertHashratePoint(minerName, minerType, oldPoint, ResolutionHigh); err != nil {
+	if err := InsertHashratePoint(nil, minerName, minerType, oldPoint, ResolutionHigh); err != nil {
 		t.Fatalf("Failed to insert old point: %v", err)
 	}
-	if err := InsertHashratePoint(minerName, minerType, midPoint, ResolutionHigh); err != nil {
+	if err := InsertHashratePoint(nil, minerName, minerType, midPoint, ResolutionHigh); err != nil {
 		t.Fatalf("Failed to insert mid point: %v", err)
 	}
-	if err := InsertHashratePoint(minerName, minerType, newPoint, ResolutionHigh); err != nil {
+	if err := InsertHashratePoint(nil, minerName, minerType, newPoint, ResolutionHigh); err != nil {
 		t.Fatalf("Failed to insert new point: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestGetHashrateHistoryTimeRange(t *testing.T) {
 			Timestamp: now.Add(offset),
 			Hashrate:  1000 + i*100,
 		}
-		if err := InsertHashratePoint(minerName, minerType, point, ResolutionHigh); err != nil {
+		if err := InsertHashratePoint(nil, minerName, minerType, point, ResolutionHigh); err != nil {
 			t.Fatalf("Failed to insert point: %v", err)
 		}
 	}
@@ -291,7 +291,7 @@ func TestMultipleMinerStats(t *testing.T) {
 				Timestamp: now.Add(time.Duration(-i) * time.Minute),
 				Hashrate:  hr,
 			}
-			if err := InsertHashratePoint(m.name, "xmrig", point, ResolutionHigh); err != nil {
+			if err := InsertHashratePoint(nil, m.name, "xmrig", point, ResolutionHigh); err != nil {
 				t.Fatalf("Failed to insert point for %s: %v", m.name, err)
 			}
 		}

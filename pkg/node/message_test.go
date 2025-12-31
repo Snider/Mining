@@ -92,6 +92,7 @@ func TestMessageReply(t *testing.T) {
 func TestParsePayload(t *testing.T) {
 	t.Run("ValidPayload", func(t *testing.T) {
 		payload := StartMinerPayload{
+			MinerType: "xmrig",
 			ProfileID: "test-profile",
 		}
 
@@ -190,6 +191,7 @@ func TestNewErrorMessage(t *testing.T) {
 
 func TestMessageSerialization(t *testing.T) {
 	original, _ := NewMessage(MsgStartMiner, "ctrl", "worker", StartMinerPayload{
+		MinerType: "xmrig",
 		ProfileID: "my-profile",
 	})
 

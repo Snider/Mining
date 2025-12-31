@@ -246,6 +246,7 @@ func (b *BaseMiner) InstallFromURL(url string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse
 		return fmt.Errorf("failed to download release: unexpected status code %d", resp.StatusCode)
 	}
 

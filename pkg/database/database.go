@@ -77,8 +77,10 @@ func Initialize(cfg Config) error {
 
 	// Create tables
 	if err := createTables(); err != nil {
-		db.Close()
+		// Nil out global before closing to prevent use of closed connection
+		closingDB := db
 		db = nil
+		closingDB.Close()
 		return fmt.Errorf("failed to create tables: %w", err)
 	}
 

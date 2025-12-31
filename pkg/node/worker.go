@@ -198,6 +198,11 @@ func (w *Worker) handleStartMiner(msg *Message) (*Message, error) {
 		return nil, fmt.Errorf("invalid start miner payload: %w", err)
 	}
 
+	// Validate miner type is provided
+	if payload.MinerType == "" {
+		return nil, fmt.Errorf("miner type is required")
+	}
+
 	// Get the config from the profile or use the override
 	var config interface{}
 	if payload.Config != nil {
@@ -213,7 +218,7 @@ func (w *Worker) handleStartMiner(msg *Message) (*Message, error) {
 	}
 
 	// Start the miner
-	miner, err := w.minerManager.StartMiner("", config)
+	miner, err := w.minerManager.StartMiner(payload.MinerType, config)
 	if err != nil {
 		ack := MinerAckPayload{
 			Success: false,

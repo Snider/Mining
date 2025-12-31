@@ -247,7 +247,7 @@ func TestWorker_HandleStartMiner_NoManager(t *testing.T) {
 	if identity == nil {
 		t.Fatal("expected identity to be generated")
 	}
-	payload := StartMinerPayload{ProfileID: "test-profile"}
+	payload := StartMinerPayload{MinerType: "xmrig", ProfileID: "test-profile"}
 	msg, err := NewMessage(MsgStartMiner, "sender-id", identity.ID, payload)
 	if err != nil {
 		t.Fatalf("failed to create start_miner message: %v", err)

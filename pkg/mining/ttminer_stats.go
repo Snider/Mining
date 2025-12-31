@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -41,6 +42,7 @@ func (m *TTMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse
 		return nil, fmt.Errorf("failed to get stats: unexpected status code %d", resp.StatusCode)
 	}
 

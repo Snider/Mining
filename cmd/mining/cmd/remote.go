@@ -82,10 +82,11 @@ var remoteStartCmd = &cobra.Command{
 	Long:  `Start a miner on a remote peer using a profile.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		profileID, _ := cmd.Flags().GetString("profile")
-		if profileID == "" {
-			return fmt.Errorf("--profile is required")
+		minerType, _ := cmd.Flags().GetString("type")
+		if minerType == "" {
+			return fmt.Errorf("--type is required (e.g., xmrig, tt-miner)")
 		}
+		profileID, _ := cmd.Flags().GetString("profile")
 
 		peerID := args[0]
 		peer := findPeerByPartialID(peerID)
@@ -98,8 +99,8 @@ var remoteStartCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Starting miner on %s with profile %s...\n", peer.Name, profileID)
-		if err := ctrl.StartRemoteMiner(peer.ID, profileID, nil); err != nil {
+		fmt.Printf("Starting %s miner on %s with profile %s...\n", minerType, peer.Name, profileID)
+		if err := ctrl.StartRemoteMiner(peer.ID, minerType, profileID, nil); err != nil {
 			return fmt.Errorf("failed to start miner: %w", err)
 		}
 
@@ -298,6 +299,7 @@ func init() {
 	// remote start
 	remoteCmd.AddCommand(remoteStartCmd)
 	remoteStartCmd.Flags().StringP("profile", "p", "", "Profile ID to use for starting the miner")
+	remoteStartCmd.Flags().StringP("type", "t", "", "Miner type (e.g., xmrig, tt-miner)")
 
 	// remote stop
 	remoteCmd.AddCommand(remoteStopCmd)

@@ -117,7 +117,8 @@ type PongPayload struct {
 
 // StartMinerPayload requests starting a miner.
 type StartMinerPayload struct {
-	ProfileID string          `json:"profileId"`
+	MinerType string          `json:"minerType"`           // Required: miner type (e.g., "xmrig", "tt-miner")
+	ProfileID string          `json:"profileId,omitempty"`
 	Config    json.RawMessage `json:"config,omitempty"` // Override profile config
 }
 
