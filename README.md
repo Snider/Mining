@@ -7,162 +7,173 @@
 [![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
 
-GoLang Miner management with embedable RESTful control - A modern, modular package for managing cryptocurrency miners.
+A modern, modular cryptocurrency mining management platform with GPU support, RESTful API, and cross-platform desktop application.
 
-```bash
-miner-ctrl serve --host localhost --port 9090 --namespace /api/v1/mining
-```
-
-```html
-<script type="module" src="./mbe-mining-dashboard.js"></script>
-<mde-mining-dashboard miner-name="xmrig" wallet="..." pool="..." api-base-url="http://localhost:9090/api/v1/mining"></mde-mining-dashboard>
-```
-
-<img width="834" height="657" alt="image" src="https://github.com/user-attachments/assets/d4fc4704-819c-4aca-bcd3-ae4af6e25c1b" />
-
-
-
-## Overview
-
-Mining is a Go package designed to provide comprehensive miner management capabilities. It can be used both as a standalone CLI tool and as a module/plugin in other Go projects. The package offers:
-
-- **Miner Lifecycle Management**: Start, stop, and monitor miners
-- **Status Tracking**: Real-time status and hash rate monitoring
-- **CLI Interface**: Easy-to-use command-line interface built with Cobra
-- **Modular Design**: Import as a package in your own projects
-- **RESTful Ready**: Designed for integration with RESTful control systems
+<img width="834" height="657" alt="Mining Dashboard" src="https://github.com/user-attachments/assets/d4fc4704-819c-4aca-bcd3-ae4af6e25c1b" />
 
 ## Features
 
-- ✅ Start and stop miners programmatically
-- ✅ Monitor miner status and performance
-- ✅ Track hash rates
-- ✅ List all active miners
-- ✅ CLI for easy management
-- ✅ Designed as a reusable Go module
-- ✅ Comprehensive test coverage
-- ✅ Standards-compliant configuration (CodeRabbit, GoReleaser)
+### Supported Algorithms
 
-## Installation
+| Algorithm | Coin | CPU | GPU (OpenCL) | GPU (CUDA) |
+|-----------|------|-----|--------------|------------|
+| RandomX | Monero (XMR) | ✅ | ✅ | ✅ |
+| KawPow | Ravencoin (RVN) | ❌ | ✅ | ✅ |
+| ETChash | Ethereum Classic (ETC) | ❌ | ✅ | ✅ |
+| ProgPowZ | Zano (ZANO) | ❌ | ✅ | ✅ |
+| Blake3 | Decred (DCR) | ✅ | ✅ | ✅ |
+| CryptoNight | Various | ✅ | ✅ | ✅ |
 
-### As a CLI Tool
+### Core Capabilities
+
+- **Multi-Algorithm Mining**: Support for CPU and GPU mining across multiple algorithms
+- **Dual Mining**: Run CPU and GPU mining simultaneously with separate pools
+- **Profile Management**: Save and switch between mining configurations
+- **Real-time Monitoring**: Live hashrate, shares, and performance metrics
+- **RESTful API**: Full control via HTTP endpoints with Swagger documentation
+- **Web Dashboard**: Embeddable Angular web component for any application
+- **Desktop Application**: Native cross-platform app built with Wails v3
+- **Mobile Responsive**: Touch-friendly UI with drawer navigation
+
+### Mining Software
+
+Manages installation and configuration of:
+- **XMRig** - High-performance CPU/GPU miner (RandomX, CryptoNight)
+- **T-Rex** - NVIDIA GPU miner (KawPow, Ethash, and more)
+- **lolMiner** - AMD/NVIDIA GPU miner (Ethash, Beam, Equihash)
+- **TT-Miner** - NVIDIA GPU miner (Ethash, KawPow, Autolykos2)
+
+## Quick Start
+
+### CLI
 
 ```bash
+# Install
 go install github.com/Snider/Mining/cmd/mining@latest
+
+# Start the API server
+miner-ctrl serve --host localhost --port 9090
+
+# Or use the interactive shell
+miner-ctrl serve
 ```
 
-### As a Go Module
+### Web Component
+
+```html
+<script type="module" src="./mbe-mining-dashboard.js"></script>
+<snider-mining api-base-url="http://localhost:9090/api/v1/mining"></snider-mining>
+```
+
+### Desktop Application
+
+Download pre-built binaries from [Releases](https://github.com/Snider/Mining/releases) or build from source:
 
 ```bash
-go get github.com/Snider/Mining
+cd cmd/desktop/mining-desktop
+wails3 build
 ```
 
-## Usage
-
-### CLI Commands
-
-The `miner-ctrl` provides the following commands:
+## Architecture
 
 ```
-miner-ctrl completion  Generate the autocompletion script for the specified shell
-miner-ctrl doctor      Check and refresh the status of installed miners
-miner-ctrl help        Help about any command
-miner-ctrl install     Install or update a miner
-miner-ctrl list        List running and available miners
-miner-ctrl serve       Start the mining service and interactive shell
-miner-ctrl start       Start a new miner
-miner-ctrl status      Get status of a running miner
-miner-ctrl stop        Stop a running miner
-miner-ctrl uninstall   Uninstall a miner
-miner-ctrl update      Check for updates to installed miners
+Mining/
+├── cmd/
+│   ├── mining/              # CLI application
+│   └── desktop/             # Wails desktop app
+├── pkg/mining/              # Core Go package
+│   ├── mining.go            # Interfaces and types
+│   ├── manager.go           # Miner lifecycle management
+│   ├── service.go           # RESTful API (Gin)
+│   ├── xmrig.go             # XMRig implementation
+│   └── profile_manager.go   # Profile persistence
+├── miner/core/              # Modified XMRig with algorithm support
+│   └── src/
+│       ├── backend/opencl/  # OpenCL GPU kernels
+│       ├── backend/cuda/    # CUDA GPU kernels
+│       └── crypto/          # Algorithm implementations
+└── ui/                      # Angular 20+ web dashboard
+    └── src/app/
+        ├── components/      # Reusable UI components
+        └── pages/           # Route pages
 ```
 
-For more details on any command, use `miner-ctrl [command] --help`.
+## API Reference
 
-### RESTful API Endpoints
+Base path: `/api/v1/mining`
 
-When running the `miner-ctrl serve` command, the following RESTful API endpoints are exposed (default base path `/api/v1/mining`):
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/info` | System info and installed miners |
+| GET | `/miners` | List running miners |
+| POST | `/miners/:name` | Start a miner |
+| DELETE | `/miners/:name` | Stop a miner |
+| GET | `/miners/:name/stats` | Get miner statistics |
+| GET | `/profiles` | List saved profiles |
+| POST | `/profiles` | Create a profile |
+| PUT | `/profiles/:id` | Update a profile |
+| DELETE | `/profiles/:id` | Delete a profile |
+| POST | `/miners/:name/install` | Install miner software |
 
-- `GET /api/v1/mining/info` - Get cached miner installation information and system details.
-- `POST /api/v1/mining/doctor` - Perform a live check on all available miners to verify their installation status, version, and path.
-- `POST /api/v1/mining/update` - Check if any installed miners have a new version available for download.
-- `GET /api/v1/mining/miners` - Get a list of all running miners.
-- `GET /api/v1/mining/miners/available` - Get a list of all available miners.
-- `POST /api/v1/mining/miners/:miner_name` - Start a new miner with the given configuration.
-- `POST /api/v1/mining/miners/:miner_name/install` - Install a new miner or update an existing one.
-- `DELETE /api/v1/mining/miners/:miner_name/uninstall` - Remove all files for a specific miner.
-- `DELETE /api/v1/mining/miners/:miner_name` - Stop a running miner by its name.
-- `GET /api/v1/mining/miners/:miner_name/stats` - Get statistics for a running miner.
-- `GET /api/v1/mining/swagger/*any` - Serve Swagger UI for API documentation.
-
-Swagger documentation is typically available at `http://<host>:<port>/api/v1/mining/swagger/index.html`.
+Swagger UI: `http://localhost:9090/api/v1/mining/swagger/index.html`
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.24 or higher
-- Make (optional, for using Makefile targets)
+- Go 1.24+
+- Node.js 20+ (for UI development)
+- CMake 3.21+ (for miner core)
+- OpenCL SDK (for GPU support)
 
-### Build
+### Build Commands
 
 ```bash
-# Build the CLI
-go build -o miner-ctrl ./cmd/mining
+# Backend
+make build              # Build CLI binary
+make test               # Run tests with coverage
+make dev                # Start dev server on :9090
 
-# Run tests
-go test ./...
+# Frontend
+cd ui
+npm install
+npm run build           # Build web component
+npm test                # Run unit tests (36 specs)
 
-# Run tests with coverage
-go test -cover ./...
-```
+# Desktop
+cd cmd/desktop/mining-desktop
+wails3 build            # Build native app
 
-### Project Structure
-
-```
-.
-├── cmd/
-│   └── mining/          # CLI application
-│       ├── main.go      # CLI entry point
-│       └── cmd/         # Cobra commands
-├── pkg/
-│   └── mining/          # Core mining package
-│       ├── mining.go    # Main package code
-│       └── mining_test.go
-├── main.go              # Demo/development main
-├── .coderabbit.yaml     # CodeRabbit configuration
-├── .goreleaser.yaml     # GoReleaser configuration
-├── .gitignore
-├── go.mod
-├── LICENSE
-└── README.md
+# Miner Core (GPU support)
+cd miner/core
+mkdir build && cd build
+cmake .. -DWITH_OPENCL=ON -DWITH_CUDA=ON
+make -j$(nproc)
 ```
 
 ## Configuration
 
-### CodeRabbit
+Mining profiles are stored in `~/.config/lethean-desktop/mining_profiles.json`
 
-The project uses CodeRabbit for automated code reviews. Configuration is in `.coderabbit.yaml`.
-
-### GoReleaser
-
-Releases are managed with GoReleaser. Configuration is in `.goreleaser.yaml`. To create a release:
-
-```bash
-# Tag a version
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
-
-# GoReleaser will automatically build and publish
+Example profile:
+```json
+{
+  "id": "uuid",
+  "name": "My XMR Mining",
+  "minerType": "xmrig",
+  "config": {
+    "pool": "stratum+tcp://pool.supportxmr.com:3333",
+    "wallet": "YOUR_WALLET_ADDRESS",
+    "algo": "rx/0"
+  }
+}
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
@@ -172,10 +183,8 @@ This project is licensed under the EUPL-1.2 License - see the [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- Built with [Cobra](https://github.com/spf13/cobra) for CLI functionality
-- Configured for [CodeRabbit](https://coderabbit.ai) automated reviews
-- Releases managed with [GoReleaser](https://goreleaser.com)
-
-## Support
-
-For issues, questions, or contributions, please open an issue on GitHub.
+- [XMRig](https://github.com/xmrig/xmrig) - High performance miner
+- [Wails](https://wails.io) - Desktop application framework
+- [Angular](https://angular.io) - Web framework
+- [Gin](https://gin-gonic.com) - HTTP web framework
+- [Cobra](https://github.com/spf13/cobra) - CLI framework

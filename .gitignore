@@ -57,3 +57,7 @@ temp/
 
 # goreleaser
 .goreleaser.yaml.bak
+
+# MkDocs build output
+/site/
+.cache/

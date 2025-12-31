@@ -1,39 +1,74 @@
-site_name: Mining Dashboard
-docs_dir: site-docs
-site_description: Multi-Miner Management System - Control XMRig, TT-Miner and more from a single dashboard
-site_author: Built with Claude Code
-repo_url: https://github.com/Snider/Mining
+site_name: Mining - Cryptocurrency Mining Management
+site_description: A modular cryptocurrency mining management system with CLI, API, and desktop applications
+site_author: Mining Project Contributors
+site_url: https://snider.github.io/Mining/
+
 repo_name: Snider/Mining
+repo_url: https://github.com/Snider/Mining
+edit_uri: edit/main/docs/
+
+docs_dir: docs
 
 theme:
   name: material
   palette:
-    - scheme: slate
+    # Palette toggle for dark mode (default)
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: deep purple
-      accent: lime
+      accent: purple
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-    - scheme: default
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: deep purple
-      accent: lime
+      accent: purple
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
+
   features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.tracking
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
+    - navigation.path
     - navigation.top
+    - navigation.footer
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+    - content.action.view
+
   icon:
     repo: fontawesome/brands/github
-  logo: assets/logo.svg
-  favicon: assets/favicon.ico
+    edit: material/pencil
+    view: material/eye
+
+  font:
+    text: Roboto
+    code: Roboto Mono
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - minify:
+      minify_html: true
   - glightbox:
       touchNavigation: true
       loop: false
@@ -45,10 +80,35 @@ plugins:
       draggable: true
 
 markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -56,51 +116,117 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.details
-  - admonition
-  - tables
-  - attr_list
-  - md_in_html
-  - toc:
-      permalink: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
 
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/Snider/Mining
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/snider/mining
   generator: false
+  version:
+    provider: mike
 
-copyright: Built with Claude Code - AI-Powered Development
+extra_css:
+  - stylesheets/extra.css
+
+copyright: Copyright &copy; 2025 Mining Project Contributors
 
 nav:
   - Home: index.md
+
   - Getting Started:
+    - Introduction: getting-started/introduction.md
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
     - Configuration: getting-started/configuration.md
-  - Features:
-    - Dashboard: features/dashboard.md
-    - Mining Profiles: features/profiles.md
-    - Console & Logs: features/console.md
-    - Multi-Miner Support: features/multi-miner.md
-    - Historical Data: features/history.md
-    - P2P Multi-Node: features/p2p-multinode.md
-  - User Interface:
-    - Overview: ui/overview.md
-    - Screenshots: ui/screenshots.md
-  - API Reference:
-    - REST API: api/rest-api.md
-    - Endpoints: api/endpoints.md
+    - First Mining Session: getting-started/first-session.md
+
   - CLI Reference:
-    - Commands: cli/commands.md
-    - Examples: cli/examples.md
+    - Overview: cli/overview.md
+    - serve: cli/serve.md
+    - start: cli/start.md
+    - stop: cli/stop.md
+    - status: cli/status.md
+    - install: cli/install.md
+    - uninstall: cli/uninstall.md
+    - update: cli/update.md
+    - list: cli/list.md
+    - doctor: cli/doctor.md
+    - profiles: cli/profiles.md
+
+  - API Reference:
+    - Overview: api/overview.md
+    - Authentication: api/authentication.md
+    - System Endpoints: api/system.md
+    - Miner Endpoints: api/miners.md
+    - Profile Endpoints: api/profiles.md
+    - Stats Endpoints: api/stats.md
+    - Swagger UI: api/swagger.md
+    - Error Handling: api/errors.md
+
+  - Web Dashboard:
+    - Overview: dashboard/overview.md
+    - Installation: dashboard/installation.md
+    - Web Component: dashboard/web-component.md
+    - Features: dashboard/features.md
+    - Configuration: dashboard/configuration.md
+    - Customization: dashboard/customization.md
+
+  - Desktop Application:
+    - Overview: desktop/overview.md
+    - Installation: desktop/installation.md
+    - Building from Source: desktop/building.md
+    - Platform Support: desktop/platforms.md
+    - Configuration: desktop/configuration.md
+    - Troubleshooting: desktop/troubleshooting.md
+
+  - Development Guide:
+    - Setup: development/setup.md
+    - Project Structure: development/structure.md
+    - Building: development/building.md
+    - Testing: development/testing.md
+    - E2E Tests: development/e2e-tests.md
+    - Code Style: development/code-style.md
+    - Contributing: development/contributing.md
+    - Release Process: development/releases.md
+
   - Architecture:
     - Overview: architecture/overview.md
-    - Backend: architecture/backend.md
-    - Frontend: architecture/frontend.md
-  - Development:
-    - Contributing: development/contributing.md
-    - Building: development/building.md
-  - About:
-    - Built with Claude: about/claude.md
-    - Changelog: about/changelog.md
+    - Go Backend: architecture/backend.md
+    - Miner Interface: architecture/miner-interface.md
+    - Manager System: architecture/manager.md
+    - REST Service: architecture/rest-service.md
+    - XMRig Implementation: architecture/xmrig.md
+    - Profile System: architecture/profiles.md
+    - Stats Collection: architecture/stats.md
+    - XDG Directories: architecture/xdg.md
+
+  - Pool Integration:
+    - Research Overview: pools/research.md
+    - Supported Algorithms: pools/algorithms.md
+    - Stratum Protocol: pools/stratum.md
+    - Pool Configuration: pools/configuration.md
+    - ETChash Pools: pools/etchash.md
+    - ProgPowZ Pools: pools/progpowz.md
+    - Blake3DCR Pools: pools/blake3dcr.md
+    - Custom Pools: pools/custom.md
+
+  - Miners:
+    - Overview: miners/overview.md
+    - XMRig: miners/xmrig.md
+    - Adding New Miners: miners/adding-miners.md
+
+  - Troubleshooting:
+    - Common Issues: troubleshooting/common-issues.md
+    - Logs: troubleshooting/logs.md
+    - Performance: troubleshooting/performance.md
+    - GPU Issues: troubleshooting/gpu.md
+    - Network Issues: troubleshooting/network.md
+
+  - FAQ: faq.md
+  - Changelog: changelog.md
+  - License: license.md
