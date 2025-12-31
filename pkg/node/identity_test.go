@@ -216,3 +216,138 @@ func TestNodeRoles(t *testing.T) {
 		})
 	}
 }
+
+func TestChallengeResponse(t *testing.T) {
+	t.Run("GenerateChallenge", func(t *testing.T) {
+		challenge, err := GenerateChallenge()
+		if err != nil {
+			t.Fatalf("failed to generate challenge: %v", err)
+		}
+
+		if len(challenge) != ChallengeSize {
+			t.Errorf("expected challenge size %d, got %d", ChallengeSize, len(challenge))
+		}
+
+		// Ensure challenges are unique (not all zeros)
+		allZero := true
+		for _, b := range challenge {
+			if b != 0 {
+				allZero = false
+				break
+			}
+		}
+		if allZero {
+			t.Error("challenge should not be all zeros")
+		}
+
+		// Generate another and ensure they're different
+		challenge2, err := GenerateChallenge()
+		if err != nil {
+			t.Fatalf("failed to generate second challenge: %v", err)
+		}
+
+		same := true
+		for i := range challenge {
+			if challenge[i] != challenge2[i] {
+				same = false
+				break
+			}
+		}
+		if same {
+			t.Error("two generated challenges should be different")
+		}
+	})
+
+	t.Run("SignAndVerifyChallenge", func(t *testing.T) {
+		challenge, _ := GenerateChallenge()
+		sharedSecret := []byte("test-secret-key-32-bytes-long!!")
+
+		// Sign the challenge
+		signature := SignChallenge(challenge, sharedSecret)
+
+		if len(signature) == 0 {
+			t.Error("signature should not be empty")
+		}
+
+		// Verify should succeed with correct parameters
+		if !VerifyChallenge(challenge, signature, sharedSecret) {
+			t.Error("verification should succeed with correct parameters")
+		}
+
+		// Verify should fail with wrong challenge
+		wrongChallenge, _ := GenerateChallenge()
+		if VerifyChallenge(wrongChallenge, signature, sharedSecret) {
+			t.Error("verification should fail with wrong challenge")
+		}
+
+		// Verify should fail with wrong secret
+		wrongSecret := []byte("wrong-secret-key-32-bytes-long!")
+		if VerifyChallenge(challenge, signature, wrongSecret) {
+			t.Error("verification should fail with wrong secret")
+		}
+
+		// Verify should fail with tampered signature
+		tamperedSig := make([]byte, len(signature))
+		copy(tamperedSig, signature)
+		tamperedSig[0] ^= 0xFF // Flip bits
+		if VerifyChallenge(challenge, tamperedSig, sharedSecret) {
+			t.Error("verification should fail with tampered signature")
+		}
+	})
+
+	t.Run("SignatureIsDeterministic", func(t *testing.T) {
+		challenge := []byte("fixed-challenge-for-testing")
+		sharedSecret := []byte("fixed-secret-key-for-testing")
+
+		sig1 := SignChallenge(challenge, sharedSecret)
+		sig2 := SignChallenge(challenge, sharedSecret)
+
+		if len(sig1) != len(sig2) {
+			t.Fatal("signatures should have same length")
+		}
+
+		for i := range sig1 {
+			if sig1[i] != sig2[i] {
+				t.Fatal("signatures should be identical for same inputs")
+			}
+		}
+	})
+
+	t.Run("IntegrationWithSharedSecret", func(t *testing.T) {
+		// Create two nodes and test end-to-end challenge-response
+		tmpDir1, _ := os.MkdirTemp("", "node-challenge-1")
+		tmpDir2, _ := os.MkdirTemp("", "node-challenge-2")
+		defer os.RemoveAll(tmpDir1)
+		defer os.RemoveAll(tmpDir2)
+
+		nm1, _ := NewNodeManagerWithPaths(
+			filepath.Join(tmpDir1, "private.key"),
+			filepath.Join(tmpDir1, "node.json"),
+		)
+		nm1.GenerateIdentity("challenger", RoleDual)
+
+		nm2, _ := NewNodeManagerWithPaths(
+			filepath.Join(tmpDir2, "private.key"),
+			filepath.Join(tmpDir2, "node.json"),
+		)
+		nm2.GenerateIdentity("responder", RoleDual)
+
+		// Challenger generates challenge
+		challenge, err := GenerateChallenge()
+		if err != nil {
+			t.Fatalf("failed to generate challenge: %v", err)
+		}
+
+		// Both derive the same shared secret
+		secret1, _ := nm1.DeriveSharedSecret(nm2.GetIdentity().PublicKey)
+		secret2, _ := nm2.DeriveSharedSecret(nm1.GetIdentity().PublicKey)
+
+		// Responder signs challenge with their derived secret
+		response := SignChallenge(challenge, secret2)
+
+		// Challenger verifies with their derived secret
+		if !VerifyChallenge(challenge, response, secret1) {
+			t.Error("challenge-response should verify with matching shared secrets")
+		}
+	})
+}

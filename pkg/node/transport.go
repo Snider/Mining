@@ -196,19 +196,12 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 		transport:    t,
 	}
 
-	// Perform handshake first to exchange public keys
+	// Perform handshake with challenge-response authentication
+	// This also derives and stores the shared secret in pc.SharedSecret
 	if err := t.performHandshake(pc); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("handshake failed: %w", err)
 	}
-
-	// Now derive shared secret using the received public key
-	sharedSecret, err := t.node.DeriveSharedSecret(pc.Peer.PublicKey)
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("failed to derive shared secret: %w", err)
-	}
-	pc.SharedSecret = sharedSecret
 
 	// Store connection using the real peer ID from handshake
 	t.mu.Lock()
@@ -394,9 +387,17 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
+
+	// Sign the client's challenge to prove we have the matching private key
+	var challengeResponse []byte
+	if len(payload.Challenge) > 0 {
+		challengeResponse = SignChallenge(payload.Challenge, sharedSecret)
+	}
+
 	ackPayload := HandshakeAckPayload{
-		Identity: *identity,
-		Accepted: true,
+		Identity:          *identity,
+		ChallengeResponse: challengeResponse,
+		Accepted:          true,
 	}
 
 	ackMsg, err := NewMessage(MsgHandshakeAck, identity.ID, peer.ID, ackPayload)
@@ -451,9 +452,16 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 		return fmt.Errorf("node identity not initialized")
 	}
 
+	// Generate challenge for the server to prove it has the matching private key
+	challenge, err := GenerateChallenge()
+	if err != nil {
+		return fmt.Errorf("generate challenge: %w", err)
+	}
+
 	payload := HandshakePayload{
-		Identity: *identity,
-		Version:  "1.0",
+		Identity:  *identity,
+		Challenge: challenge,
+		Version:   "1.0",
 	}
 
 	msg, err := NewMessage(MsgHandshake, identity.ID, pc.Peer.ID, payload)
@@ -501,11 +509,33 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 	pc.Peer.Name = ackPayload.Identity.Name
 	pc.Peer.Role = ackPayload.Identity.Role
 
+	// Verify challenge response - derive shared secret first using the peer's public key
+	sharedSecret, err := t.node.DeriveSharedSecret(pc.Peer.PublicKey)
+	if err != nil {
+		return fmt.Errorf("derive shared secret for challenge verification: %w", err)
+	}
+
+	// Verify the server's response to our challenge
+	if len(ackPayload.ChallengeResponse) == 0 {
+		return fmt.Errorf("server did not provide challenge response")
+	}
+	if !VerifyChallenge(challenge, ackPayload.ChallengeResponse, sharedSecret) {
+		return fmt.Errorf("challenge response verification failed: server may not have matching private key")
+	}
+
+	// Store the shared secret for later use
+	pc.SharedSecret = sharedSecret
+
 	// Update the peer in registry with the real identity
 	if err := t.registry.UpdatePeer(pc.Peer); err != nil {
 		// If update fails (peer not found with old ID), add as new
 		t.registry.AddPeer(pc.Peer)
 	}
+
+	logging.Debug("handshake completed with challenge-response verification", logging.Fields{
+		"peer_id":   pc.Peer.ID,
+		"peer_name": pc.Peer.Name,
+	})
 
 	return nil
 }

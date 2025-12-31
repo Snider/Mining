@@ -3,6 +3,8 @@ package node
 
 import (
 	"crypto/ecdh"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +17,32 @@ import (
 	"github.com/Snider/Borg/pkg/stmf"
 	"github.com/adrg/xdg"
 )
+
+// ChallengeSize is the size of the challenge in bytes
+const ChallengeSize = 32
+
+// GenerateChallenge creates a random challenge for authentication.
+func GenerateChallenge() ([]byte, error) {
+	challenge := make([]byte, ChallengeSize)
+	if _, err := rand.Read(challenge); err != nil {
+		return nil, fmt.Errorf("failed to generate challenge: %w", err)
+	}
+	return challenge, nil
+}
+
+// SignChallenge creates an HMAC signature of a challenge using a shared secret.
+// The signature proves possession of the shared secret without revealing it.
+func SignChallenge(challenge []byte, sharedSecret []byte) []byte {
+	mac := hmac.New(sha256.New, sharedSecret)
+	mac.Write(challenge)
+	return mac.Sum(nil)
+}
+
+// VerifyChallenge verifies that a challenge response was signed with the correct shared secret.
+func VerifyChallenge(challenge, response, sharedSecret []byte) bool {
+	expected := SignChallenge(challenge, sharedSecret)
+	return hmac.Equal(response, expected)
+}
 
 // NodeRole defines the operational mode of a node.
 type NodeRole string
