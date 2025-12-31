@@ -18,6 +18,7 @@ import (
 	"github.com/Snider/Mining/docs"
 	"github.com/Snider/Mining/pkg/logging"
 	"github.com/adrg/xdg"
+	ginmcp "github.com/ckanthony/gin-mcp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -42,6 +43,7 @@ type Service struct {
 	SwaggerUIPath       string
 	rateLimiter         *RateLimiter
 	auth                *DigestAuth
+	mcpServer           *ginmcp.GinMCP
 }
 
 // APIError represents a structured error response for the API
@@ -430,6 +432,16 @@ func (s *Service) SetupRoutes() {
 
 	swaggerURL := ginSwagger.URL(fmt.Sprintf("http://%s%s/doc.json", s.DisplayAddr, s.SwaggerUIPath))
 	s.Router.GET(s.SwaggerUIPath+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL, ginSwagger.InstanceName(s.SwaggerInstanceName)))
+
+	// Initialize MCP server for AI assistant integration
+	// This exposes API endpoints as MCP tools for Claude, Cursor, etc.
+	s.mcpServer = ginmcp.New(s.Router, &ginmcp.Config{
+		Name:        "Mining API",
+		Description: "Mining dashboard API exposed via Model Context Protocol (MCP)",
+		BaseURL:     fmt.Sprintf("http://%s", s.DisplayAddr),
+	})
+	s.mcpServer.Mount(s.APIBasePath + "/mcp")
+	logging.Info("MCP server enabled", logging.Fields{"endpoint": s.APIBasePath + "/mcp"})
 }
 
 // handleGetInfo godoc
