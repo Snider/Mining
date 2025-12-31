@@ -41,6 +41,64 @@ type Service struct {
 	SwaggerUIPath       string
 }
 
+// APIError represents a structured error response for the API
+type APIError struct {
+	Code       string `json:"code"`                 // Machine-readable error code
+	Message    string `json:"message"`              // Human-readable message
+	Details    string `json:"details,omitempty"`    // Technical details (for debugging)
+	Suggestion string `json:"suggestion,omitempty"` // What to do next
+	Retryable  bool   `json:"retryable"`            // Can the client retry?
+}
+
+// Error codes for API responses
+const (
+	ErrCodeMinerNotFound     = "MINER_NOT_FOUND"
+	ErrCodeProfileNotFound   = "PROFILE_NOT_FOUND"
+	ErrCodeInstallFailed     = "INSTALL_FAILED"
+	ErrCodeStartFailed       = "START_FAILED"
+	ErrCodeStopFailed        = "STOP_FAILED"
+	ErrCodeInvalidInput      = "INVALID_INPUT"
+	ErrCodeInternalError     = "INTERNAL_ERROR"
+	ErrCodeNotSupported      = "NOT_SUPPORTED"
+	ErrCodeServiceUnavailable = "SERVICE_UNAVAILABLE"
+)
+
+// respondWithError sends a structured error response
+func respondWithError(c *gin.Context, status int, code string, message string, details string) {
+	apiErr := APIError{
+		Code:      code,
+		Message:   message,
+		Details:   details,
+		Retryable: isRetryableError(status),
+	}
+
+	// Add suggestions based on error code
+	switch code {
+	case ErrCodeMinerNotFound:
+		apiErr.Suggestion = "Check the miner name or install the miner first"
+	case ErrCodeProfileNotFound:
+		apiErr.Suggestion = "Create a new profile or check the profile ID"
+	case ErrCodeInstallFailed:
+		apiErr.Suggestion = "Check your internet connection and try again"
+	case ErrCodeStartFailed:
+		apiErr.Suggestion = "Check the miner configuration and logs"
+	case ErrCodeInvalidInput:
+		apiErr.Suggestion = "Verify the request body matches the expected format"
+	case ErrCodeServiceUnavailable:
+		apiErr.Suggestion = "The service is temporarily unavailable, try again later"
+		apiErr.Retryable = true
+	}
+
+	c.JSON(status, apiErr)
+}
+
+// isRetryableError determines if an error status code is retryable
+func isRetryableError(status int) bool {
+	return status == http.StatusServiceUnavailable ||
+		status == http.StatusTooManyRequests ||
+		status == http.StatusGatewayTimeout
+}
+
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -502,7 +560,7 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 	profileID := c.Param("id")
 	profile, exists := s.ProfileManager.GetProfile(profileID)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "profile not found"})
+		respondWithError(c, http.StatusNotFound, ErrCodeProfileNotFound, "profile not found", "")
 		return
 	}
 
@@ -549,7 +607,7 @@ func (s *Service) handleGetMinerStats(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	miner, err := s.Manager.GetMiner(minerName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
+		respondWithError(c, http.StatusNotFound, ErrCodeMinerNotFound, "miner not found", err.Error())
 		return
 	}
 	stats, err := miner.GetStats(c.Request.Context())
@@ -590,7 +648,7 @@ func (s *Service) handleGetMinerLogs(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	miner, err := s.Manager.GetMiner(minerName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
+		respondWithError(c, http.StatusNotFound, ErrCodeMinerNotFound, "miner not found", err.Error())
 		return
 	}
 	logs := miner.GetLogs()
@@ -623,7 +681,7 @@ func (s *Service) handleMinerStdin(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	miner, err := s.Manager.GetMiner(minerName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "miner not found"})
+		respondWithError(c, http.StatusNotFound, ErrCodeMinerNotFound, "miner not found", err.Error())
 		return
 	}
 
@@ -690,7 +748,7 @@ func (s *Service) handleGetProfile(c *gin.Context) {
 	profileID := c.Param("id")
 	profile, exists := s.ProfileManager.GetProfile(profileID)
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "profile not found"})
+		respondWithError(c, http.StatusNotFound, ErrCodeProfileNotFound, "profile not found", "")
 		return
 	}
 	c.JSON(http.StatusOK, profile)
