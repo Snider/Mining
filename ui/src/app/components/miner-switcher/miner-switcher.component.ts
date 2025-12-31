@@ -9,6 +9,11 @@ interface ContextMenuState {
   minerName: string;
 }
 
+// Spinner SVG for loading states
+const SPINNER_SVG = `<svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+  <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+</svg>`;
+
 @Component({
   selector: 'app-miner-switcher',
   standalone: true,
@@ -64,12 +69,20 @@ interface ContextMenuState {
               <div class="miner-actions">
                 <button
                   class="action-btn stop"
+                  [class.loading]="isLoading('stop-' + miner.name)"
+                  [disabled]="isLoading('stop-' + miner.name)"
                   title="Stop miner"
                   (click)="stopMiner($event, miner.name)">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
-                  </svg>
+                  @if (isLoading('stop-' + miner.name)) {
+                    <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+                    </svg>
+                  } @else {
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                    </svg>
+                  }
                 </button>
                 <button
                   class="action-btn edit"
@@ -97,11 +110,21 @@ interface ContextMenuState {
             <div class="start-section">
               <span class="section-label">Start Worker</span>
               @for (profile of profiles(); track profile.id) {
-                <button class="dropdown-item start-item" (click)="startProfile(profile.id, profile.name)">
-                  <svg class="item-icon play" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
+                <button
+                  class="dropdown-item start-item"
+                  [class.loading]="isLoading('start-' + profile.id)"
+                  [disabled]="isLoading('start-' + profile.id)"
+                  (click)="startProfile(profile.id, profile.name)">
+                  @if (isLoading('start-' + profile.id)) {
+                    <svg class="item-icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+                    </svg>
+                  } @else {
+                    <svg class="item-icon play" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  }
                   <span>{{ profile.name }}</span>
                   <span class="profile-type">{{ profile.minerType }}</span>
                 </button>
@@ -152,11 +175,21 @@ interface ContextMenuState {
           <span>Edit Configuration</span>
         </button>
         <div class="context-menu-divider"></div>
-        <button class="context-menu-item danger" (click)="stopFromContext()">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
-          </svg>
+        <button
+          class="context-menu-item danger"
+          [class.loading]="isLoading('stop-' + contextMenu().minerName)"
+          [disabled]="isLoading('stop-' + contextMenu().minerName)"
+          (click)="stopFromContext()">
+          @if (isLoading('stop-' + contextMenu().minerName)) {
+            <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+            </svg>
+          } @else {
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+            </svg>
+          }
           <span>Stop Worker</span>
         </button>
       </div>
@@ -490,6 +523,38 @@ interface ContextMenuState {
     .context-menu-item.danger svg {
       color: var(--color-danger-500);
     }
+
+    /* Spinner animation */
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Loading state styles */
+    .action-btn.loading,
+    .dropdown-item.loading,
+    .context-menu-item.loading {
+      opacity: 0.7;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .action-btn:disabled,
+    .dropdown-item:disabled,
+    .context-menu-item:disabled {
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .action-btn.loading .spinner,
+    .dropdown-item.loading .spinner,
+    .context-menu-item.loading .spinner {
+      color: var(--color-accent-400);
+    }
   `]
 })
 export class MinerSwitcherComponent {
@@ -504,6 +569,25 @@ export class MinerSwitcherComponent {
 
   dropdownOpen = signal(false);
   contextMenu = signal<ContextMenuState>({ visible: false, x: 0, y: 0, minerName: '' });
+
+  // Track loading states for actions (e.g., "stop-minerName", "start-profileId")
+  private loadingActions = signal<Set<string>>(new Set());
+
+  isLoading(actionKey: string): boolean {
+    return this.loadingActions().has(actionKey);
+  }
+
+  private setLoading(actionKey: string, loading: boolean) {
+    this.loadingActions.update(set => {
+      const newSet = new Set(set);
+      if (loading) {
+        newSet.add(actionKey);
+      } else {
+        newSet.delete(actionKey);
+      }
+      return newSet;
+    });
+  }
 
   // Close context menu on Escape
   @HostListener('document:keydown.escape')
@@ -544,12 +628,20 @@ export class MinerSwitcherComponent {
 
   stopMiner(event: Event, name: string) {
     event.stopPropagation();
+    const actionKey = `stop-${name}`;
+    if (this.isLoading(actionKey)) return;
+
+    this.setLoading(actionKey, true);
     this.minerService.stopMiner(name).subscribe({
       next: () => {
         // If this was the selected miner, switch to all view
         if (this.selectedMinerName() === name) {
           this.minerService.selectAllMiners();
         }
+        this.setLoading(actionKey, false);
+      },
+      error: () => {
+        this.setLoading(actionKey, false);
       }
     });
   }
@@ -565,8 +657,19 @@ export class MinerSwitcherComponent {
   }
 
   startProfile(profileId: string, profileName: string) {
-    this.minerService.startMiner(profileId).subscribe();
-    this.closeDropdown();
+    const actionKey = `start-${profileId}`;
+    if (this.isLoading(actionKey)) return;
+
+    this.setLoading(actionKey, true);
+    this.minerService.startMiner(profileId).subscribe({
+      next: () => {
+        this.setLoading(actionKey, false);
+        this.closeDropdown();
+      },
+      error: () => {
+        this.setLoading(actionKey, false);
+      }
+    });
   }
 
   getHashrate(miner: any): number {
@@ -632,13 +735,22 @@ export class MinerSwitcherComponent {
 
   stopFromContext() {
     const minerName = this.contextMenu().minerName;
+    const actionKey = `stop-${minerName}`;
+    if (this.isLoading(actionKey)) return;
+
+    this.setLoading(actionKey, true);
     this.minerService.stopMiner(minerName).subscribe({
       next: () => {
         if (this.selectedMinerName() === minerName) {
           this.minerService.selectAllMiners();
         }
+        this.setLoading(actionKey, false);
+        this.closeContextMenu();
+      },
+      error: () => {
+        this.setLoading(actionKey, false);
+        this.closeContextMenu();
       }
     });
-    this.closeContextMenu();
   }
 }
