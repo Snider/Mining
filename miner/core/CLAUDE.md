@@ -36,6 +36,9 @@ cmake .. -DBUILD_STATIC=ON
 | `WITH_RANDOMX` | ON | RandomX algorithms (Monero) |
 | `WITH_ARGON2` | ON | Argon2 algorithms |
 | `WITH_KAWPOW` | ON | KawPow algorithm (GPU only) |
+| `WITH_ETCHASH` | ON | ETChash/Ethash algorithms (GPU only) |
+| `WITH_PROGPOWZ` | ON | ProgPowZ algorithm (Zano, GPU only) |
+| `WITH_BLAKE3DCR` | ON | Blake3DCR algorithm (Decred) |
 | `WITH_GHOSTRIDER` | ON | GhostRider algorithm |
 | `WITH_OPENCL` | ON | AMD GPU backend |
 | `WITH_CUDA` | ON | NVIDIA GPU backend (requires external plugin) |
@@ -47,7 +50,11 @@ cmake .. -DBUILD_STATIC=ON
 
 ## Architecture Overview
 
-XMRig is a C++ cryptocurrency miner supporting RandomX, KawPow, CryptoNight, and GhostRider algorithms across CPU, OpenCL (AMD), and CUDA (NVIDIA) backends.
+C++ cryptocurrency miner (XMRig-based) supporting RandomX, KawPow, CryptoNight, GhostRider, ETChash, and ProgPowZ algorithms across CPU, OpenCL (AMD), and CUDA (NVIDIA) backends.
+
+### Startup Flow
+
+`main()` in `xmrig.cpp` creates `Process` (command line parsing), checks for special `Entry` points (benchmark, version), then runs `App::exec()` which initializes `Controller`. Controller inherits from `Base` and owns `Miner` (backend management) and `Network` (pool connections).
 
 ### Source Structure (`src/`)
 
@@ -55,9 +62,10 @@ XMRig is a C++ cryptocurrency miner supporting RandomX, KawPow, CryptoNight, and
 src/
 ├── xmrig.cpp              # Entry point: main() -> Process -> Entry -> App
 ├── App.h/cpp              # Application lifecycle, signal/console handling
+├── donate.h               # Donation configuration (dev fee percentage)
 ├── core/
 │   ├── Controller.h/cpp   # Main controller: manages backends, network, config
-│   ├── Miner.h/cpp        # Mining orchestration, job distribution
+│   ├── Miner.h/cpp        # Mining orchestration, job distribution to backends
 │   └── config/            # JSON configuration parsing and validation
 ├── backend/
 │   ├── cpu/               # CPU mining: threads, workers, platform-specific code
@@ -67,6 +75,9 @@ src/
 │   ├── cn/                # CryptoNight variants (x86/ARM/RISC-V implementations)
 │   ├── randomx/           # RandomX with JIT compiler
 │   ├── kawpow/            # KawPow (GPU-optimized)
+│   ├── etchash/           # ETChash/Ethash (GPU-optimized)
+│   ├── progpowz/          # ProgPowZ for Zano
+│   ├── blake3dcr/         # Blake3DCR for Decred
 │   ├── ghostrider/        # GhostRider algorithm
 │   ├── argon2/            # Argon2 variants
 │   └── common/            # Huge pages, NUMA memory pools, virtual memory
@@ -86,7 +97,7 @@ src/
 
 ### Key Interfaces
 
-- **`IBackend`** - Mining backend abstraction (CPU, OpenCL, CUDA)
+- **`IBackend`** - Mining backend abstraction (CPU, OpenCL, CUDA). Methods: `isEnabled()`, `tick()`, `hashrate()`, `setJob()`, `start()`, `stop()`
 - **`IConsoleListener`** - Interactive console commands (h=hashrate, p=pause, r=resume)
 - **`ISignalListener`** - SIGTERM/SIGINT handling for graceful shutdown
 - **`IRxListener`** - RandomX dataset initialization events
