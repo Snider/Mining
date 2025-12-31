@@ -109,9 +109,13 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 	s.InitRouter()
 	s.Server.Handler = s.Router
 
+	// Channel to capture server startup errors
+	errChan := make(chan error, 1)
+
 	go func() {
 		if err := s.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("could not listen on %s: %v\n", s.Server.Addr, err)
+			log.Printf("Server error on %s: %v", s.Server.Addr, err)
+			errChan <- err
 		}
 	}()
 
@@ -121,11 +125,18 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.Server.Shutdown(ctxShutdown); err != nil {
-			log.Fatalf("server shutdown failed: %+v", err)
+			log.Printf("Server shutdown error: %v", err)
 		}
 	}()
 
-	return nil
+	// Give the server a moment to start and check for immediate errors
+	select {
+	case err := <-errChan:
+		return fmt.Errorf("failed to start server: %w", err)
+	case <-time.After(100 * time.Millisecond):
+		// Server started successfully
+		return nil
+	}
 }
 
 // SetupRoutes configures all API routes on the Gin router.
@@ -230,7 +241,10 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 		default:
 			continue
 		}
-		details, _ := miner.CheckInstallation()
+		details, err := miner.CheckInstallation()
+		if err != nil {
+			log.Printf("Warning: failed to check installation for %s: %v", availableMiner.Name, err)
+		}
 		systemInfo.InstalledMinersInfo = append(systemInfo.InstalledMinersInfo, details)
 	}
 

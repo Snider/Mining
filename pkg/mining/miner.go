@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -127,7 +128,8 @@ func (b *BaseMiner) GetBinaryPath() string {
 	return b.MinerBinary
 }
 
-// Stop terminates the miner process.
+// Stop terminates the miner process gracefully.
+// It first tries SIGTERM to allow cleanup, then SIGKILL if needed.
 func (b *BaseMiner) Stop() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -140,6 +142,25 @@ func (b *BaseMiner) Stop() error {
 	if b.stdinPipe != nil {
 		b.stdinPipe.Close()
 		b.stdinPipe = nil
+	}
+
+	// Try graceful shutdown with SIGTERM first (Unix only)
+	if runtime.GOOS != "windows" {
+		if err := b.cmd.Process.Signal(syscall.SIGTERM); err == nil {
+			// Wait up to 3 seconds for graceful shutdown
+			done := make(chan error, 1)
+			go func() {
+				_, err := b.cmd.Process.Wait()
+				done <- err
+			}()
+
+			select {
+			case <-done:
+				return nil
+			case <-time.After(3 * time.Second):
+				// Process didn't exit, force kill
+			}
+		}
 	}
 
 	return b.cmd.Process.Kill()
@@ -371,10 +392,14 @@ func (b *BaseMiner) GetLowResHistoryLength() int {
 
 // GetLogs returns the captured log output from the miner process.
 func (b *BaseMiner) GetLogs() []string {
-	if b.LogBuffer == nil {
+	b.mu.RLock()
+	logBuffer := b.LogBuffer
+	b.mu.RUnlock()
+
+	if logBuffer == nil {
 		return []string{}
 	}
-	return b.LogBuffer.GetLines()
+	return logBuffer.GetLines()
 }
 
 // ReduceHashrateHistory aggregates and trims hashrate data.

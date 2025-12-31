@@ -139,94 +139,33 @@ nav:
   - Home: index.md
 
   - Getting Started:
-    - Introduction: getting-started/introduction.md
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quickstart.md
-    - Configuration: getting-started/configuration.md
-    - First Mining Session: getting-started/first-session.md
+    - Installation: getting-started/index.md
+    - Quick Start: getting-started/quick-start.md
 
-  - CLI Reference:
-    - Overview: cli/overview.md
-    - serve: cli/serve.md
-    - start: cli/start.md
-    - stop: cli/stop.md
-    - status: cli/status.md
-    - install: cli/install.md
-    - uninstall: cli/uninstall.md
-    - update: cli/update.md
-    - list: cli/list.md
-    - doctor: cli/doctor.md
-    - profiles: cli/profiles.md
+  - User Guide:
+    - CLI: user-guide/cli.md
+    - Web Dashboard: user-guide/web-dashboard.md
+    - Desktop App: user-guide/desktop-app.md
 
   - API Reference:
-    - Overview: api/overview.md
-    - Authentication: api/authentication.md
-    - System Endpoints: api/system.md
-    - Miner Endpoints: api/miners.md
-    - Profile Endpoints: api/profiles.md
-    - Stats Endpoints: api/stats.md
-    - Swagger UI: api/swagger.md
-    - Error Handling: api/errors.md
+    - Overview: api/index.md
+    - Endpoints: api/endpoints.md
+    - Swagger Docs: swagger.json
 
-  - Web Dashboard:
-    - Overview: dashboard/overview.md
-    - Installation: dashboard/installation.md
-    - Web Component: dashboard/web-component.md
-    - Features: dashboard/features.md
-    - Configuration: dashboard/configuration.md
-    - Customization: dashboard/customization.md
-
-  - Desktop Application:
-    - Overview: desktop/overview.md
-    - Installation: desktop/installation.md
-    - Building from Source: desktop/building.md
-    - Platform Support: desktop/platforms.md
-    - Configuration: desktop/configuration.md
-    - Troubleshooting: desktop/troubleshooting.md
-
-  - Development Guide:
-    - Setup: development/setup.md
-    - Project Structure: development/structure.md
-    - Building: development/building.md
-    - Testing: development/testing.md
-    - E2E Tests: development/e2e-tests.md
-    - Code Style: development/code-style.md
+  - Development:
+    - Setup: development/index.md
+    - Architecture: development/architecture.md
     - Contributing: development/contributing.md
-    - Release Process: development/releases.md
 
-  - Architecture:
-    - Overview: architecture/overview.md
-    - Go Backend: architecture/backend.md
-    - Miner Interface: architecture/miner-interface.md
-    - Manager System: architecture/manager.md
-    - REST Service: architecture/rest-service.md
-    - XMRig Implementation: architecture/xmrig.md
-    - Profile System: architecture/profiles.md
-    - Stats Collection: architecture/stats.md
-    - XDG Directories: architecture/xdg.md
+  - Reference:
+    - Mining Pools: reference/pools.md
+    - Algorithms: reference/algorithms.md
 
-  - Pool Integration:
-    - Research Overview: pools/research.md
-    - Supported Algorithms: pools/algorithms.md
-    - Stratum Protocol: pools/stratum.md
-    - Pool Configuration: pools/configuration.md
-    - ETChash Pools: pools/etchash.md
-    - ProgPowZ Pools: pools/progpowz.md
-    - Blake3DCR Pools: pools/blake3dcr.md
-    - Custom Pools: pools/custom.md
-
-  - Miners:
-    - Overview: miners/overview.md
-    - XMRig: miners/xmrig.md
-    - Adding New Miners: miners/adding-miners.md
-
-  - Troubleshooting:
-    - Common Issues: troubleshooting/common-issues.md
-    - Logs: troubleshooting/logs.md
-    - Performance: troubleshooting/performance.md
-    - GPU Issues: troubleshooting/gpu.md
-    - Network Issues: troubleshooting/network.md
-
-  - FAQ: faq.md
-  - Changelog: changelog.md
-  - License: license.md
+  - Legacy Docs:
+    - Start Here: 00-START-HERE.md
+    - Quick Reference: QUICK-REFERENCE.md
+    - Pool Research: pool-research.md
+    - Pool Integration: pool-integration-guide.md
+    - Pool README: POOL-RESEARCH-README.md
+    - Files Index: FILES-INDEX.md
+    - Manifest: MANIFEST.md

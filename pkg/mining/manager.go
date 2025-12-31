@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/Snider/Mining/pkg/database"
 )
+
+// sanitizeInstanceName ensures the instance name only contains safe characters.
+var instanceNameRegex = regexp.MustCompile(`[^a-zA-Z0-9_/-]`)
 
 // ManagerInterface defines the contract for a miner manager.
 type ManagerInterface interface {
@@ -203,7 +207,9 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 
 	instanceName := miner.GetName()
 	if config.Algo != "" {
-		instanceName = fmt.Sprintf("%s-%s", instanceName, config.Algo)
+		// Sanitize algo to prevent directory traversal or invalid filenames
+		sanitizedAlgo := instanceNameRegex.ReplaceAllString(config.Algo, "_")
+		instanceName = fmt.Sprintf("%s-%s", instanceName, sanitizedAlgo)
 	} else {
 		instanceName = fmt.Sprintf("%s-%d", instanceName, time.Now().UnixNano()%1000)
 	}

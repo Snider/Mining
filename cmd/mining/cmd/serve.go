@@ -12,6 +12,8 @@ import (
 
 	"github.com/Snider/Mining/pkg/mining"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -121,7 +123,7 @@ var serveCmd = &cobra.Command{
 							if err != nil {
 								fmt.Fprintf(os.Stderr, "Error getting miner stats: %v\n", err)
 							} else {
-								fmt.Printf("Miner Status for %s:\n", strings.Title(minerName))
+								fmt.Printf("Miner Status for %s:\n", cases.Title(language.English).String(minerName))
 								fmt.Printf("  Hash Rate:  %d H/s\n", stats.Hashrate)
 								fmt.Printf("  Shares:     %d\n", stats.Shares)
 								fmt.Printf("  Rejected:   %d\n", stats.Rejected)

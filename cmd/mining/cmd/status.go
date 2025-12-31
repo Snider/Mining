@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // statusCmd represents the status command
@@ -27,7 +28,7 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("failed to get miner stats: %w", err)
 		}
 
-		fmt.Printf("Miner Status for %s:\n", strings.Title(minerName))
+		fmt.Printf("Miner Status for %s:\n", cases.Title(language.English).String(minerName))
 		fmt.Printf("  Hash Rate:  %d H/s\n", stats.Hashrate)
 		fmt.Printf("  Shares:     %d\n", stats.Shares)
 		fmt.Printf("  Rejected:   %d\n", stats.Rejected)
