@@ -92,6 +92,7 @@ func (lb *LogBuffer) Clear() {
 // BaseMiner provides a foundation for specific miner implementations.
 type BaseMiner struct {
 	Name                  string `json:"name"`
+	MinerType             string `json:"miner_type"` // Type identifier (e.g., "xmrig", "tt-miner")
 	Version               string `json:"version"`
 	URL                   string `json:"url"`
 	Path                  string `json:"path"`
@@ -107,6 +108,11 @@ type BaseMiner struct {
 	LowResHashrateHistory []HashratePoint `json:"lowResHashrateHistory"`
 	LastLowResAggregation time.Time       `json:"-"`
 	LogBuffer             *LogBuffer      `json:"-"`
+}
+
+// GetType returns the miner type identifier.
+func (b *BaseMiner) GetType() string {
+	return b.MinerType
 }
 
 // GetName returns the name of the miner.

@@ -17,6 +17,7 @@ type MockMiner struct {
 	StartFunc                 func(config *Config) error
 	StopFunc                  func() error
 	GetStatsFunc              func(ctx context.Context) (*PerformanceMetrics, error)
+	GetTypeFunc               func() string
 	GetNameFunc               func() string
 	GetPathFunc               func() string
 	GetBinaryPathFunc         func() string
@@ -35,6 +36,12 @@ func (m *MockMiner) Start(config *Config) error             { return m.StartFunc
 func (m *MockMiner) Stop() error                            { return m.StopFunc() }
 func (m *MockMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
 	return m.GetStatsFunc(ctx)
+}
+func (m *MockMiner) GetType() string {
+	if m.GetTypeFunc != nil {
+		return m.GetTypeFunc()
+	}
+	return "mock"
 }
 func (m *MockMiner) GetName() string                        { return m.GetNameFunc() }
 func (m *MockMiner) GetPath() string                        { return m.GetPathFunc() }

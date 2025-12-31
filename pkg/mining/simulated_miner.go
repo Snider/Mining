@@ -9,10 +9,14 @@ import (
 	"time"
 )
 
+// MinerTypeSimulated is the type identifier for simulated miners.
+const MinerTypeSimulated = "simulated"
+
 // SimulatedMiner is a mock miner that generates realistic-looking stats for UI testing.
 type SimulatedMiner struct {
 	// Exported fields for JSON serialization
 	Name             string           `json:"name"`
+	MinerType        string           `json:"miner_type"`
 	Version          string           `json:"version"`
 	URL              string           `json:"url"`
 	Path             string           `json:"path"`
@@ -62,6 +66,7 @@ func NewSimulatedMiner(config SimulatedMinerConfig) *SimulatedMiner {
 
 	return &SimulatedMiner{
 		Name:            config.Name,
+		MinerType:       MinerTypeSimulated,
 		Version:         "1.0.0-simulated",
 		URL:             "https://github.com/simulated/miner",
 		Path:            "/simulated/miner",
@@ -75,6 +80,11 @@ func NewSimulatedMiner(config SimulatedMinerConfig) *SimulatedMiner {
 		difficultyBase:  config.Difficulty,
 		logs:            make([]string, 0),
 	}
+}
+
+// GetType returns the miner type identifier.
+func (m *SimulatedMiner) GetType() string {
+	return m.MinerType
 }
 
 // Install is a no-op for simulated miners.

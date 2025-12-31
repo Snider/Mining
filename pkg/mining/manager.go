@@ -554,17 +554,9 @@ func (m *Manager) collectMinerStats() {
 		minerType string
 	}
 	miners := make([]minerInfo, 0, len(m.miners))
-	for name, miner := range m.miners {
-		// Determine miner type from name prefix
-		var minerType string
-		if strings.HasPrefix(name, "xmrig") {
-			minerType = "xmrig"
-		} else if strings.HasPrefix(name, "tt-miner") || strings.HasPrefix(name, "ttminer") {
-			minerType = "tt-miner"
-		} else {
-			minerType = "unknown"
-		}
-		miners = append(miners, minerInfo{miner: miner, minerType: minerType})
+	for _, miner := range m.miners {
+		// Use the miner's GetType() method for proper type identification
+		miners = append(miners, minerInfo{miner: miner, minerType: miner.GetType()})
 	}
 	dbEnabled := m.dbEnabled // Copy to avoid holding lock
 	m.mu.RUnlock()

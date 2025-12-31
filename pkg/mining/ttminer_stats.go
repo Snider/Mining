@@ -2,11 +2,7 @@ package mining
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"net/http"
 )
 
 // GetStats retrieves performance metrics from the TT-Miner API.
@@ -21,33 +17,20 @@ func (m *TTMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
 		m.mu.RUnlock()
 		return nil, errors.New("miner API not configured or port is zero")
 	}
-	host := m.API.ListenHost
-	port := m.API.ListenPort
+	config := HTTPStatsConfig{
+		Host:     m.API.ListenHost,
+		Port:     m.API.ListenPort,
+		Endpoint: "/summary",
+	}
 	m.mu.RUnlock()
 
 	// Create request with context and timeout
 	reqCtx, cancel := context.WithTimeout(ctx, statsTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, "GET", fmt.Sprintf("http://%s:%d/summary", host, port), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// HTTP call outside the lock to avoid blocking other operations
-	resp, err := getHTTPClient().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse
-		return nil, fmt.Errorf("failed to get stats: unexpected status code %d", resp.StatusCode)
-	}
-
+	// Use the common HTTP stats fetcher
 	var summary TTMinerSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+	if err := FetchJSONStats(reqCtx, config, &summary); err != nil {
 		return nil, err
 	}
 

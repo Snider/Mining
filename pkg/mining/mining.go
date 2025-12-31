@@ -22,7 +22,7 @@ const (
 //   - GetStats
 //
 // Info - Miner identification and installation details:
-//   - GetName, GetPath, GetBinaryPath, CheckInstallation, GetLatestVersion
+//   - GetType, GetName, GetPath, GetBinaryPath, CheckInstallation, GetLatestVersion
 //
 // History - Hashrate history management:
 //   - GetHashrateHistory, AddHashratePoint, ReduceHashrateHistory
@@ -40,6 +40,7 @@ type Miner interface {
 	GetStats(ctx context.Context) (*PerformanceMetrics, error)
 
 	// Info operations
+	GetType() string // Returns miner type identifier (e.g., "xmrig", "tt-miner")
 	GetName() string
 	GetPath() string
 	GetBinaryPath() string

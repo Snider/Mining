@@ -54,11 +54,15 @@ type TTMinerSummary struct {
 	} `json:"hashrate"`
 }
 
+// MinerTypeTTMiner is the type identifier for TT-Miner miners.
+const MinerTypeTTMiner = "tt-miner"
+
 // NewTTMiner creates a new TT-Miner instance with default settings.
 func NewTTMiner() *TTMiner {
 	return &TTMiner{
 		BaseMiner: BaseMiner{
 			Name:           "tt-miner",
+			MinerType:      MinerTypeTTMiner,
 			ExecutableName: "TT-Miner",
 			Version:        "latest",
 			URL:            "https://github.com/TrailingStop/TT-Miner-release",

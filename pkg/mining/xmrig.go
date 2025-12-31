@@ -43,11 +43,15 @@ func setHTTPClient(client *http.Client) {
 	httpClient = client
 }
 
+// MinerTypeXMRig is the type identifier for XMRig miners.
+const MinerTypeXMRig = "xmrig"
+
 // NewXMRigMiner creates a new XMRig miner instance with default settings.
 func NewXMRigMiner() *XMRigMiner {
 	return &XMRigMiner{
 		BaseMiner: BaseMiner{
 			Name:           "xmrig",
+			MinerType:      MinerTypeXMRig,
 			ExecutableName: "xmrig",
 			Version:        "latest",
 			URL:            "https://github.com/xmrig/xmrig/releases",
