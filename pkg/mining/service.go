@@ -104,7 +104,7 @@ func (s *Service) InitRouter() {
 			"http://127.0.0.1:9090",
 			"http://localhost:" + serverPort,
 			"http://127.0.0.1:" + serverPort,
-			"wails://wails",          // Wails desktop app
+			"http://wails.localhost", // Wails desktop app (uses localhost origin)
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
