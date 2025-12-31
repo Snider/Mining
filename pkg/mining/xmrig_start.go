@@ -113,11 +113,17 @@ func (m *XMRigMiner) Start(config *Config) error {
 			// Normal exit
 		case <-time.After(5 * time.Minute):
 			// Process didn't exit after 5 minutes - force cleanup
-			logging.Warn("miner process wait timeout, forcing cleanup")
+			logging.Warn("miner process wait timeout, forcing cleanup", logging.Fields{"miner": m.Name})
 			if cmd.Process != nil {
 				cmd.Process.Kill()
 			}
-			<-done // Wait for the inner goroutine to finish
+			// Wait with timeout to prevent goroutine leak if Wait() never returns
+			select {
+			case <-done:
+				// Inner goroutine completed
+			case <-time.After(10 * time.Second):
+				logging.Error("process cleanup timed out after kill", logging.Fields{"miner": m.Name})
+			}
 		}
 
 		m.mu.Lock()

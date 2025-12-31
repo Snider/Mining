@@ -117,7 +117,7 @@ func (t *Transport) Start() error {
 			err = t.server.ListenAndServe()
 		}
 		if err != nil && err != http.ErrServerClosed {
-			// Log error
+			logging.Error("HTTP server error", logging.Fields{"error": err, "addr": t.config.ListenAddr})
 		}
 	}()
 
@@ -135,12 +135,14 @@ func (t *Transport) Stop() error {
 	}
 	t.mu.Unlock()
 
-	// Shutdown HTTP server
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Shutdown HTTP server if it was started
+	if t.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	if err := t.server.Shutdown(ctx); err != nil {
-		return fmt.Errorf("server shutdown error: %w", err)
+		if err := t.server.Shutdown(ctx); err != nil {
+			return fmt.Errorf("server shutdown error: %w", err)
+		}
 	}
 
 	t.wg.Wait()

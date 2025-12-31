@@ -133,6 +133,7 @@ deploy/
 ### GitHub Repository Optimization
 - [ ] Add topic tags: `mining`, `monero`, `xmrig`, `cryptocurrency`, `dashboard`, `self-hosted`, `golang`, `angular`
 - [ ] Add social preview image
+- [ ] Create demo GIF for README showcasing the dashboard UI
 - [ ] Create GitHub Discussions for community Q&A
 - [ ] Add "Used By" section in README
 

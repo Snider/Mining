@@ -2,10 +2,8 @@ package mining
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -91,24 +89,7 @@ var getXMRigConfigPath = func(instanceName string) (string, error) {
 
 // GetLatestVersion fetches the latest version of XMRig from the GitHub API.
 func (m *XMRigMiner) GetLatestVersion() (string, error) {
-	resp, err := getHTTPClient().Get("https://api.github.com/repos/xmrig/xmrig/releases/latest")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse
-		return "", fmt.Errorf("failed to get latest release: unexpected status code %d", resp.StatusCode)
-	}
-
-	var release struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", err
-	}
-	return release.TagName, nil
+	return FetchLatestGitHubVersion("xmrig", "xmrig")
 }
 
 // Install determines the correct download URL for the latest version of XMRig

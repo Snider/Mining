@@ -82,6 +82,31 @@ func respondWithError(c *gin.Context, status int, code string, message string, d
 	c.JSON(status, apiErr)
 }
 
+// respondWithMiningError sends a structured error response from a MiningError.
+// This allows using pre-built error constructors from errors.go.
+func respondWithMiningError(c *gin.Context, err *MiningError) {
+	details := ""
+	if err.Cause != nil {
+		details = err.Cause.Error()
+	}
+	if err.Details != "" {
+		if details != "" {
+			details += "; "
+		}
+		details += err.Details
+	}
+
+	apiErr := APIError{
+		Code:       err.Code,
+		Message:    err.Message,
+		Details:    details,
+		Suggestion: err.Suggestion,
+		Retryable:  err.Retryable,
+	}
+
+	c.JSON(err.StatusCode(), apiErr)
+}
+
 // isRetryableError determines if an error status code is retryable
 func isRetryableError(status int) bool {
 	return status == http.StatusServiceUnavailable ||
@@ -606,7 +631,7 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 	profileID := c.Param("id")
 	profile, exists := s.ProfileManager.GetProfile(profileID)
 	if !exists {
-		respondWithError(c, http.StatusNotFound, ErrCodeProfileNotFound, "profile not found", "")
+		respondWithMiningError(c, ErrProfileNotFound(profileID))
 		return
 	}
 
@@ -653,7 +678,7 @@ func (s *Service) handleGetMinerStats(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	miner, err := s.Manager.GetMiner(minerName)
 	if err != nil {
-		respondWithError(c, http.StatusNotFound, ErrCodeMinerNotFound, "miner not found", err.Error())
+		respondWithMiningError(c, ErrMinerNotFound(minerName).WithCause(err))
 		return
 	}
 	stats, err := miner.GetStats(c.Request.Context())
@@ -694,7 +719,7 @@ func (s *Service) handleGetMinerLogs(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	miner, err := s.Manager.GetMiner(minerName)
 	if err != nil {
-		respondWithError(c, http.StatusNotFound, ErrCodeMinerNotFound, "miner not found", err.Error())
+		respondWithMiningError(c, ErrMinerNotFound(minerName).WithCause(err))
 		return
 	}
 	logs := miner.GetLogs()

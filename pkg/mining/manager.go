@@ -582,9 +582,9 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 
 	// Use context with timeout to prevent hanging on unresponsive miner APIs
 	ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
-	stats, err := miner.GetStats(ctx)
-	cancel() // Release context resources immediately
+	defer cancel() // Ensure context is released after all operations
 
+	stats, err := miner.GetStats(ctx)
 	if err != nil {
 		logging.Error("failed to get miner stats", logging.Fields{"miner": minerName, "error": err})
 		return
@@ -606,8 +606,8 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 			Timestamp: point.Timestamp,
 			Hashrate:  point.Hashrate,
 		}
-		// Use nil context to let InsertHashratePoint use its default timeout
-		if err := database.InsertHashratePoint(nil, minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
+		// Use the same context for DB writes so they respect timeout/cancellation
+		if err := database.InsertHashratePoint(ctx, minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
 			logging.Warn("failed to persist hashrate", logging.Fields{"miner": minerName, "error": err})
 		}
 	}
