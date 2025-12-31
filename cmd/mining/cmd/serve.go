@@ -91,16 +91,15 @@ var serveCmd = &cobra.Command{
 
 				switch command {
 				case "start":
-					if len(cmdArgs) < 1 {
-						fmt.Println("Error: start command requires miner type (e.g., 'start xmrig')")
+					if len(cmdArgs) < 3 {
+						fmt.Println("Usage: start <miner_type> <pool> <wallet>")
+						fmt.Println("Example: start xmrig stratum+tcp://pool.example.com:3333 YOUR_WALLET_ADDRESS")
 					} else {
 						minerType := cmdArgs[0]
-						// Use default pool and wallet for interactive shell for simplicity
 						config := &mining.Config{
-							Pool:      "pool.hashvault.pro:443",
-							Wallet:    "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H", // Corrected wallet address
-							LogOutput: true,                                                                                              // Enable logging for interactive shell
-							// Add other default config values if necessary
+							Pool:      cmdArgs[1],
+							Wallet:    cmdArgs[2],
+							LogOutput: true,
 						}
 						miner, err := mgr.StartMiner(minerType, config)
 						if err != nil {

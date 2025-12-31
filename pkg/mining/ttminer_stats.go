@@ -9,8 +9,8 @@ import (
 
 // GetStats retrieves performance metrics from the TT-Miner API.
 func (m *TTMiner) GetStats() (*PerformanceMetrics, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if !m.Running {
 		return nil, errors.New("miner is not running")

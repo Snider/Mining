@@ -147,7 +147,7 @@ func (sm *SettingsManager) Save() error {
 		return err
 	}
 
-	return os.WriteFile(sm.settingsPath, data, 0644)
+	return os.WriteFile(sm.settingsPath, data, 0600)
 }
 
 // Get returns a copy of the current settings
@@ -172,7 +172,7 @@ func (sm *SettingsManager) Update(fn func(*AppSettings)) error {
 		return err
 	}
 
-	return os.WriteFile(sm.settingsPath, data, 0644)
+	return os.WriteFile(sm.settingsPath, data, 0600)
 }
 
 // UpdateWindowState saves the current window state

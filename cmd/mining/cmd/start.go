@@ -38,7 +38,8 @@ var startCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(startCmd)
-	startCmd.Flags().StringVarP(&minerPool, "pool", "p", "pool.hashvault.pro", "Mining pool address")
-	startCmd.Flags().StringVarP(&minerWallet, "wallet", "w", "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H", "Wallet address")
-	// Removed MarkFlagRequired as we now have default values
+	startCmd.Flags().StringVarP(&minerPool, "pool", "p", "", "Mining pool address (required)")
+	startCmd.Flags().StringVarP(&minerWallet, "wallet", "w", "", "Wallet address (required)")
+	_ = startCmd.MarkFlagRequired("pool")
+	_ = startCmd.MarkFlagRequired("wallet")
 }

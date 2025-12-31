@@ -255,5 +255,5 @@ func (m *XMRigMiner) createConfig(config *Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(m.ConfigPath, data, 0644)
+	return os.WriteFile(m.ConfigPath, data, 0600)
 }

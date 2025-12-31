@@ -510,7 +510,7 @@ func (b *BaseMiner) untar(src, dest string) error {
 
 		target := filepath.Join(dest, header.Name)
 		if !strings.HasPrefix(target, filepath.Clean(dest)+string(os.PathSeparator)) {
-			continue
+			return fmt.Errorf("%s: illegal file path in archive", header.Name)
 		}
 
 		switch header.Typeflag {

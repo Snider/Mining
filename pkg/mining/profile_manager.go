@@ -78,7 +78,7 @@ func (pm *ProfileManager) saveProfiles() error {
 		return err
 	}
 
-	return os.WriteFile(pm.configPath, data, 0644)
+	return os.WriteFile(pm.configPath, data, 0600)
 }
 
 // CreateProfile adds a new profile and saves it.
