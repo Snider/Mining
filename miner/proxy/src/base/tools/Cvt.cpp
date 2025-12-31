@@ -27,6 +27,9 @@
 
 #ifdef XMRIG_SODIUM
 #   include <sodium.h>
+#elif defined(XMRIG_FEATURE_TLS)
+// SECURITY FIX (HIGH-014): Use OpenSSL's CSPRNG when sodium not available
+#   include <openssl/rand.h>
 #endif
 
 
@@ -224,14 +227,17 @@ xmrig::Buffer xmrig::Cvt::randomBytes(const size_t size)
 {
     Buffer buf(size);
 
-#   ifndef XMRIG_SODIUM
+#   ifdef XMRIG_SODIUM
+    randombytes_buf(buf.data(), size);
+#   elif defined(XMRIG_FEATURE_TLS)
+    // SECURITY FIX (HIGH-014): Use OpenSSL's CSPRNG instead of mt19937
+    RAND_bytes(reinterpret_cast<unsigned char*>(buf.data()), static_cast<int>(size));
+#   else
     std::uniform_int_distribution<> dis(0, 255);
 
     for (size_t i = 0; i < size; ++i) {
         buf[i] = static_cast<char>(dis(randomEngine));
     }
-#   else
-    randombytes_buf(buf.data(), size);
 #   endif
 
     return buf;
@@ -284,13 +290,16 @@ xmrig::String xmrig::Cvt::toHex(const uint8_t *in, size_t size)
 
 void xmrig::Cvt::randomBytes(void *buf, size_t size)
 {
-#   ifndef XMRIG_SODIUM
+#   ifdef XMRIG_SODIUM
+    randombytes_buf(buf, size);
+#   elif defined(XMRIG_FEATURE_TLS)
+    // SECURITY FIX (HIGH-014): Use OpenSSL's CSPRNG instead of mt19937
+    RAND_bytes(static_cast<unsigned char*>(buf), static_cast<int>(size));
+#   else
     std::uniform_int_distribution<> dis(0, 255);
 
     for (size_t i = 0; i < size; ++i) {
         static_cast<uint8_t *>(buf)[i] = static_cast<char>(dis(randomEngine));
     }
-#   else
-    randombytes_buf(buf, size);
 #   endif
 }

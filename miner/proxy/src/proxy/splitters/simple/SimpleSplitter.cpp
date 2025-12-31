@@ -245,8 +245,9 @@ void xmrig::SimpleSplitter::submit(SubmitEvent *event)
         return;
     }
 
-    SimpleMapper *mapper = m_upstreams[event->miner()->mapperId()];
-    if (mapper) {
-        mapper->submit(event);
+    // SECURITY FIX (HIGH-021): Use find() instead of operator[] to avoid inserting nullptr
+    const auto it = m_upstreams.find(static_cast<size_t>(event->miner()->mapperId()));
+    if (it != m_upstreams.end() && it->second) {
+        it->second->submit(event);
     }
 }

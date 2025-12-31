@@ -26,8 +26,9 @@
 #include "core/config/Config.h"
 #include "core/Controller.h"
 
-
+// SECURITY FIX (HIGH-024): Include for constant-time comparison
 #ifdef XMRIG_FEATURE_TLS
+#   include <openssl/crypto.h>
 #   include "base/net/https/HttpsServer.h"
 #else
 #   include "base/net/http/HttpServer.h"
@@ -194,5 +195,15 @@ int xmrig::Httpd::auth(const HttpData &req) const
         return 403 /* FORBIDDEN */;
     }
 
-    return strncmp(config.token().data(), token.c_str() + 7, config.token().size()) == 0 ? 200 : 403 /* FORBIDDEN */;
+    // SECURITY FIX (HIGH-024): Use constant-time comparison to prevent timing attacks
+#   ifdef XMRIG_FEATURE_TLS
+    const int result = CRYPTO_memcmp(config.token().data(), token.c_str() + 7, config.token().size());
+#   else
+    // Fallback: use volatile to prevent optimization, though not perfectly constant-time
+    volatile int result = 0;
+    for (size_t i = 0; i < config.token().size(); ++i) {
+        result |= config.token().data()[i] ^ token[i + 7];
+    }
+#   endif
+    return result == 0 ? 200 : 403 /* FORBIDDEN */;
 }

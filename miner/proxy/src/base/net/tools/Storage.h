@@ -21,6 +21,7 @@
 
 
 #include <cassert>
+#include <limits>
 #include <map>
 
 
@@ -36,6 +37,15 @@ public:
 
     inline uintptr_t add(TYPE *ptr)
     {
+        // SECURITY FIX (HIGH-026): Check for counter overflow
+        if (m_counter == std::numeric_limits<uintptr_t>::max()) {
+            // Wrap around and find an unused slot (should be extremely rare)
+            m_counter = 0;
+            while (m_data.count(m_counter) > 0 && m_counter < std::numeric_limits<uintptr_t>::max()) {
+                m_counter++;
+            }
+        }
+
         m_data[m_counter] = ptr;
 
         return m_counter++;
