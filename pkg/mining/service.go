@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -125,6 +126,65 @@ func generateRequestID() string {
 	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b[:4])
 }
 
+// rateLimitMiddleware provides basic rate limiting per IP address
+func rateLimitMiddleware(requestsPerSecond int, burst int) gin.HandlerFunc {
+	type client struct {
+		tokens    float64
+		lastCheck time.Time
+	}
+
+	var (
+		clients = make(map[string]*client)
+		mu      = &sync.RWMutex{}
+	)
+
+	// Cleanup old clients every minute
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			mu.Lock()
+			for ip, c := range clients {
+				if time.Since(c.lastCheck) > 5*time.Minute {
+					delete(clients, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+
+		mu.Lock()
+		cl, exists := clients[ip]
+		if !exists {
+			cl = &client{tokens: float64(burst), lastCheck: time.Now()}
+			clients[ip] = cl
+		}
+
+		// Token bucket algorithm
+		now := time.Now()
+		elapsed := now.Sub(cl.lastCheck).Seconds()
+		cl.tokens += elapsed * float64(requestsPerSecond)
+		if cl.tokens > float64(burst) {
+			cl.tokens = float64(burst)
+		}
+		cl.lastCheck = now
+
+		if cl.tokens < 1 {
+			mu.Unlock()
+			respondWithError(c, http.StatusTooManyRequests, "RATE_LIMITED",
+				"too many requests", "rate limit exceeded")
+			c.Abort()
+			return
+		}
+
+		cl.tokens--
+		mu.Unlock()
+		c.Next()
+	}
+}
+
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -235,6 +295,9 @@ func (s *Service) InitRouter() {
 
 	// Add X-Request-ID middleware for request tracing
 	s.Router.Use(requestIDMiddleware())
+
+	// Add rate limiting (10 requests/second with burst of 20)
+	s.Router.Use(rateLimitMiddleware(10, 20))
 
 	s.SetupRoutes()
 }
@@ -954,5 +1017,7 @@ func (s *Service) handleWebSocketEvents(c *gin.Context) {
 	}
 
 	log.Printf("[WebSocket] New connection from %s", c.Request.RemoteAddr)
-	s.EventHub.ServeWs(conn)
+	if !s.EventHub.ServeWs(conn) {
+		log.Printf("[WebSocket] Connection from %s rejected (limit reached)", c.Request.RemoteAddr)
+	}
 }

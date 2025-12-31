@@ -81,16 +81,31 @@ type EventHub struct {
 
 	// Stop signal
 	stop chan struct{}
+
+	// Connection limits
+	maxConnections int
 }
 
-// NewEventHub creates a new EventHub
+// DefaultMaxConnections is the default maximum WebSocket connections
+const DefaultMaxConnections = 100
+
+// NewEventHub creates a new EventHub with default settings
 func NewEventHub() *EventHub {
+	return NewEventHubWithOptions(DefaultMaxConnections)
+}
+
+// NewEventHubWithOptions creates a new EventHub with custom settings
+func NewEventHubWithOptions(maxConnections int) *EventHub {
+	if maxConnections <= 0 {
+		maxConnections = DefaultMaxConnections
+	}
 	return &EventHub{
-		clients:    make(map[*wsClient]bool),
-		broadcast:  make(chan Event, 256),
-		register:   make(chan *wsClient),
-		unregister: make(chan *wsClient),
-		stop:       make(chan struct{}),
+		clients:        make(map[*wsClient]bool),
+		broadcast:      make(chan Event, 256),
+		register:       make(chan *wsClient),
+		unregister:     make(chan *wsClient),
+		stop:           make(chan struct{}),
+		maxConnections: maxConnections,
 	}
 }
 
@@ -309,8 +324,22 @@ func (c *wsClient) readPump() {
 	}
 }
 
-// ServeWs handles websocket requests from clients
-func (h *EventHub) ServeWs(conn *websocket.Conn) {
+// ServeWs handles websocket requests from clients.
+// Returns false if the connection was rejected due to limits.
+func (h *EventHub) ServeWs(conn *websocket.Conn) bool {
+	// Check connection limit
+	h.mu.RLock()
+	currentCount := len(h.clients)
+	h.mu.RUnlock()
+
+	if currentCount >= h.maxConnections {
+		log.Printf("[EventHub] Connection rejected: limit reached (%d/%d)", currentCount, h.maxConnections)
+		conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "connection limit reached"))
+		conn.Close()
+		return false
+	}
+
 	client := &wsClient{
 		conn:   conn,
 		send:   make(chan []byte, 256),
@@ -323,4 +352,5 @@ func (h *EventHub) ServeWs(conn *websocket.Conn) {
 	// Start read/write pumps
 	go client.writePump()
 	go client.readPump()
+	return true
 }

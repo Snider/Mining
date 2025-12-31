@@ -143,3 +143,90 @@ func SaveMinersConfig(cfg *MinersConfig) error {
 	success = true
 	return nil
 }
+
+// UpdateMinersConfig atomically loads, modifies, and saves the miners config.
+// This prevents race conditions in read-modify-write operations.
+func UpdateMinersConfig(fn func(*MinersConfig) error) error {
+	configMu.Lock()
+	defer configMu.Unlock()
+
+	configPath, err := getMinersConfigPath()
+	if err != nil {
+		return fmt.Errorf("could not determine miners config path: %w", err)
+	}
+
+	// Load current config
+	var cfg MinersConfig
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cfg = MinersConfig{
+				Miners:   []MinerAutostartConfig{},
+				Database: defaultDatabaseConfig(),
+			}
+		} else {
+			return fmt.Errorf("failed to read miners config file: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("failed to unmarshal miners config: %w", err)
+		}
+		if cfg.Database.RetentionDays == 0 {
+			cfg.Database = defaultDatabaseConfig()
+		}
+	}
+
+	// Apply the modification
+	if err := fn(&cfg); err != nil {
+		return err
+	}
+
+	// Save atomically
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	newData, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal miners config: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, "miners-config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	success := false
+	defer func() {
+		if !success {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(newData); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Chmod(tmpPath, 0600); err != nil {
+		return fmt.Errorf("failed to set temp file permissions: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	success = true
+	return nil
+}

@@ -356,48 +356,40 @@ func (m *Manager) UninstallMiner(minerType string) error {
 		return fmt.Errorf("failed to uninstall miner files: %w", err)
 	}
 
-	cfg, err := LoadMinersConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load miners config to update uninstall status: %w", err)
-	}
-
-	var updatedMiners []MinerAutostartConfig
-	for _, minerCfg := range cfg.Miners {
-		if !strings.EqualFold(minerCfg.MinerType, minerType) {
-			updatedMiners = append(updatedMiners, minerCfg)
+	return UpdateMinersConfig(func(cfg *MinersConfig) error {
+		var updatedMiners []MinerAutostartConfig
+		for _, minerCfg := range cfg.Miners {
+			if !strings.EqualFold(minerCfg.MinerType, minerType) {
+				updatedMiners = append(updatedMiners, minerCfg)
+			}
 		}
-	}
-	cfg.Miners = updatedMiners
-
-	return SaveMinersConfig(cfg)
+		cfg.Miners = updatedMiners
+		return nil
+	})
 }
 
 // updateMinerConfig saves the autostart and last-used config for a miner.
 func (m *Manager) updateMinerConfig(minerType string, autostart bool, config *Config) error {
-	cfg, err := LoadMinersConfig()
-	if err != nil {
-		return err
-	}
-
-	found := false
-	for i, minerCfg := range cfg.Miners {
-		if strings.EqualFold(minerCfg.MinerType, minerType) {
-			cfg.Miners[i].Autostart = autostart
-			cfg.Miners[i].Config = config
-			found = true
-			break
+	return UpdateMinersConfig(func(cfg *MinersConfig) error {
+		found := false
+		for i, minerCfg := range cfg.Miners {
+			if strings.EqualFold(minerCfg.MinerType, minerType) {
+				cfg.Miners[i].Autostart = autostart
+				cfg.Miners[i].Config = config
+				found = true
+				break
+			}
 		}
-	}
 
-	if !found {
-		cfg.Miners = append(cfg.Miners, MinerAutostartConfig{
-			MinerType: minerType,
-			Autostart: autostart,
-			Config:    config,
-		})
-	}
-
-	return SaveMinersConfig(cfg)
+		if !found {
+			cfg.Miners = append(cfg.Miners, MinerAutostartConfig{
+				MinerType: minerType,
+				Autostart: autostart,
+				Config:    config,
+			})
+		}
+		return nil
+	})
 }
 
 // StopMiner stops a running miner and removes it from the manager.
@@ -618,6 +610,9 @@ func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) 
 	return miner.GetHashrateHistory(), nil
 }
 
+// ShutdownTimeout is the maximum time to wait for goroutines during shutdown
+const ShutdownTimeout = 10 * time.Second
+
 // Stop stops all running miners, background goroutines, and closes resources.
 // Safe to call multiple times - subsequent calls are no-ops.
 func (m *Manager) Stop() {
@@ -632,7 +627,20 @@ func (m *Manager) Stop() {
 		m.mu.Unlock()
 
 		close(m.stopChan)
-		m.waitGroup.Wait()
+
+		// Wait for goroutines with timeout
+		done := make(chan struct{})
+		go func() {
+			m.waitGroup.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			log.Printf("All goroutines stopped gracefully")
+		case <-time.After(ShutdownTimeout):
+			log.Printf("Warning: shutdown timeout - some goroutines may not have stopped")
+		}
 
 		// Close the database
 		if m.dbEnabled {
