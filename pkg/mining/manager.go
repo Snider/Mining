@@ -3,7 +3,6 @@ package mining
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"regexp"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Snider/Mining/pkg/database"
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // sanitizeInstanceName ensures the instance name only contains safe characters.
@@ -94,7 +94,7 @@ func NewManagerForSimulation() *Manager {
 func (m *Manager) initDatabase() {
 	cfg, err := LoadMinersConfig()
 	if err != nil {
-		log.Printf("Warning: could not load config for database init: %v", err)
+		logging.Warn("could not load config for database init", logging.Fields{"error": err})
 		return
 	}
 
@@ -105,7 +105,7 @@ func (m *Manager) initDatabase() {
 	}
 
 	if !m.dbEnabled {
-		log.Println("Database persistence is disabled")
+		logging.Debug("database persistence is disabled")
 		return
 	}
 
@@ -115,12 +115,12 @@ func (m *Manager) initDatabase() {
 	}
 
 	if err := database.Initialize(dbCfg); err != nil {
-		log.Printf("Warning: failed to initialize database: %v", err)
+		logging.Warn("failed to initialize database", logging.Fields{"error": err})
 		m.dbEnabled = false
 		return
 	}
 
-	log.Printf("Database persistence enabled (retention: %d days)", m.dbRetention)
+	logging.Info("database persistence enabled", logging.Fields{"retention_days": m.dbRetention})
 
 	// Start periodic cleanup
 	m.startDBCleanup()
@@ -137,14 +137,14 @@ func (m *Manager) startDBCleanup() {
 
 		// Run initial cleanup
 		if err := database.Cleanup(m.dbRetention); err != nil {
-			log.Printf("Warning: database cleanup failed: %v", err)
+			logging.Warn("database cleanup failed", logging.Fields{"error": err})
 		}
 
 		for {
 			select {
 			case <-ticker.C:
 				if err := database.Cleanup(m.dbRetention); err != nil {
-					log.Printf("Warning: database cleanup failed: %v", err)
+					logging.Warn("database cleanup failed", logging.Fields{"error": err})
 				}
 			case <-m.stopChan:
 				return
@@ -157,7 +157,7 @@ func (m *Manager) startDBCleanup() {
 func (m *Manager) syncMinersConfig() {
 	cfg, err := LoadMinersConfig()
 	if err != nil {
-		log.Printf("Warning: could not load miners config for sync: %v", err)
+		logging.Warn("could not load miners config for sync", logging.Fields{"error": err})
 		return
 	}
 
@@ -179,13 +179,13 @@ func (m *Manager) syncMinersConfig() {
 				Config:    nil, // No default config
 			})
 			configUpdated = true
-			log.Printf("Added default config for missing miner: %s", availableMiner.Name)
+			logging.Info("added default config for missing miner", logging.Fields{"miner": availableMiner.Name})
 		}
 	}
 
 	if configUpdated {
 		if err := SaveMinersConfig(cfg); err != nil {
-			log.Printf("Warning: failed to save updated miners config: %v", err)
+			logging.Warn("failed to save updated miners config", logging.Fields{"error": err})
 		}
 	}
 }
@@ -194,15 +194,15 @@ func (m *Manager) syncMinersConfig() {
 func (m *Manager) autostartMiners() {
 	cfg, err := LoadMinersConfig()
 	if err != nil {
-		log.Printf("Warning: could not load miners config for autostart: %v", err)
+		logging.Warn("could not load miners config for autostart", logging.Fields{"error": err})
 		return
 	}
 
 	for _, minerCfg := range cfg.Miners {
 		if minerCfg.Autostart && minerCfg.Config != nil {
-			log.Printf("Autostarting miner: %s", minerCfg.MinerType)
+			logging.Info("autostarting miner", logging.Fields{"type": minerCfg.MinerType})
 			if _, err := m.StartMiner(context.Background(), minerCfg.MinerType, minerCfg.Config); err != nil {
-				log.Printf("Failed to autostart miner %s: %v", minerCfg.MinerType, err)
+				logging.Error("failed to autostart miner", logging.Fields{"type": minerCfg.MinerType, "error": err})
 			}
 		}
 	}
@@ -302,7 +302,7 @@ func (m *Manager) StartMiner(ctx context.Context, minerType string, config *Conf
 	m.miners[instanceName] = miner
 
 	if err := m.updateMinerConfig(minerType, true, config); err != nil {
-		log.Printf("Warning: failed to save miner config for autostart: %v", err)
+		logging.Warn("failed to save miner config for autostart", logging.Fields{"error": err})
 	}
 
 	logMessage := fmt.Sprintf("CryptoCurrency Miner started: %s (Binary: %s)", miner.GetName(), miner.GetBinaryPath())
@@ -349,7 +349,7 @@ func (m *Manager) UninstallMiner(ctx context.Context, minerType string) error {
 	// Stop miners outside the lock to avoid blocking
 	for i, miner := range minersToStop {
 		if err := miner.Stop(); err != nil {
-			log.Printf("Warning: failed to stop running miner %s during uninstall: %v", minersToDelete[i], err)
+			logging.Warn("failed to stop running miner during uninstall", logging.Fields{"miner": minersToDelete[i], "error": err})
 		}
 	}
 
@@ -493,7 +493,7 @@ func (m *Manager) RegisterMiner(miner Miner) error {
 	m.miners[name] = miner
 	m.mu.Unlock()
 
-	log.Printf("Registered miner: %s", name)
+	logging.Info("registered miner", logging.Fields{"name": name})
 
 	// Emit miner started event (outside lock)
 	m.emitEvent(EventMinerStarted, map[string]interface{}{
@@ -594,7 +594,7 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 	cancel() // Release context resources immediately
 
 	if err != nil {
-		log.Printf("Error getting stats for miner %s: %v\n", minerName, err)
+		logging.Error("failed to get miner stats", logging.Fields{"miner": minerName, "error": err})
 		return
 	}
 
@@ -615,7 +615,7 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 			Hashrate:  point.Hashrate,
 		}
 		if err := database.InsertHashratePoint(minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
-			log.Printf("Warning: failed to persist hashrate for %s: %v", minerName, err)
+			logging.Warn("failed to persist hashrate", logging.Fields{"miner": minerName, "error": err})
 		}
 	}
 
@@ -653,7 +653,7 @@ func (m *Manager) Stop() {
 		m.mu.Lock()
 		for name, miner := range m.miners {
 			if err := miner.Stop(); err != nil {
-				log.Printf("Warning: failed to stop miner %s: %v", name, err)
+				logging.Warn("failed to stop miner", logging.Fields{"miner": name, "error": err})
 			}
 		}
 		m.mu.Unlock()
@@ -669,15 +669,15 @@ func (m *Manager) Stop() {
 
 		select {
 		case <-done:
-			log.Printf("All goroutines stopped gracefully")
+			logging.Info("all goroutines stopped gracefully")
 		case <-time.After(ShutdownTimeout):
-			log.Printf("Warning: shutdown timeout - some goroutines may not have stopped")
+			logging.Warn("shutdown timeout - some goroutines may not have stopped")
 		}
 
 		// Close the database
 		if m.dbEnabled {
 			if err := database.Close(); err != nil {
-				log.Printf("Warning: failed to close database: %v", err)
+				logging.Warn("failed to close database", logging.Fields{"error": err})
 			}
 		}
 	})

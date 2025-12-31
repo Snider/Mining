@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // Start launches the XMRig miner with the specified configuration.
@@ -63,7 +64,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	addCliArgs(config, &args)
 
-	log.Printf("Executing XMRig command: %s %s", m.MinerBinary, strings.Join(args, " "))
+	logging.Info("executing XMRig command", logging.Fields{"binary": m.MinerBinary, "args": strings.Join(args, " ")})
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
@@ -112,7 +113,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 			// Normal exit
 		case <-time.After(5 * time.Minute):
 			// Process didn't exit after 5 minutes - force cleanup
-			log.Printf("Miner process wait timeout, forcing cleanup")
+			logging.Warn("miner process wait timeout, forcing cleanup")
 			if cmd.Process != nil {
 				cmd.Process.Kill()
 			}

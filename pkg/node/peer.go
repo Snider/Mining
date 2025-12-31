@@ -3,12 +3,12 @@ package node
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/Snider/Mining/pkg/logging"
 	"github.com/Snider/Poindexter"
 	"github.com/adrg/xdg"
 )
@@ -381,7 +381,7 @@ func (r *PeerRegistry) scheduleSave() {
 			r.mu.RUnlock()
 			if err != nil {
 				// Log error but continue - best effort persistence
-				log.Printf("Warning: failed to save peer registry: %v", err)
+				logging.Warn("failed to save peer registry", logging.Fields{"error": err})
 			}
 		}
 	})

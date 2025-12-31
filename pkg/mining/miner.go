@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Snider/Mining/pkg/logging"
 	"github.com/adrg/xdg"
 )
 
@@ -349,7 +349,7 @@ func (b *BaseMiner) findMinerBinary() (string, error) {
 		if highestVersionDir != "" {
 			fullPath := filepath.Join(baseInstallPath, highestVersionDir, executableName)
 			if _, err := os.Stat(fullPath); err == nil {
-				log.Printf("Found miner binary at highest versioned path: %s", fullPath)
+				logging.Debug("found miner binary at highest versioned path", logging.Fields{"path": fullPath})
 				return fullPath, nil
 			}
 		}
@@ -362,7 +362,7 @@ func (b *BaseMiner) findMinerBinary() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to get absolute path for '%s': %w", path, err)
 		}
-		log.Printf("Found miner binary in system PATH: %s", absPath)
+		logging.Debug("found miner binary in system PATH", logging.Fields{"path": absPath})
 		return absPath, nil
 	}
 

@@ -2,8 +2,9 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // parseSQLiteTimestamp parses timestamp strings from SQLite which may use various formats.
@@ -28,7 +29,7 @@ func parseSQLiteTimestamp(s string) time.Time {
 		}
 	}
 
-	log.Printf("Warning: failed to parse timestamp '%s' from database", s)
+	logging.Warn("failed to parse timestamp from database", logging.Fields{"timestamp": s})
 	return time.Time{}
 }
 

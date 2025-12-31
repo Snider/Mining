@@ -3,7 +3,7 @@
 package mining
 
 import (
-	"log"
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // On Windows, syslog is not available. We'll use a dummy implementation
@@ -11,5 +11,5 @@ import (
 
 // logToSyslog logs a message to the standard logger, mimicking the syslog function's signature.
 func logToSyslog(message string) {
-	log.Println(message)
+	logging.Info(message)
 }

@@ -3,8 +3,9 @@ package node
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // MinerManager interface for the mining package integration.
@@ -98,11 +99,11 @@ func (w *Worker) HandleMessage(conn *PeerConnection, msg *Message) {
 	}
 
 	if response != nil {
-		log.Printf("[Worker] Sending %s response to %s", response.Type, msg.From)
+		logging.Debug("sending response", logging.Fields{"type": response.Type, "to": msg.From})
 		if err := conn.Send(response); err != nil {
-			log.Printf("[Worker] Failed to send response: %v", err)
+			logging.Error("failed to send response", logging.Fields{"error": err})
 		} else {
-			log.Printf("[Worker] Response sent successfully")
+			logging.Debug("response sent successfully")
 		}
 	}
 }

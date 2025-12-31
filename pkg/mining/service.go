@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/Snider/Mining/docs"
+	"github.com/Snider/Mining/pkg/logging"
 	"github.com/adrg/xdg"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -153,7 +153,7 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 	// Initialize node service (optional - only fails if XDG paths are broken)
 	nodeService, err := NewNodeService()
 	if err != nil {
-		log.Printf("Warning: failed to initialize node service: %v", err)
+		logging.Warn("failed to initialize node service", logging.Fields{"error": err})
 		// Continue without node service - P2P features will be unavailable
 	}
 
@@ -282,7 +282,7 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 
 	go func() {
 		if err := s.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Server error on %s: %v", s.Server.Addr, err)
+			logging.Error("server error", logging.Fields{"addr": s.Server.Addr, "error": err})
 			errChan <- err
 		}
 		close(errChan) // Prevent goroutine leak
@@ -294,7 +294,7 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.Server.Shutdown(ctxShutdown); err != nil {
-			log.Printf("Server shutdown error: %v", err)
+			logging.Error("server shutdown error", logging.Fields{"error": err})
 		}
 	}()
 
@@ -426,7 +426,7 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 		}
 		details, err := miner.CheckInstallation()
 		if err != nil {
-			log.Printf("Warning: failed to check installation for %s: %v", availableMiner.Name, err)
+			logging.Warn("failed to check installation", logging.Fields{"miner": availableMiner.Name, "error": err})
 		}
 		systemInfo.InstalledMinersInfo = append(systemInfo.InstalledMinersInfo, details)
 	}
@@ -531,7 +531,7 @@ func (s *Service) handleUninstallMiner(c *gin.Context) {
 		return
 	}
 	if _, err := s.updateInstallationCache(); err != nil {
-		log.Printf("Warning: failed to update cache after uninstall: %v", err)
+		logging.Warn("failed to update cache after uninstall", logging.Fields{"error": err})
 	}
 	c.JSON(http.StatusOK, gin.H{"status": minerType + " uninstalled successfully."})
 }
@@ -582,7 +582,7 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 	}
 
 	if _, err := s.updateInstallationCache(); err != nil {
-		log.Printf("Warning: failed to update cache after install: %v", err)
+		logging.Warn("failed to update cache after install", logging.Fields{"error": err})
 	}
 
 	details, err := miner.CheckInstallation()
@@ -966,12 +966,12 @@ func (s *Service) handleMinerHistoricalHashrate(c *gin.Context) {
 func (s *Service) handleWebSocketEvents(c *gin.Context) {
 	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("[WebSocket] Failed to upgrade connection: %v", err)
+		logging.Error("failed to upgrade WebSocket connection", logging.Fields{"error": err})
 		return
 	}
 
-	log.Printf("[WebSocket] New connection from %s", c.Request.RemoteAddr)
+	logging.Info("new WebSocket connection", logging.Fields{"remote": c.Request.RemoteAddr})
 	if !s.EventHub.ServeWs(conn) {
-		log.Printf("[WebSocket] Connection from %s rejected (limit reached)", c.Request.RemoteAddr)
+		logging.Warn("WebSocket connection rejected", logging.Fields{"remote": c.Request.RemoteAddr, "reason": "limit reached"})
 	}
 }

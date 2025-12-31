@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/Snider/Borg/pkg/smsg"
+	"github.com/Snider/Mining/pkg/logging"
 	"github.com/gorilla/websocket"
 )
 
@@ -193,7 +193,7 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 	t.conns[pc.Peer.ID] = pc
 	t.mu.Unlock()
 
-	log.Printf("[Connect] Connected to %s, SharedSecret len: %d", pc.Peer.ID, len(pc.SharedSecret))
+	logging.Debug("connected to peer", logging.Fields{"peer_id": pc.Peer.ID, "secret_len": len(pc.SharedSecret)})
 
 	// Update registry
 	t.registry.SetConnected(pc.Peer.ID, true)
@@ -202,7 +202,7 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 	t.wg.Add(1)
 	go t.readLoop(pc)
 
-	log.Printf("[Connect] Started readLoop for %s", pc.Peer.ID)
+	logging.Debug("started readLoop for peer", logging.Fields{"peer_id": pc.Peer.ID})
 
 	// Start keepalive
 	t.wg.Add(1)
@@ -462,13 +462,13 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 		// Set read deadline to prevent blocking forever on unresponsive connections
 		readDeadline := t.config.PingInterval + t.config.PongTimeout
 		if err := pc.Conn.SetReadDeadline(time.Now().Add(readDeadline)); err != nil {
-			log.Printf("[readLoop] SetReadDeadline error for %s: %v", pc.Peer.ID, err)
+			logging.Error("SetReadDeadline error", logging.Fields{"peer_id": pc.Peer.ID, "error": err})
 			return
 		}
 
 		_, data, err := pc.Conn.ReadMessage()
 		if err != nil {
-			log.Printf("[readLoop] Read error from %s: %v", pc.Peer.ID, err)
+			logging.Debug("read error from peer", logging.Fields{"peer_id": pc.Peer.ID, "error": err})
 			return
 		}
 
@@ -477,11 +477,11 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 		// Decrypt message using SMSG with shared secret
 		msg, err := t.decryptMessage(data, pc.SharedSecret)
 		if err != nil {
-			log.Printf("[readLoop] Decrypt error from %s: %v (data len: %d)", pc.Peer.ID, err, len(data))
+			logging.Debug("decrypt error from peer", logging.Fields{"peer_id": pc.Peer.ID, "error": err, "data_len": len(data)})
 			continue // Skip invalid messages
 		}
 
-		log.Printf("[readLoop] Received %s from %s (reply to: %s)", msg.Type, pc.Peer.ID, msg.ReplyTo)
+		logging.Debug("received message from peer", logging.Fields{"type": msg.Type, "peer_id": pc.Peer.ID, "reply_to": msg.ReplyTo})
 
 		// Dispatch to handler
 		if t.handler != nil {

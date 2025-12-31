@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // Start launches the TT-Miner with the given configuration.
@@ -40,7 +41,7 @@ func (m *TTMiner) Start(config *Config) error {
 	// Build command line arguments for TT-Miner
 	args := m.buildArgs(config)
 
-	log.Printf("Executing TT-Miner command: %s %s", m.MinerBinary, strings.Join(args, " "))
+	logging.Info("executing TT-Miner command", logging.Fields{"binary": m.MinerBinary, "args": strings.Join(args, " ")})
 
 	m.cmd = exec.Command(m.MinerBinary, args...)
 
@@ -85,7 +86,7 @@ func (m *TTMiner) Start(config *Config) error {
 			// Normal exit
 		case <-time.After(5 * time.Minute):
 			// Process didn't exit after 5 minutes - force cleanup
-			log.Printf("TT-Miner process wait timeout, forcing cleanup")
+			logging.Warn("TT-Miner process wait timeout, forcing cleanup")
 			if cmd.Process != nil {
 				cmd.Process.Kill()
 			}
@@ -100,9 +101,9 @@ func (m *TTMiner) Start(config *Config) error {
 		}
 		m.mu.Unlock()
 		if err != nil {
-			log.Printf("TT-Miner exited with error: %v", err)
+			logging.Debug("TT-Miner exited with error", logging.Fields{"error": err})
 		} else {
-			log.Printf("TT-Miner exited normally")
+			logging.Debug("TT-Miner exited normally")
 		}
 	}()
 
@@ -166,7 +167,7 @@ func addTTMinerCliArgs(config *Config, args *[]string) {
 			if isValidCLIArg(arg) {
 				*args = append(*args, arg)
 			} else {
-				log.Printf("Warning: skipping invalid CLI argument: %s", arg)
+				logging.Warn("skipping invalid CLI argument", logging.Fields{"arg": arg})
 			}
 		}
 	}

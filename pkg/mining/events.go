@@ -2,10 +2,10 @@ package mining
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/Snider/Mining/pkg/logging"
 	"github.com/gorilla/websocket"
 )
 
@@ -135,7 +135,7 @@ func (h *EventHub) Run() {
 			h.clients[client] = true
 			stateProvider := h.stateProvider
 			h.mu.Unlock()
-			log.Printf("[EventHub] Client connected (total: %d)", len(h.clients))
+			logging.Debug("client connected", logging.Fields{"total": len(h.clients)})
 
 			// Send initial state sync if provider is set
 			if stateProvider != nil {
@@ -149,7 +149,7 @@ func (h *EventHub) Run() {
 						}
 						data, err := json.Marshal(event)
 						if err != nil {
-							log.Printf("[EventHub] Failed to marshal state sync: %v", err)
+							logging.Error("failed to marshal state sync", logging.Fields{"error": err})
 							return
 						}
 						select {
@@ -168,12 +168,12 @@ func (h *EventHub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-			log.Printf("[EventHub] Client disconnected (total: %d)", len(h.clients))
+			logging.Debug("client disconnected", logging.Fields{"total": len(h.clients)})
 
 		case event := <-h.broadcast:
 			data, err := json.Marshal(event)
 			if err != nil {
-				log.Printf("[EventHub] Failed to marshal event: %v", err)
+				logging.Error("failed to marshal event", logging.Fields{"error": err})
 				continue
 			}
 
@@ -255,7 +255,7 @@ func (h *EventHub) Broadcast(event Event) {
 	select {
 	case h.broadcast <- event:
 	default:
-		log.Printf("[EventHub] Broadcast channel full, dropping event: %s", event.Type)
+		logging.Warn("broadcast channel full, dropping event", logging.Fields{"type": event.Type})
 	}
 }
 
@@ -330,7 +330,7 @@ func (c *wsClient) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("[EventHub] WebSocket error: %v", err)
+				logging.Debug("WebSocket error", logging.Fields{"error": err})
 			}
 			break
 		}
@@ -351,7 +351,7 @@ func (c *wsClient) readPump() {
 			for _, m := range msg.Miners {
 				c.miners[m] = true
 			}
-			log.Printf("[EventHub] Client subscribed to miners: %v", msg.Miners)
+			logging.Debug("client subscribed to miners", logging.Fields{"miners": msg.Miners})
 
 		case "ping":
 			// Respond with pong
@@ -372,7 +372,7 @@ func (h *EventHub) ServeWs(conn *websocket.Conn) bool {
 	h.mu.RUnlock()
 
 	if currentCount >= h.maxConnections {
-		log.Printf("[EventHub] Connection rejected: limit reached (%d/%d)", currentCount, h.maxConnections)
+		logging.Warn("connection rejected: limit reached", logging.Fields{"current": currentCount, "max": h.maxConnections})
 		conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "connection limit reached"))
 		conn.Close()

@@ -3,8 +3,9 @@
 package mining
 
 import (
-	"log"
 	"log/syslog"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 var syslogWriter *syslog.Writer
@@ -17,7 +18,7 @@ func init() {
 	var err error
 	syslogWriter, err = syslog.New(syslog.LOG_NOTICE|syslog.LOG_DAEMON, "mining-service")
 	if err != nil {
-		log.Printf("Failed to connect to syslog: %v. Syslog logging will be disabled.", err)
+		logging.Warn("failed to connect to syslog, syslog logging disabled", logging.Fields{"error": err})
 		syslogWriter = nil // Ensure it's nil on failure
 	}
 }
@@ -27,6 +28,6 @@ func logToSyslog(message string) {
 	if syslogWriter != nil {
 		_ = syslogWriter.Notice(message)
 	} else {
-		log.Println(message)
+		logging.Info(message)
 	}
 }
