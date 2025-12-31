@@ -1,11 +1,14 @@
 # Mining
 
-[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
+[![CI](https://github.com/Snider/Mining/actions/workflows/e2e.yml/badge.svg)](https://github.com/Snider/Mining/actions/workflows/e2e.yml)
+[![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
+[![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8.svg?logo=go&logoColor=white)](https://golang.org)
+[![Angular](https://img.shields.io/badge/angular-20+-DD0031.svg?logo=angular&logoColor=white)](https://angular.io)
 [![GoDoc](https://pkg.go.dev/badge/github.com/Snider/Mining.svg)](https://pkg.go.dev/github.com/Snider/Mining)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Snider/Mining)](https://goreportcard.com/report/github.com/Snider/Mining)
 [![codecov](https://codecov.io/gh/Snider/Mining/branch/main/graph/badge.svg)](https://codecov.io/gh/Snider/Mining)
-[![Release](https://img.shields.io/github/release/Snider/Mining.svg)](https://github.com/Snider/Mining/releases)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://opensource.org/license/eupl-1-2)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg)](https://github.com/Snider/Mining/releases)
 
 A modern, modular cryptocurrency mining management platform with GPU support, RESTful API, and cross-platform desktop application.
 
