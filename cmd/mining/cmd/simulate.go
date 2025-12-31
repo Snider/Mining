@@ -115,7 +115,7 @@ Available presets:
 
 		// Stop all simulated miners
 		for _, miner := range mgr.ListMiners() {
-			mgr.StopMiner(miner.GetName())
+			mgr.StopMiner(context.Background(), miner.GetName())
 		}
 
 		fmt.Println("Simulation stopped.")

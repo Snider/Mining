@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Snider/Mining/pkg/mining"
@@ -25,7 +26,7 @@ var startCmd = &cobra.Command{
 			Wallet: minerWallet,
 		}
 
-		miner, err := getManager().StartMiner(minerType, config)
+		miner, err := getManager().StartMiner(context.Background(), minerType, config)
 		if err != nil {
 			return fmt.Errorf("failed to start miner: %w", err)
 		}

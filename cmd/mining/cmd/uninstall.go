@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ var uninstallCmd = &cobra.Command{
 		manager := getManager() // Assuming getManager() provides the singleton manager instance
 
 		fmt.Printf("Uninstalling %s...\n", minerType)
-		if err := manager.UninstallMiner(minerType); err != nil {
+		if err := manager.UninstallMiner(context.Background(), minerType); err != nil {
 			return fmt.Errorf("failed to uninstall miner: %w", err)
 		}
 

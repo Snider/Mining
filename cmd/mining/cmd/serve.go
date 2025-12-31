@@ -103,7 +103,7 @@ var serveCmd = &cobra.Command{
 							Wallet:    cmdArgs[2],
 							LogOutput: true,
 						}
-						miner, err := mgr.StartMiner(minerType, config)
+						miner, err := mgr.StartMiner(context.Background(), minerType, config)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Error starting miner: %v\n", err)
 						} else {
@@ -137,7 +137,7 @@ var serveCmd = &cobra.Command{
 						fmt.Println("Error: stop command requires miner name (e.g., 'stop xmrig')")
 					} else {
 						minerName := cmdArgs[0]
-						err := mgr.StopMiner(minerName)
+						err := mgr.StopMiner(context.Background(), minerName)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Error stopping miner: %v\n", err)
 						} else {

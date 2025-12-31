@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -16,7 +17,7 @@ var stopCmd = &cobra.Command{
 		minerName := args[0]
 		mgr := getManager()
 
-		if err := mgr.StopMiner(minerName); err != nil {
+		if err := mgr.StopMiner(context.Background(), minerName); err != nil {
 			return fmt.Errorf("failed to stop miner: %w", err)
 		}
 

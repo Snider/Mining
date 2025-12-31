@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -40,6 +39,7 @@ type Service struct {
 	SwaggerInstanceName string
 	APIBasePath         string
 	SwaggerUIPath       string
+	rateLimiter         *RateLimiter
 }
 
 // APIError represents a structured error response for the API
@@ -51,18 +51,7 @@ type APIError struct {
 	Retryable  bool   `json:"retryable"`            // Can the client retry?
 }
 
-// Error codes for API responses
-const (
-	ErrCodeMinerNotFound     = "MINER_NOT_FOUND"
-	ErrCodeProfileNotFound   = "PROFILE_NOT_FOUND"
-	ErrCodeInstallFailed     = "INSTALL_FAILED"
-	ErrCodeStartFailed       = "START_FAILED"
-	ErrCodeStopFailed        = "STOP_FAILED"
-	ErrCodeInvalidInput      = "INVALID_INPUT"
-	ErrCodeInternalError     = "INTERNAL_ERROR"
-	ErrCodeNotSupported      = "NOT_SUPPORTED"
-	ErrCodeServiceUnavailable = "SERVICE_UNAVAILABLE"
-)
+// Error codes are defined in errors.go
 
 // respondWithError sends a structured error response
 func respondWithError(c *gin.Context, status int, code string, message string, details string) {
@@ -126,64 +115,6 @@ func generateRequestID() string {
 	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b[:4])
 }
 
-// rateLimitMiddleware provides basic rate limiting per IP address
-func rateLimitMiddleware(requestsPerSecond int, burst int) gin.HandlerFunc {
-	type client struct {
-		tokens    float64
-		lastCheck time.Time
-	}
-
-	var (
-		clients = make(map[string]*client)
-		mu      = &sync.RWMutex{}
-	)
-
-	// Cleanup old clients every minute
-	go func() {
-		for {
-			time.Sleep(time.Minute)
-			mu.Lock()
-			for ip, c := range clients {
-				if time.Since(c.lastCheck) > 5*time.Minute {
-					delete(clients, ip)
-				}
-			}
-			mu.Unlock()
-		}
-	}()
-
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
-
-		mu.Lock()
-		cl, exists := clients[ip]
-		if !exists {
-			cl = &client{tokens: float64(burst), lastCheck: time.Now()}
-			clients[ip] = cl
-		}
-
-		// Token bucket algorithm
-		now := time.Now()
-		elapsed := now.Sub(cl.lastCheck).Seconds()
-		cl.tokens += elapsed * float64(requestsPerSecond)
-		if cl.tokens > float64(burst) {
-			cl.tokens = float64(burst)
-		}
-		cl.lastCheck = now
-
-		if cl.tokens < 1 {
-			mu.Unlock()
-			respondWithError(c, http.StatusTooManyRequests, "RATE_LIMITED",
-				"too many requests", "rate limit exceeded")
-			c.Abort()
-			return
-		}
-
-		cl.tokens--
-		mu.Unlock()
-		c.Next()
-	}
-}
 
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
@@ -324,9 +255,20 @@ func (s *Service) InitRouter() {
 	s.Router.Use(requestIDMiddleware())
 
 	// Add rate limiting (10 requests/second with burst of 20)
-	s.Router.Use(rateLimitMiddleware(10, 20))
+	s.rateLimiter = NewRateLimiter(10, 20)
+	s.Router.Use(s.rateLimiter.Middleware())
 
 	s.SetupRoutes()
+}
+
+// Stop gracefully stops the service and cleans up resources
+func (s *Service) Stop() {
+	if s.rateLimiter != nil {
+		s.rateLimiter.Stop()
+	}
+	if s.EventHub != nil {
+		s.EventHub.Stop()
+	}
 }
 
 // ServiceStartup initializes the router and starts the HTTP server.
