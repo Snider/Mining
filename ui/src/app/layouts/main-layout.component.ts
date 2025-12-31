@@ -30,7 +30,11 @@ import { ApiStatusComponent } from '../components/api-status/api-status.componen
       <div class="main-content">
         <div class="top-bar">
           <app-stats-panel></app-stats-panel>
-          <app-miner-switcher (editProfile)="navigateToProfiles($event)"></app-miner-switcher>
+          <app-miner-switcher
+            (editProfile)="navigateToProfiles($event)"
+            (navigateToConsole)="navigateToConsole($event)"
+            (navigateToStats)="navigateToStats($event)">
+          </app-miner-switcher>
         </div>
 
         <div class="page-content">
@@ -125,5 +129,14 @@ export class MainLayoutComponent implements AfterViewInit {
   navigateToProfiles(profileId: string) {
     // TODO: Could pass profileId via query params or state
     this.router.navigate(['/', 'profiles']);
+  }
+
+  navigateToConsole(minerName: string) {
+    this.router.navigate(['/', 'console']);
+  }
+
+  navigateToStats(minerName: string) {
+    // Navigate to dashboard to see stats/hashrate for selected miner
+    this.router.navigate(['/', 'dashboard']);
   }
 }

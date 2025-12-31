@@ -1,6 +1,13 @@
-import { Component, inject, computed, signal, output } from '@angular/core';
+import { Component, inject, computed, signal, output, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MinerService } from '../../miner.service';
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  minerName: string;
+}
 
 @Component({
   selector: 'app-miner-switcher',
@@ -46,7 +53,9 @@ import { MinerService } from '../../miner.service';
 
           <!-- Individual Miners -->
           @for (miner of runningMiners(); track miner.name) {
-            <div class="dropdown-item miner-item" [class.active]="selectedMinerName() === miner.name">
+            <div class="dropdown-item miner-item"
+                 [class.active]="selectedMinerName() === miner.name"
+                 (contextmenu)="openContextMenu($event, miner.name)">
               <button class="miner-select" (click)="selectMiner(miner.name)">
                 <div class="miner-status-dot online"></div>
                 <span class="miner-name">{{ miner.name }}</span>
@@ -106,6 +115,51 @@ import { MinerService } from '../../miner.service';
     <!-- Backdrop to close dropdown -->
     @if (dropdownOpen()) {
       <div class="backdrop" (click)="closeDropdown()"></div>
+    }
+
+    <!-- Context Menu -->
+    @if (contextMenu().visible) {
+      <div class="context-menu-backdrop" (click)="closeContextMenu()"></div>
+      <div class="context-menu"
+           [style.left.px]="contextMenu().x"
+           [style.top.px]="contextMenu().y">
+        <div class="context-menu-header">{{ contextMenu().minerName }}</div>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item" (click)="viewConsole()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <span>View Console</span>
+        </button>
+        <button class="context-menu-item" (click)="viewStats()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          <span>View Stats</span>
+        </button>
+        <button class="context-menu-item" (click)="viewHashrateHistory()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+          </svg>
+          <span>Hashrate History</span>
+        </button>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item" (click)="editFromContext()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <span>Edit Configuration</span>
+        </button>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item danger" (click)="stopFromContext()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+          </svg>
+          <span>Stop Worker</span>
+        </button>
+      </div>
     }
   `,
   styles: [`
@@ -354,6 +408,88 @@ import { MinerService } from '../../miner.service';
       inset: 0;
       z-index: 99;
     }
+
+    /* Context Menu Styles */
+    .context-menu-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+    }
+
+    .context-menu {
+      position: fixed;
+      min-width: 180px;
+      background: var(--color-surface-100);
+      border: 1px solid rgb(37 37 66 / 0.5);
+      border-radius: 0.5rem;
+      box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.5);
+      z-index: 201;
+      overflow: hidden;
+      animation: contextMenuIn 0.15s ease;
+    }
+
+    @keyframes contextMenuIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .context-menu-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-accent-400);
+      background: rgb(0 212 255 / 0.05);
+      border-bottom: 1px solid rgb(37 37 66 / 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .context-menu-divider {
+      height: 1px;
+      background: rgb(37 37 66 / 0.3);
+      margin: 0.25rem 0;
+    }
+
+    .context-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .context-menu-item:hover {
+      background: rgb(37 37 66 / 0.4);
+      color: white;
+    }
+
+    .context-menu-item.danger:hover {
+      background: rgb(239 68 68 / 0.15);
+      color: var(--color-danger-400);
+    }
+
+    .context-menu-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .context-menu-item.danger svg {
+      color: var(--color-danger-500);
+    }
   `]
 })
 export class MinerSwitcherComponent {
@@ -362,7 +498,18 @@ export class MinerSwitcherComponent {
   // Output for edit action (navigate to profiles page)
   editProfile = output<string>();
 
+  // Output for navigation actions
+  navigateToConsole = output<string>();
+  navigateToStats = output<string>();
+
   dropdownOpen = signal(false);
+  contextMenu = signal<ContextMenuState>({ visible: false, x: 0, y: 0, minerName: '' });
+
+  // Close context menu on Escape
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    this.closeContextMenu();
+  }
 
   viewMode = this.minerService.viewMode;
   selectedMinerName = this.minerService.selectedMinerName;
@@ -430,5 +577,68 @@ export class MinerSwitcherComponent {
     if (hashrate >= 1000000) return (hashrate / 1000000).toFixed(1) + ' MH/s';
     if (hashrate >= 1000) return (hashrate / 1000).toFixed(1) + ' kH/s';
     return hashrate.toFixed(0) + ' H/s';
+  }
+
+  // Context Menu Methods
+  openContextMenu(event: MouseEvent, minerName: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.contextMenu.set({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      minerName
+    });
+  }
+
+  closeContextMenu() {
+    this.contextMenu.set({ visible: false, x: 0, y: 0, minerName: '' });
+  }
+
+  viewConsole() {
+    const minerName = this.contextMenu().minerName;
+    this.minerService.selectMiner(minerName);
+    this.navigateToConsole.emit(minerName);
+    this.closeContextMenu();
+    this.closeDropdown();
+  }
+
+  viewStats() {
+    const minerName = this.contextMenu().minerName;
+    this.minerService.selectMiner(minerName);
+    this.navigateToStats.emit(minerName);
+    this.closeContextMenu();
+    this.closeDropdown();
+  }
+
+  viewHashrateHistory() {
+    const minerName = this.contextMenu().minerName;
+    this.minerService.selectMiner(minerName);
+    // Navigate to dashboard which shows hashrate history
+    this.navigateToStats.emit(minerName);
+    this.closeContextMenu();
+    this.closeDropdown();
+  }
+
+  editFromContext() {
+    const minerName = this.contextMenu().minerName;
+    const profile = this.minerService.getProfileForMiner(minerName);
+    if (profile) {
+      this.editProfile.emit(profile.id);
+    }
+    this.closeContextMenu();
+    this.closeDropdown();
+  }
+
+  stopFromContext() {
+    const minerName = this.contextMenu().minerName;
+    this.minerService.stopMiner(minerName).subscribe({
+      next: () => {
+        if (this.selectedMinerName() === minerName) {
+          this.minerService.selectAllMiners();
+        }
+      }
+    });
+    this.closeContextMenu();
   }
 }
