@@ -86,17 +86,20 @@ func TestStartMiner_Ugly(t *testing.T) {
 	m := setupTestManager(t)
 	defer m.Stop()
 
+	// Use an algorithm to get consistent instance naming (xmrig-test_algo)
+	// Without algo, each start gets a random suffix and won't be detected as duplicate
 	config := &Config{
 		HTTPPort: 9001, // Use a different port to avoid conflict
 		Pool:     "test:1234",
 		Wallet:   "testwallet",
+		Algo:     "test_algo", // Consistent algo = consistent instance name
 	}
 	// Case 1: Successfully start a supported miner
 	_, err := m.StartMiner(context.Background(), "xmrig", config)
 	if err != nil {
 		t.Fatalf("Expected to start miner, but got error: %v", err)
 	}
-	// Case 3: Attempt to start a duplicate miner
+	// Case 3: Attempt to start a duplicate miner (same algo = same instance name)
 	_, err = m.StartMiner(context.Background(), "xmrig", config)
 	if err == nil {
 		t.Error("Expected an error when starting a duplicate miner, but got nil")
@@ -174,22 +177,20 @@ func TestListMiners_Good(t *testing.T) {
 	m := setupTestManager(t)
 	defer m.Stop()
 
-	// Case 1: List miners when empty
-	miners := m.ListMiners()
-	if len(miners) != 0 {
-		t.Errorf("Expected 0 miners, but got %d", len(miners))
-	}
+	// Get initial count (may include autostarted miners from config)
+	initialMiners := m.ListMiners()
+	initialCount := len(initialMiners)
 
-	// Case 2: List miners when not empty
+	// Case 2: List miners after starting one - should have one more
 	config := &Config{
 		HTTPPort: 9004,
 		Pool:     "test:1234",
 		Wallet:   "testwallet",
 	}
 	_, _ = m.StartMiner(context.Background(), "xmrig", config)
-	miners = m.ListMiners()
-	if len(miners) != 1 {
-		t.Errorf("Expected 1 miner, but got %d", len(miners))
+	miners := m.ListMiners()
+	if len(miners) != initialCount+1 {
+		t.Errorf("Expected %d miners (initial %d + 1), but got %d", initialCount+1, initialCount, len(miners))
 	}
 }
 
