@@ -52,6 +52,49 @@ func DefaultTransportConfig() TransportConfig {
 // MessageHandler processes incoming messages.
 type MessageHandler func(conn *PeerConnection, msg *Message)
 
+// MessageDeduplicator tracks seen message IDs to prevent duplicate processing
+type MessageDeduplicator struct {
+	seen map[string]time.Time
+	mu   sync.RWMutex
+	ttl  time.Duration
+}
+
+// NewMessageDeduplicator creates a deduplicator with specified TTL
+func NewMessageDeduplicator(ttl time.Duration) *MessageDeduplicator {
+	d := &MessageDeduplicator{
+		seen: make(map[string]time.Time),
+		ttl:  ttl,
+	}
+	return d
+}
+
+// IsDuplicate checks if a message ID has been seen recently
+func (d *MessageDeduplicator) IsDuplicate(msgID string) bool {
+	d.mu.RLock()
+	_, exists := d.seen[msgID]
+	d.mu.RUnlock()
+	return exists
+}
+
+// Mark records a message ID as seen
+func (d *MessageDeduplicator) Mark(msgID string) {
+	d.mu.Lock()
+	d.seen[msgID] = time.Now()
+	d.mu.Unlock()
+}
+
+// Cleanup removes expired entries
+func (d *MessageDeduplicator) Cleanup() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	now := time.Now()
+	for id, seen := range d.seen {
+		if now.Sub(seen) > d.ttl {
+			delete(d.seen, id)
+		}
+	}
+}
+
 // Transport manages WebSocket connections with SMSG encryption.
 type Transport struct {
 	config       TransportConfig
@@ -62,10 +105,52 @@ type Transport struct {
 	node         *NodeManager
 	registry     *PeerRegistry
 	handler      MessageHandler
+	dedup        *MessageDeduplicator // Message deduplication
 	mu           sync.RWMutex
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
+}
+
+// PeerRateLimiter implements a simple token bucket rate limiter per peer
+type PeerRateLimiter struct {
+	tokens     int
+	maxTokens  int
+	refillRate int // tokens per second
+	lastRefill time.Time
+	mu         sync.Mutex
+}
+
+// NewPeerRateLimiter creates a rate limiter with specified messages/second
+func NewPeerRateLimiter(maxTokens, refillRate int) *PeerRateLimiter {
+	return &PeerRateLimiter{
+		tokens:     maxTokens,
+		maxTokens:  maxTokens,
+		refillRate: refillRate,
+		lastRefill: time.Now(),
+	}
+}
+
+// Allow checks if a message is allowed and consumes a token if so
+func (r *PeerRateLimiter) Allow() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Refill tokens based on elapsed time
+	now := time.Now()
+	elapsed := now.Sub(r.lastRefill)
+	tokensToAdd := int(elapsed.Seconds()) * r.refillRate
+	if tokensToAdd > 0 {
+		r.tokens = min(r.tokens+tokensToAdd, r.maxTokens)
+		r.lastRefill = now
+	}
+
+	// Check if we have tokens available
+	if r.tokens > 0 {
+		r.tokens--
+		return true
+	}
+	return false
 }
 
 // PeerConnection represents an active connection to a peer.
@@ -76,7 +161,8 @@ type PeerConnection struct {
 	LastActivity time.Time
 	writeMu      sync.Mutex // Serialize WebSocket writes
 	transport    *Transport
-	closeOnce    sync.Once // Ensure Close() is only called once
+	closeOnce    sync.Once           // Ensure Close() is only called once
+	rateLimiter  *PeerRateLimiter    // Per-peer message rate limiting
 }
 
 // NewTransport creates a new WebSocket transport.
@@ -88,6 +174,7 @@ func NewTransport(node *NodeManager, registry *PeerRegistry, config TransportCon
 		node:     node,
 		registry: registry,
 		conns:    make(map[string]*PeerConnection),
+		dedup:    NewMessageDeduplicator(5 * time.Minute), // 5 minute TTL for dedup
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -132,6 +219,22 @@ func (t *Transport) Start() error {
 		}
 		if err != nil && err != http.ErrServerClosed {
 			logging.Error("HTTP server error", logging.Fields{"error": err, "addr": t.config.ListenAddr})
+		}
+	}()
+
+	// Start message deduplication cleanup goroutine
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-t.ctx.Done():
+				return
+			case <-ticker.C:
+				t.dedup.Cleanup()
+			}
 		}
 	}()
 
@@ -194,6 +297,7 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 		Conn:         conn,
 		LastActivity: time.Now(),
 		transport:    t,
+		rateLimiter:  NewPeerRateLimiter(100, 50), // 100 burst, 50/sec refill
 	}
 
 	// Perform handshake with challenge-response authentication
@@ -379,6 +483,7 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 		SharedSecret: sharedSecret,
 		LastActivity: time.Now(),
 		transport:    t,
+		rateLimiter:  NewPeerRateLimiter(100, 50), // 100 burst, 50/sec refill
 	}
 
 	// Send handshake acknowledgment
@@ -574,12 +679,25 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 
 		pc.LastActivity = time.Now()
 
+		// Check rate limit before processing
+		if pc.rateLimiter != nil && !pc.rateLimiter.Allow() {
+			logging.Warn("peer rate limited, dropping message", logging.Fields{"peer_id": pc.Peer.ID})
+			continue // Drop message from rate-limited peer
+		}
+
 		// Decrypt message using SMSG with shared secret
 		msg, err := t.decryptMessage(data, pc.SharedSecret)
 		if err != nil {
 			logging.Debug("decrypt error from peer", logging.Fields{"peer_id": pc.Peer.ID, "error": err, "data_len": len(data)})
 			continue // Skip invalid messages
 		}
+
+		// Check for duplicate messages (prevents amplification attacks)
+		if t.dedup.IsDuplicate(msg.ID) {
+			logging.Debug("dropping duplicate message", logging.Fields{"msg_id": msg.ID, "peer_id": pc.Peer.ID})
+			continue
+		}
+		t.dedup.Mark(msg.ID)
 
 		// Rate limit debug logs in hot path to reduce noise (log 1 in N messages)
 		if debugLogCounter.Add(1)%debugLogInterval == 0 {

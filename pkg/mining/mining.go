@@ -2,6 +2,8 @@ package mining
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -155,6 +157,80 @@ type Config struct {
 	CUDA         bool   `json:"cuda,omitempty"`         // Enable CUDA (NVIDIA GPUs)
 	Intensity    int    `json:"intensity,omitempty"`    // Mining intensity for GPU miners
 	CLIArgs      string `json:"cliArgs,omitempty"`      // Additional CLI arguments
+}
+
+// Validate checks the Config for common errors and security issues.
+// Returns nil if valid, otherwise returns a descriptive error.
+func (c *Config) Validate() error {
+	// Pool URL validation
+	if c.Pool != "" {
+		// Block shell metacharacters in pool URL
+		if containsShellChars(c.Pool) {
+			return fmt.Errorf("pool URL contains invalid characters")
+		}
+	}
+
+	// Wallet validation (basic alphanumeric + special chars allowed in addresses)
+	if c.Wallet != "" {
+		if containsShellChars(c.Wallet) {
+			return fmt.Errorf("wallet address contains invalid characters")
+		}
+		// Most wallet addresses are 40-128 chars
+		if len(c.Wallet) > 256 {
+			return fmt.Errorf("wallet address too long (max 256 chars)")
+		}
+	}
+
+	// Thread count validation
+	if c.Threads < 0 {
+		return fmt.Errorf("threads cannot be negative")
+	}
+	if c.Threads > 1024 {
+		return fmt.Errorf("threads value too high (max 1024)")
+	}
+
+	// Algorithm validation (alphanumeric, dash, slash)
+	if c.Algo != "" {
+		if !isValidAlgo(c.Algo) {
+			return fmt.Errorf("algorithm name contains invalid characters")
+		}
+	}
+
+	// Intensity validation
+	if c.Intensity < 0 || c.Intensity > 100 {
+		return fmt.Errorf("intensity must be between 0 and 100")
+	}
+	if c.GPUIntensity < 0 || c.GPUIntensity > 100 {
+		return fmt.Errorf("GPU intensity must be between 0 and 100")
+	}
+
+	// Donate level validation
+	if c.DonateLevel < 0 || c.DonateLevel > 100 {
+		return fmt.Errorf("donate level must be between 0 and 100")
+	}
+
+	return nil
+}
+
+// containsShellChars checks for shell metacharacters that could enable injection
+func containsShellChars(s string) bool {
+	dangerous := []string{";", "|", "&", "`", "$", "(", ")", "{", "}", "<", ">", "\n", "\r", "\\", "'", "\"", "!"}
+	for _, d := range dangerous {
+		if strings.Contains(s, d) {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidAlgo checks if an algorithm name contains only valid characters
+func isValidAlgo(algo string) bool {
+	for _, r := range algo {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '/' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // PerformanceMetrics represents the performance metrics for a miner.

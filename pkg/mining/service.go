@@ -210,7 +210,12 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 
 	profileManager, err := NewProfileManager()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize profile manager: %w", err)
+		logging.Warn("failed to initialize profile manager", logging.Fields{"error": err})
+		// Continue without profile manager - profile features will be degraded
+		// Create a minimal in-memory profile manager as fallback
+		profileManager = &ProfileManager{
+			profiles: make(map[string]*MiningProfile),
+		}
 	}
 
 	// Initialize node service (optional - only fails if XDG paths are broken)
@@ -408,6 +413,10 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 func (s *Service) SetupRoutes() {
 	apiGroup := s.Router.Group(s.APIBasePath)
 
+	// Health endpoints (no auth required for orchestration/monitoring)
+	apiGroup.GET("/health", s.handleHealth)
+	apiGroup.GET("/ready", s.handleReady)
+
 	// Apply authentication middleware if enabled
 	if s.auth != nil {
 		apiGroup.Use(s.auth.Middleware())
@@ -481,6 +490,81 @@ func (s *Service) SetupRoutes() {
 	})
 	s.mcpServer.Mount(s.APIBasePath + "/mcp")
 	logging.Info("MCP server enabled", logging.Fields{"endpoint": s.APIBasePath + "/mcp"})
+}
+
+// HealthResponse represents the health check response
+type HealthResponse struct {
+	Status     string            `json:"status"`
+	Components map[string]string `json:"components,omitempty"`
+}
+
+// handleHealth godoc
+// @Summary Health check endpoint
+// @Description Returns service health status. Used for liveness probes.
+// @Tags system
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Router /health [get]
+func (s *Service) handleHealth(c *gin.Context) {
+	c.JSON(http.StatusOK, HealthResponse{
+		Status: "healthy",
+	})
+}
+
+// handleReady godoc
+// @Summary Readiness check endpoint
+// @Description Returns service readiness with component status. Used for readiness probes.
+// @Tags system
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Success 503 {object} HealthResponse
+// @Router /ready [get]
+func (s *Service) handleReady(c *gin.Context) {
+	components := make(map[string]string)
+	allReady := true
+
+	// Check manager
+	if s.Manager != nil {
+		components["manager"] = "ready"
+	} else {
+		components["manager"] = "not initialized"
+		allReady = false
+	}
+
+	// Check profile manager
+	if s.ProfileManager != nil {
+		components["profiles"] = "ready"
+	} else {
+		components["profiles"] = "degraded"
+		// Don't fail readiness for degraded profile manager
+	}
+
+	// Check event hub
+	if s.EventHub != nil {
+		components["events"] = "ready"
+	} else {
+		components["events"] = "not initialized"
+		allReady = false
+	}
+
+	// Check node service (optional)
+	if s.NodeService != nil {
+		components["p2p"] = "ready"
+	} else {
+		components["p2p"] = "disabled"
+	}
+
+	status := "ready"
+	httpStatus := http.StatusOK
+	if !allReady {
+		status = "not ready"
+		httpStatus = http.StatusServiceUnavailable
+	}
+
+	c.JSON(httpStatus, HealthResponse{
+		Status:     status,
+		Components: components,
+	})
 }
 
 // handleGetInfo godoc
