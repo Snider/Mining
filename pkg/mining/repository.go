@@ -96,45 +96,7 @@ func (r *FileRepository[T]) saveUnlocked(data T) error {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
 
-	// Atomic write: write to temp file, sync, then rename
-	tmpFile, err := os.CreateTemp(dir, "repo-*.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-
-	// Clean up temp file on error
-	success := false
-	defer func() {
-		if !success {
-			os.Remove(tmpPath)
-		}
-	}()
-
-	if _, err := tmpFile.Write(jsonData); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to sync temp file: %w", err)
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		return fmt.Errorf("failed to set file permissions: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, r.path); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
-	}
-
-	success = true
-	return nil
+	return AtomicWriteFile(r.path, jsonData, 0600)
 }
 
 // Update atomically loads, modifies, and saves data.

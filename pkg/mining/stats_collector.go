@@ -56,16 +56,3 @@ func FetchJSONStats[T any](ctx context.Context, config HTTPStatsConfig, target *
 	return nil
 }
 
-// MinerTypeRegistry provides a central registry of known miner types.
-// This can be used for validation and discovery of available miners.
-var MinerTypeRegistry = map[string]string{
-	MinerTypeXMRig:     "XMRig - CPU/GPU miner for RandomX, KawPow, CryptoNight",
-	MinerTypeTTMiner:   "TT-Miner - NVIDIA GPU miner for Ethash, KawPow, ProgPow",
-	MinerTypeSimulated: "Simulated - Mock miner for testing and development",
-}
-
-// IsKnownMinerType returns true if the given type is a registered miner type.
-func IsKnownMinerType(minerType string) bool {
-	_, exists := MinerTypeRegistry[minerType]
-	return exists
-}

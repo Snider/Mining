@@ -87,28 +87,27 @@ func TestFetchJSONStats(t *testing.T) {
 
 func TestMinerTypeRegistry(t *testing.T) {
 	t.Run("KnownTypes", func(t *testing.T) {
-		if !IsKnownMinerType(MinerTypeXMRig) {
+		if !IsMinerSupported(MinerTypeXMRig) {
 			t.Error("xmrig should be a known miner type")
 		}
-		if !IsKnownMinerType(MinerTypeTTMiner) {
+		if !IsMinerSupported(MinerTypeTTMiner) {
 			t.Error("tt-miner should be a known miner type")
 		}
-		if !IsKnownMinerType(MinerTypeSimulated) {
+		if !IsMinerSupported(MinerTypeSimulated) {
 			t.Error("simulated should be a known miner type")
 		}
 	})
 
 	t.Run("UnknownType", func(t *testing.T) {
-		if IsKnownMinerType("unknown-miner") {
+		if IsMinerSupported("unknown-miner") {
 			t.Error("unknown-miner should not be a known miner type")
 		}
 	})
 
-	t.Run("RegistryHasDescriptions", func(t *testing.T) {
-		for minerType, description := range MinerTypeRegistry {
-			if description == "" {
-				t.Errorf("Miner type %s has empty description", minerType)
-			}
+	t.Run("ListMinerTypes", func(t *testing.T) {
+		types := ListMinerTypes()
+		if len(types) == 0 {
+			t.Error("ListMinerTypes should return registered types")
 		}
 	})
 }

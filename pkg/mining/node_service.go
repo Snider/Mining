@@ -401,16 +401,20 @@ func (ns *NodeService) handleRemoteStop(c *gin.Context) {
 // @Produce json
 // @Param peerId path string true "Peer ID"
 // @Param miner path string true "Miner Name"
-// @Param lines query int false "Number of lines" default(100)
+// @Param lines query int false "Number of lines (max 10000)" default(100)
 // @Success 200 {array} string
 // @Router /remote/{peerId}/logs/{miner} [get]
 func (ns *NodeService) handleRemoteLogs(c *gin.Context) {
 	peerID := c.Param("peerId")
 	minerName := c.Param("miner")
 	lines := 100
+	const maxLines = 10000 // Prevent resource exhaustion
 	if l := c.Query("lines"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
 			lines = parsed
+			if lines > maxLines {
+				lines = maxLines
+			}
 		}
 	}
 

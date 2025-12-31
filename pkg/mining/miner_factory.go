@@ -37,6 +37,16 @@ func (f *MinerFactory) registerDefaults() {
 	// TT-Miner (GPU Kawpow, etc.)
 	f.Register("tt-miner", func() Miner { return NewTTMiner() })
 	f.RegisterAlias("ttminer", "tt-miner")
+
+	// Simulated miner for testing and development
+	f.Register(MinerTypeSimulated, func() Miner {
+		return NewSimulatedMiner(SimulatedMinerConfig{
+			Name:         "simulated-miner",
+			Algorithm:    "rx/0",
+			BaseHashrate: 1000,
+			Variance:     0.1,
+		})
+	})
 }
 
 // Register adds a miner constructor to the factory

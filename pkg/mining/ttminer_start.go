@@ -173,20 +173,54 @@ func addTTMinerCliArgs(config *Config, args *[]string) {
 	}
 }
 
-// isValidCLIArg validates CLI arguments to prevent injection or dangerous patterns
+// isValidCLIArg validates CLI arguments to prevent injection or dangerous patterns.
+// Uses a combination of allowlist patterns and blocklist for security.
 func isValidCLIArg(arg string) bool {
+	// Empty or whitespace-only args are invalid
+	if strings.TrimSpace(arg) == "" {
+		return false
+	}
+
+	// Must start with dash (standard CLI argument format)
+	// This is an allowlist approach - only accept valid argument patterns
+	if !strings.HasPrefix(arg, "-") {
+		// Allow values for flags (e.g., the "3" in "-i 3")
+		// Values must not contain shell metacharacters
+		return isValidArgValue(arg)
+	}
+
 	// Block shell metacharacters and dangerous patterns
-	dangerousPatterns := []string{";", "|", "&", "`", "$", "(", ")", "{", "}", "<", ">", "\n", "\r"}
-	for _, p := range dangerousPatterns {
-		if strings.Contains(arg, p) {
+	if !isValidArgValue(arg) {
+		return false
+	}
+
+	// Block arguments that could override security-related settings
+	blockedPrefixes := []string{
+		"--api-access-token", "--api-worker-id", // TT-Miner API settings
+		"--config",       // Could load arbitrary config
+		"--log-file",     // Could write to arbitrary locations
+		"--coin-file",    // Could load arbitrary coin configs
+		"-o", "--out",    // Output redirection
+	}
+	lowerArg := strings.ToLower(arg)
+	for _, blocked := range blockedPrefixes {
+		if lowerArg == blocked || strings.HasPrefix(lowerArg, blocked+"=") {
 			return false
 		}
 	}
-	// Block arguments that could override security-related settings
-	blockedArgs := []string{"--api-access-token", "--api-worker-id"}
-	lowerArg := strings.ToLower(arg)
-	for _, blocked := range blockedArgs {
-		if strings.HasPrefix(lowerArg, blocked) {
+
+	return true
+}
+
+// isValidArgValue checks if a value contains dangerous patterns
+func isValidArgValue(arg string) bool {
+	// Block shell metacharacters and command injection patterns
+	dangerousPatterns := []string{
+		";", "|", "&", "`", "$", "(", ")", "{", "}",
+		"<", ">", "\n", "\r", "\\", "'", "\"", "!",
+	}
+	for _, p := range dangerousPatterns {
+		if strings.Contains(arg, p) {
 			return false
 		}
 	}

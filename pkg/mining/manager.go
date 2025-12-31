@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -717,9 +716,4 @@ func (m *Manager) GetAllMinerHistoricalStats() ([]database.HashrateStats, error)
 // IsDatabaseEnabled returns whether database persistence is enabled.
 func (m *Manager) IsDatabaseEnabled() bool {
 	return m.dbEnabled
-}
-
-// Helper to convert port to string for net.JoinHostPort
-func portToString(port int) string {
-	return strconv.Itoa(port)
 }

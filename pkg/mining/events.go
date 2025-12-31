@@ -86,6 +86,9 @@ type EventHub struct {
 	// Stop signal
 	stop chan struct{}
 
+	// Ensure Stop() is called only once
+	stopOnce sync.Once
+
 	// Connection limits
 	maxConnections int
 
@@ -109,8 +112,8 @@ func NewEventHubWithOptions(maxConnections int) *EventHub {
 	return &EventHub{
 		clients:        make(map[*wsClient]bool),
 		broadcast:      make(chan Event, 256),
-		register:       make(chan *wsClient),
-		unregister:     make(chan *wsClient),
+		register:       make(chan *wsClient, 16),
+		unregister:     make(chan *wsClient, 16), // Buffered to prevent goroutine leaks on shutdown
 		stop:           make(chan struct{}),
 		maxConnections: maxConnections,
 	}
@@ -235,9 +238,11 @@ func (h *EventHub) shouldSendToClient(client *wsClient, event Event) bool {
 	return client.miners[minerName]
 }
 
-// Stop stops the EventHub
+// Stop stops the EventHub (safe to call multiple times)
 func (h *EventHub) Stop() {
-	close(h.stop)
+	h.stopOnce.Do(func() {
+		close(h.stop)
+	})
 }
 
 // SetStateProvider sets the function that provides current state for new clients

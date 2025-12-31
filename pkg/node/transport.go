@@ -63,6 +63,7 @@ type PeerConnection struct {
 	LastActivity time.Time
 	writeMu      sync.Mutex // Serialize WebSocket writes
 	transport    *Transport
+	closeOnce    sync.Once // Ensure Close() is only called once
 }
 
 // NewTransport creates a new WebSocket transport.
@@ -150,7 +151,10 @@ func (t *Transport) Stop() error {
 }
 
 // OnMessage sets the handler for incoming messages.
+// Must be called before Start() to avoid races.
 func (t *Transport) OnMessage(handler MessageHandler) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.handler = handler
 }
 
@@ -163,8 +167,11 @@ func (t *Transport) Connect(peer *Peer) (*PeerConnection, error) {
 	}
 	u := url.URL{Scheme: scheme, Host: peer.Address, Path: t.config.WSPath}
 
-	// Dial the peer
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	// Dial the peer with timeout to prevent hanging on unresponsive peers
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	conn, _, err := dialer.Dial(u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to peer: %w", err)
 	}
@@ -485,9 +492,12 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 
 		logging.Debug("received message from peer", logging.Fields{"type": msg.Type, "peer_id": pc.Peer.ID, "reply_to": msg.ReplyTo})
 
-		// Dispatch to handler
-		if t.handler != nil {
-			t.handler(pc, msg)
+		// Dispatch to handler (read handler under lock to avoid race)
+		t.mu.RLock()
+		handler := t.handler
+		t.mu.RUnlock()
+		if handler != nil {
+			handler(pc, msg)
 		}
 	}
 }
@@ -552,13 +562,18 @@ func (pc *PeerConnection) Send(msg *Message) error {
 	if err := pc.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 		return fmt.Errorf("failed to set write deadline: %w", err)
 	}
+	defer pc.Conn.SetWriteDeadline(time.Time{}) // Reset deadline after send
 
 	return pc.Conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
 // Close closes the connection.
 func (pc *PeerConnection) Close() error {
-	return pc.Conn.Close()
+	var err error
+	pc.closeOnce.Do(func() {
+		err = pc.Conn.Close()
+	})
+	return err
 }
 
 // encryptMessage encrypts a message using SMSG with the shared secret.

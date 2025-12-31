@@ -103,45 +103,7 @@ func SaveMinersConfig(cfg *MinersConfig) error {
 		return fmt.Errorf("failed to marshal miners config: %w", err)
 	}
 
-	// Atomic write: write to temp file, then rename
-	tmpFile, err := os.CreateTemp(dir, "miners-config-*.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-
-	// Clean up temp file on error
-	success := false
-	defer func() {
-		if !success {
-			os.Remove(tmpPath)
-		}
-	}()
-
-	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to sync temp file: %w", err)
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		return fmt.Errorf("failed to set temp file permissions: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, configPath); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
-	}
-
-	success = true
-	return nil
+	return AtomicWriteFile(configPath, data, 0600)
 }
 
 // UpdateMinersConfig atomically loads, modifies, and saves the miners config.
@@ -192,41 +154,5 @@ func UpdateMinersConfig(fn func(*MinersConfig) error) error {
 		return fmt.Errorf("failed to marshal miners config: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp(dir, "miners-config-*.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-
-	success := false
-	defer func() {
-		if !success {
-			os.Remove(tmpPath)
-		}
-	}()
-
-	if _, err := tmpFile.Write(newData); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("failed to sync temp file: %w", err)
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		return fmt.Errorf("failed to set temp file permissions: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, configPath); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
-	}
-
-	success = true
-	return nil
+	return AtomicWriteFile(configPath, newData, 0600)
 }

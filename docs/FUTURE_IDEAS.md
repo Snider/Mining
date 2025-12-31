@@ -139,6 +139,47 @@ deploy/
 
 ---
 
+## Advanced API Authentication
+
+**Priority:** Medium
+**Effort:** Medium
+
+Expand beyond basic/digest auth with more robust authentication options.
+
+### Current Implementation
+- HTTP Basic and Digest authentication (implemented)
+- Enabled via environment variables: `MINING_API_AUTH`, `MINING_API_USER`, `MINING_API_PASS`
+
+### Future Options
+
+#### JWT Tokens
+- Stateless authentication with expiring tokens
+- Refresh token support
+- Scoped permissions (read-only, admin, etc.)
+
+#### API Keys
+- Generate/revoke API keys from dashboard
+- Per-key permissions and rate limits
+- Key rotation support
+
+#### OAuth2/OIDC Integration
+- Support external identity providers (Google, GitHub, Keycloak)
+- SSO for enterprise deployments
+- Useful for multi-user mining farms
+
+#### mTLS (Mutual TLS)
+- Certificate-based client authentication
+- Strongest security for production deployments
+- No passwords to manage
+
+### Implementation Notes
+- Store credentials/keys in encrypted config file
+- Add `/api/v1/auth/token` endpoint for JWT issuance
+- Consider using `golang-jwt/jwt` for JWT implementation
+- Add audit logging for authentication events
+
+---
+
 ## Additional Ideas
 
 ### GPU Temperature Monitoring

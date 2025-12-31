@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,6 +41,7 @@ type Service struct {
 	APIBasePath         string
 	SwaggerUIPath       string
 	rateLimiter         *RateLimiter
+	auth                *DigestAuth
 }
 
 // APIError represents a structured error response for the API
@@ -146,15 +148,20 @@ var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow connections from localhost origins
+		// Allow connections from localhost origins only
 		origin := r.Header.Get("Origin")
 		if origin == "" {
-			return true
+			return true // No origin header (non-browser clients)
 		}
-		// Allow localhost with any port
-		return strings.Contains(origin, "localhost") ||
-			strings.Contains(origin, "127.0.0.1") ||
-			strings.Contains(origin, "wails.localhost")
+		// Parse the origin URL properly to prevent bypass attacks
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		host := u.Hostname()
+		// Only allow exact localhost matches
+		return host == "localhost" || host == "127.0.0.1" || host == "::1" ||
+			host == "wails.localhost"
 	},
 }
 
@@ -218,6 +225,14 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		}
 	})
 
+	// Initialize authentication from environment
+	authConfig := AuthConfigFromEnv()
+	var auth *DigestAuth
+	if authConfig.Enabled {
+		auth = NewDigestAuth(authConfig)
+		logging.Info("API authentication enabled", logging.Fields{"realm": authConfig.Realm})
+	}
+
 	return &Service{
 		Manager:        manager,
 		ProfileManager: profileManager,
@@ -234,6 +249,7 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		SwaggerInstanceName: instanceName,
 		APIBasePath:         apiBasePath,
 		SwaggerUIPath:       swaggerUIPath,
+		auth:                auth,
 	}, nil
 }
 
@@ -351,6 +367,12 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 // manually after InitRouter for embedding in other applications.
 func (s *Service) SetupRoutes() {
 	apiGroup := s.Router.Group(s.APIBasePath)
+
+	// Apply authentication middleware if enabled
+	if s.auth != nil {
+		apiGroup.Use(s.auth.Middleware())
+	}
+
 	{
 		apiGroup.GET("/info", s.handleGetInfo)
 		apiGroup.POST("/doctor", s.handleDoctor)
