@@ -76,6 +76,21 @@ int xmrig::App::exec()
     m_controller->start();
 
     rc = uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+
+    // SECURITY FIX (CRIT-015): Properly clean up libuv handles before closing loop
+    // Run the loop again to process any pending close callbacks
+    uv_run(uv_default_loop(), UV_RUN_NOWAIT);
+
+    // Walk all handles and close any that are still open
+    uv_walk(uv_default_loop(), [](uv_handle_t *handle, void *) {
+        if (!uv_is_closing(handle)) {
+            uv_close(handle, nullptr);
+        }
+    }, nullptr);
+
+    // Run loop once more to process the close callbacks
+    uv_run(uv_default_loop(), UV_RUN_NOWAIT);
+
     uv_loop_close(uv_default_loop());
 
     return rc;

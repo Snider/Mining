@@ -40,6 +40,10 @@
 
 #define LABEL(x) " \x1B[01;30m" x ":\x1B[0m "
 
+// SECURITY FIX (HIGH-016): Maximum number of upstream connections to prevent DoS
+// Each upstream can handle 256 miners, so 1000 upstreams = 256,000 miners max
+static constexpr size_t MAX_UPSTREAMS = 1000;
+
 
 xmrig::NonceSplitter::NonceSplitter(Controller *controller) : Splitter(controller)
 {
@@ -183,6 +187,13 @@ void xmrig::NonceSplitter::login(LoginEvent *event)
         if (mapper->isSuspended() && mapper->add(event->miner())) {
             return;
         }
+    }
+
+    // SECURITY FIX (HIGH-016): Limit maximum upstreams to prevent DoS
+    if (m_upstreams.size() >= MAX_UPSTREAMS) {
+        LOG_ERR("Maximum upstream limit reached (%zu), rejecting miner", MAX_UPSTREAMS);
+        event->reject();
+        return;
     }
 
     connect();

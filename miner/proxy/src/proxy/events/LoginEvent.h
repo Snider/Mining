@@ -38,6 +38,14 @@
 namespace xmrig {
 
 
+/**
+ * IMPORTANT LIFETIME CONSTRAINT (CRIT-009):
+ * The `params` and `algorithms` references are only valid during synchronous event processing.
+ * Do NOT store these references or access them after the event handler returns.
+ * The underlying JSON document may be destroyed after event dispatch.
+ *
+ * If you need to retain parameter data, copy it during event handling.
+ */
 class LoginEvent : public MinerEvent
 {
 public:
@@ -47,9 +55,9 @@ public:
     }
 
 
-    const Algorithms &algorithms;
+    const Algorithms &algorithms;  // WARNING: Only valid during event dispatch
     const int64_t loginId;
-    const rapidjson::Value &params;
+    const rapidjson::Value &params;  // WARNING: Only valid during event dispatch
     int error = -1;
     String flow;
 

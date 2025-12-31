@@ -119,7 +119,14 @@ bool xmrig::Job::setTarget(const char *target)
 
         switch (raw.size()) {
         case 4:
-            return 0xFFFFFFFFFFFFFFFFULL / (0xFFFFFFFFULL / uint64_t(*reinterpret_cast<const uint32_t *>(raw.data())));
+            {
+                // SECURITY FIX (HIGH-013): Check for division by zero
+                const uint64_t val = uint64_t(*reinterpret_cast<const uint32_t *>(raw.data()));
+                if (val == 0) {
+                    return 0;
+                }
+                return 0xFFFFFFFFFFFFFFFFULL / (0xFFFFFFFFULL / val);
+            }
 
         case 8:
             return *reinterpret_cast<const uint64_t *>(raw.data());
