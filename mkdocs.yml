@@ -150,7 +150,7 @@ nav:
   - API Reference:
     - Overview: api/index.md
     - Endpoints: api/endpoints.md
-    - Swagger Docs: swagger.json
+    - Swagger Docs: api/swagger.md
 
   - Development:
     - Setup: development/index.md

@@ -144,26 +144,42 @@ func (b *BaseMiner) Stop() error {
 		b.stdinPipe = nil
 	}
 
+	// Helper to clean up state
+	cleanup := func() {
+		b.Running = false
+		b.cmd = nil
+	}
+
 	// Try graceful shutdown with SIGTERM first (Unix only)
 	if runtime.GOOS != "windows" {
 		if err := b.cmd.Process.Signal(syscall.SIGTERM); err == nil {
 			// Wait up to 3 seconds for graceful shutdown
-			done := make(chan error, 1)
+			done := make(chan struct{})
 			go func() {
-				_, err := b.cmd.Process.Wait()
-				done <- err
+				b.cmd.Process.Wait()
+				close(done)
 			}()
 
 			select {
 			case <-done:
+				cleanup()
 				return nil
 			case <-time.After(3 * time.Second):
-				// Process didn't exit, force kill
+				// Process didn't exit gracefully, force kill below
 			}
 		}
 	}
 
-	return b.cmd.Process.Kill()
+	// Force kill and wait for process to exit
+	if err := b.cmd.Process.Kill(); err != nil {
+		cleanup()
+		return err
+	}
+
+	// Wait for process to fully terminate to avoid zombies
+	b.cmd.Process.Wait()
+	cleanup()
+	return nil
 }
 
 // WriteStdin sends input to the miner's stdin (for console commands).
