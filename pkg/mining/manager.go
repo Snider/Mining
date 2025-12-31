@@ -130,6 +130,11 @@ func (m *Manager) startDBCleanup() {
 	m.waitGroup.Add(1)
 	go func() {
 		defer m.waitGroup.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Error("panic in database cleanup goroutine", logging.Fields{"panic": r})
+			}
+		}()
 		// Run cleanup once per hour
 		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
@@ -523,6 +528,11 @@ func (m *Manager) startStatsCollection() {
 	m.waitGroup.Add(1)
 	go func() {
 		defer m.waitGroup.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Error("panic in stats collection goroutine", logging.Fields{"panic": r})
+			}
+		}()
 		ticker := time.NewTicker(HighResolutionInterval)
 		defer ticker.Stop()
 
@@ -570,6 +580,14 @@ func (m *Manager) collectMinerStats() {
 		wg.Add(1)
 		go func(miner Miner, minerType string) {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Error("panic in single miner stats collection", logging.Fields{
+						"panic": r,
+						"miner": miner.GetName(),
+					})
+				}
+			}()
 			m.collectSingleMinerStats(miner, minerType, now, dbEnabled)
 		}(mi.miner, mi.minerType)
 	}

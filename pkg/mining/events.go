@@ -60,6 +60,7 @@ type wsClient struct {
 	send      chan []byte
 	hub       *EventHub
 	miners    map[string]bool // subscribed miners, "*" for all
+	minersMu  sync.RWMutex    // protects miners map from concurrent access
 	closeOnce sync.Once
 }
 
@@ -143,6 +144,11 @@ func (h *EventHub) Run() {
 			// Send initial state sync if provider is set
 			if stateProvider != nil {
 				go func(c *wsClient) {
+					defer func() {
+						if r := recover(); r != nil {
+							logging.Error("panic in state sync goroutine", logging.Fields{"panic": r})
+						}
+					}()
 					state := stateProvider()
 					if state != nil {
 						event := Event{
@@ -206,7 +212,10 @@ func (h *EventHub) shouldSendToClient(client *wsClient, event Event) bool {
 		return true
 	}
 
-	// Check miner subscription for miner events
+	// Check miner subscription for miner events (protected by mutex)
+	client.minersMu.RLock()
+	defer client.minersMu.RUnlock()
+
 	if client.miners == nil || len(client.miners) == 0 {
 		// No subscription filter, send all
 		return true
@@ -354,11 +363,13 @@ func (c *wsClient) readPump() {
 
 		switch msg.Type {
 		case "subscribe":
-			// Update miner subscription
+			// Update miner subscription (protected by mutex)
+			c.minersMu.Lock()
 			c.miners = make(map[string]bool)
 			for _, m := range msg.Miners {
 				c.miners[m] = true
 			}
+			c.minersMu.Unlock()
 			logging.Debug("client subscribed to miners", logging.Fields{"miners": msg.Miners})
 
 		case "ping":

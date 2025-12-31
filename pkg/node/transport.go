@@ -22,25 +22,30 @@ var debugLogCounter atomic.Int64
 // debugLogInterval controls how often we log debug messages in hot paths (1 in N)
 const debugLogInterval = 100
 
+// DefaultMaxMessageSize is the default maximum message size (1MB)
+const DefaultMaxMessageSize int64 = 1 << 20 // 1MB
+
 // TransportConfig configures the WebSocket transport.
 type TransportConfig struct {
-	ListenAddr   string // ":9091" default
-	WSPath       string // "/ws" - WebSocket endpoint path
-	TLSCertPath  string // Optional TLS for wss://
-	TLSKeyPath   string
-	MaxConns     int           // Maximum concurrent connections
-	PingInterval time.Duration // WebSocket keepalive interval
-	PongTimeout  time.Duration // Timeout waiting for pong
+	ListenAddr     string // ":9091" default
+	WSPath         string // "/ws" - WebSocket endpoint path
+	TLSCertPath    string // Optional TLS for wss://
+	TLSKeyPath     string
+	MaxConns       int           // Maximum concurrent connections
+	MaxMessageSize int64         // Maximum message size in bytes (0 = 1MB default)
+	PingInterval   time.Duration // WebSocket keepalive interval
+	PongTimeout    time.Duration // Timeout waiting for pong
 }
 
 // DefaultTransportConfig returns sensible defaults.
 func DefaultTransportConfig() TransportConfig {
 	return TransportConfig{
-		ListenAddr:   ":9091",
-		WSPath:       "/ws",
-		MaxConns:     100,
-		PingInterval: 30 * time.Second,
-		PongTimeout:  10 * time.Second,
+		ListenAddr:     ":9091",
+		WSPath:         "/ws",
+		MaxConns:       100,
+		MaxMessageSize: DefaultMaxMessageSize,
+		PingInterval:   30 * time.Second,
+		PongTimeout:    10 * time.Second,
 	}
 }
 
@@ -49,17 +54,18 @@ type MessageHandler func(conn *PeerConnection, msg *Message)
 
 // Transport manages WebSocket connections with SMSG encryption.
 type Transport struct {
-	config   TransportConfig
-	server   *http.Server
-	upgrader websocket.Upgrader
-	conns    map[string]*PeerConnection // peer ID -> connection
-	node     *NodeManager
-	registry *PeerRegistry
-	handler  MessageHandler
-	mu       sync.RWMutex
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
+	config       TransportConfig
+	server       *http.Server
+	upgrader     websocket.Upgrader
+	conns        map[string]*PeerConnection // peer ID -> connection
+	pendingConns atomic.Int32               // tracks connections during handshake
+	node         *NodeManager
+	registry     *PeerRegistry
+	handler      MessageHandler
+	mu           sync.RWMutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 }
 
 // PeerConnection represents an active connection to a peer.
@@ -267,20 +273,33 @@ func (t *Transport) GetConnection(peerID string) *PeerConnection {
 
 // handleWSUpgrade handles incoming WebSocket connections.
 func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
-	// Enforce MaxConns limit
+	// Enforce MaxConns limit (including pending connections during handshake)
 	t.mu.RLock()
 	currentConns := len(t.conns)
 	t.mu.RUnlock()
+	pendingConns := int(t.pendingConns.Load())
 
-	if currentConns >= t.config.MaxConns {
+	totalConns := currentConns + pendingConns
+	if totalConns >= t.config.MaxConns {
 		http.Error(w, "Too many connections", http.StatusServiceUnavailable)
 		return
 	}
+
+	// Track this connection as pending during handshake
+	t.pendingConns.Add(1)
+	defer t.pendingConns.Add(-1)
 
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
+
+	// Apply message size limit during handshake to prevent memory exhaustion
+	maxSize := t.config.MaxMessageSize
+	if maxSize <= 0 {
+		maxSize = DefaultMaxMessageSize
+	}
+	conn.SetReadLimit(maxSize)
 
 	// Set handshake timeout to prevent slow/malicious clients from blocking
 	handshakeTimeout := 10 * time.Second
@@ -467,6 +486,13 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 func (t *Transport) readLoop(pc *PeerConnection) {
 	defer t.wg.Done()
 	defer t.removeConnection(pc)
+
+	// Apply message size limit to prevent memory exhaustion attacks
+	maxSize := t.config.MaxMessageSize
+	if maxSize <= 0 {
+		maxSize = DefaultMaxMessageSize
+	}
+	pc.Conn.SetReadLimit(maxSize)
 
 	for {
 		select {

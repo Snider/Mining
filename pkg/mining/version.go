@@ -36,7 +36,37 @@ type GitHubRelease struct {
 
 // FetchLatestGitHubVersion fetches the latest release version from a GitHub repository.
 // It takes the repository owner and name (e.g., "xmrig", "xmrig") and returns the tag name.
+// Uses a circuit breaker to prevent cascading failures when GitHub API is unavailable.
 func FetchLatestGitHubVersion(owner, repo string) (string, error) {
+	cb := getGitHubCircuitBreaker()
+
+	result, err := cb.Execute(func() (interface{}, error) {
+		return fetchGitHubVersionDirect(owner, repo)
+	})
+
+	if err != nil {
+		// If circuit is open, try to return cached value with warning
+		if err == ErrCircuitOpen {
+			if cached, ok := cb.GetCached(); ok {
+				if tagName, ok := cached.(string); ok {
+					return tagName, nil
+				}
+			}
+			return "", fmt.Errorf("github API unavailable (circuit breaker open): %w", err)
+		}
+		return "", err
+	}
+
+	tagName, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected result type from circuit breaker")
+	}
+
+	return tagName, nil
+}
+
+// fetchGitHubVersionDirect is the actual GitHub API call, wrapped by circuit breaker
+func fetchGitHubVersionDirect(owner, repo string) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 
 	resp, err := getHTTPClient().Get(url)

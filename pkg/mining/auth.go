@@ -219,7 +219,11 @@ func (da *DigestAuth) generateOpaque() string {
 
 // cleanupNonces removes expired nonces periodically
 func (da *DigestAuth) cleanupNonces() {
-	ticker := time.NewTicker(da.config.NonceExpiry)
+	interval := da.config.NonceExpiry
+	if interval <= 0 {
+		interval = 5 * time.Minute // Default if not set
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
