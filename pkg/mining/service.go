@@ -19,6 +19,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/swaggo/swag"
 
@@ -31,12 +32,30 @@ type Service struct {
 	Manager             ManagerInterface
 	ProfileManager      *ProfileManager
 	NodeService         *NodeService
+	EventHub            *EventHub
 	Router              *gin.Engine
 	Server              *http.Server
 	DisplayAddr         string
 	SwaggerInstanceName string
 	APIBasePath         string
 	SwaggerUIPath       string
+}
+
+// WebSocket upgrader for the events endpoint
+var wsUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow connections from localhost origins
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		// Allow localhost with any port
+		return strings.Contains(origin, "localhost") ||
+			strings.Contains(origin, "127.0.0.1") ||
+			strings.Contains(origin, "wails.localhost")
+	},
 }
 
 // NewService creates a new mining service
@@ -63,10 +82,20 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		// Continue without node service - P2P features will be unavailable
 	}
 
+	// Initialize event hub for WebSocket real-time updates
+	eventHub := NewEventHub()
+	go eventHub.Run()
+
+	// Wire up event hub to manager for miner events
+	if mgr, ok := manager.(*Manager); ok {
+		mgr.SetEventHub(eventHub)
+	}
+
 	return &Service{
 		Manager:        manager,
 		ProfileManager: profileManager,
 		NodeService:    nodeService,
+		EventHub:       eventHub,
 		Server: &http.Server{
 			Addr:              listenAddr,
 			ReadTimeout:       30 * time.Second,
@@ -213,6 +242,12 @@ func (s *Service) SetupRoutes() {
 			profilesGroup.PUT("/:id", s.handleUpdateProfile)
 			profilesGroup.DELETE("/:id", s.handleDeleteProfile)
 			profilesGroup.POST("/:id/start", s.handleStartMinerWithProfile)
+		}
+
+		// WebSocket endpoint for real-time events
+		wsGroup := apiGroup.Group("/ws")
+		{
+			wsGroup.GET("/events", s.handleWebSocketEvents)
 		}
 
 		// Add P2P node endpoints if node service is available
@@ -815,4 +850,22 @@ func (s *Service) handleMinerHistoricalHashrate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, history)
+}
+
+// handleWebSocketEvents godoc
+// @Summary WebSocket endpoint for real-time mining events
+// @Description Upgrade to WebSocket for real-time mining stats and events.
+// @Description Events include: miner.starting, miner.started, miner.stopping, miner.stopped, miner.stats, miner.error
+// @Tags websocket
+// @Success 101 {string} string "Switching Protocols"
+// @Router /ws/events [get]
+func (s *Service) handleWebSocketEvents(c *gin.Context) {
+	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("[WebSocket] Failed to upgrade connection: %v", err)
+		return
+	}
+
+	log.Printf("[WebSocket] New connection from %s", c.Request.RemoteAddr)
+	s.EventHub.ServeWs(conn)
 }

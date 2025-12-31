@@ -74,8 +74,29 @@ export class ChartComponent {
 
     // Create effect with proper cleanup
     const effectRef = effect(() => {
-      // Use 24-hour historical data from database
-      const historyMap = this.minerService.historicalHashrate();
+      // Hybrid approach: use live in-memory data when available, fall back to database historical data
+      const liveHistory = this.minerService.hashrateHistory();
+      const dbHistory = this.minerService.historicalHashrate();
+
+      // Merge: prefer live data, supplement with historical for longer time ranges
+      const historyMap = new Map<string, { timestamp: string; hashrate: number }[]>();
+
+      // First, add all historical data as base
+      dbHistory.forEach((points, name) => {
+        historyMap.set(name, [...points]);
+      });
+
+      // Then overlay/replace with live data (more recent and accurate)
+      liveHistory.forEach((points, name) => {
+        if (points.length > 0) {
+          const existing = historyMap.get(name) || [];
+          // Get the earliest live data timestamp
+          const earliestLive = points.length > 0 ? new Date(points[0].timestamp).getTime() : Infinity;
+          // Keep historical points before live data starts, then use all live data
+          const historicalBefore = existing.filter(p => new Date(p.timestamp).getTime() < earliestLive);
+          historyMap.set(name, [...historicalBefore, ...points]);
+        }
+      });
 
       // Clean up colors for miners no longer active
       const activeNames = new Set(historyMap.keys());

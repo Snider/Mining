@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/Snider/Mining/pkg/mining"
 	"github.com/spf13/cobra"
 )
@@ -30,6 +32,10 @@ func init() {
 
 // initManager initializes the miner manager
 func initManager() {
+	// Skip for commands that create their own manager (like simulate)
+	if len(os.Args) > 1 && os.Args[1] == "simulate" {
+		return
+	}
 	if manager == nil {
 		manager = mining.NewManager()
 	}

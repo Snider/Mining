@@ -1,6 +1,8 @@
-import { Component, inject, computed, signal, output, HostListener } from '@angular/core';
+import { Component, inject, computed, signal, output, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { MinerService } from '../../miner.service';
+import { WebSocketService } from '../../websocket.service';
 
 interface ContextMenuState {
   visible: boolean;
@@ -60,39 +62,49 @@ const SPINNER_SVG = `<svg class="spinner" viewBox="0 0 24 24" fill="none" stroke
           @for (miner of runningMiners(); track miner.name) {
             <div class="dropdown-item miner-item"
                  [class.active]="selectedMinerName() === miner.name"
+                 [class.stopping]="isLoading('stop-' + miner.name)"
                  (contextmenu)="openContextMenu($event, miner.name)">
               <button class="miner-select" (click)="selectMiner(miner.name)">
                 <div class="miner-status-dot online"></div>
                 <span class="miner-name">{{ miner.name }}</span>
                 <span class="miner-hashrate">{{ formatHashrate(getHashrate(miner)) }}</span>
               </button>
-              <div class="miner-actions">
-                <button
-                  class="action-btn stop"
-                  [class.loading]="isLoading('stop-' + miner.name)"
-                  [disabled]="isLoading('stop-' + miner.name)"
-                  title="Stop miner"
-                  (click)="stopMiner($event, miner.name)">
-                  @if (isLoading('stop-' + miner.name)) {
+              <div class="miner-actions" [class.show]="isLoading('stop-' + miner.name)">
+                @if (isLoading('stop-' + miner.name)) {
+                  <div class="stopping-indicator">
                     <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
                     </svg>
-                  } @else {
+                    <span class="stopping-text">Stopping</span>
+                  </div>
+                  <button
+                    class="cancel-btn"
+                    title="Cancel"
+                    (click)="cancelAction($event, 'stop-' + miner.name)">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                } @else {
+                  <button
+                    class="action-btn stop"
+                    title="Stop miner"
+                    (click)="stopMiner($event, miner.name)">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
                     </svg>
-                  }
-                </button>
-                <button
-                  class="action-btn edit"
-                  title="Edit configuration"
-                  (click)="editMiner($event, miner.name)">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                </button>
+                  </button>
+                  <button
+                    class="action-btn edit"
+                    title="Edit configuration"
+                    (click)="editMiner($event, miner.name)">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                  </button>
+                }
               </div>
             </div>
           }
@@ -110,24 +122,36 @@ const SPINNER_SVG = `<svg class="spinner" viewBox="0 0 24 24" fill="none" stroke
             <div class="start-section">
               <span class="section-label">Start Worker</span>
               @for (profile of profiles(); track profile.id) {
-                <button
-                  class="dropdown-item start-item"
-                  [class.loading]="isLoading('start-' + profile.id)"
-                  [disabled]="isLoading('start-' + profile.id)"
-                  (click)="startProfile(profile.id, profile.name)">
+                <div class="start-item-wrapper" [class.loading]="isLoading('start-' + profile.id)">
+                  <button
+                    class="dropdown-item start-item"
+                    [class.loading]="isLoading('start-' + profile.id)"
+                    [disabled]="isLoading('start-' + profile.id)"
+                    (click)="startProfile(profile.id, profile.name)">
+                    @if (isLoading('start-' + profile.id)) {
+                      <svg class="item-icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+                      </svg>
+                    } @else {
+                      <svg class="item-icon play" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                    }
+                    <span>{{ profile.name }}</span>
+                    <span class="profile-type">{{ profile.minerType }}</span>
+                  </button>
                   @if (isLoading('start-' + profile.id)) {
-                    <svg class="item-icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-                    </svg>
-                  } @else {
-                    <svg class="item-icon play" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                    <button
+                      class="cancel-btn"
+                      title="Cancel"
+                      (click)="cancelAction($event, 'start-' + profile.id)">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
                   }
-                  <span>{{ profile.name }}</span>
-                  <span class="profile-type">{{ profile.minerType }}</span>
-                </button>
+                </div>
               }
             </div>
           }
@@ -363,13 +387,39 @@ const SPINNER_SVG = `<svg class="spinner" viewBox="0 0 24 24" fill="none" stroke
 
     .miner-actions {
       display: flex;
+      align-items: center;
       gap: 0.25rem;
       opacity: 0;
       transition: opacity 0.15s ease;
     }
 
-    .miner-item:hover .miner-actions {
+    .miner-item:hover .miner-actions,
+    .miner-actions.show {
       opacity: 1;
+    }
+
+    /* Stopping indicator */
+    .stopping-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--color-accent-400);
+    }
+
+    .stopping-indicator .spinner {
+      width: 14px;
+      height: 14px;
+    }
+
+    .stopping-text {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .miner-item.stopping {
+      background: rgb(0 212 255 / 0.05);
     }
 
     .action-btn {
@@ -555,10 +605,63 @@ const SPINNER_SVG = `<svg class="spinner" viewBox="0 0 24 24" fill="none" stroke
     .context-menu-item.loading .spinner {
       color: var(--color-accent-400);
     }
+
+    /* Start item wrapper for cancel button positioning */
+    .start-item-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .start-item-wrapper .start-item {
+      flex: 1;
+    }
+
+    /* Cancel button - appears on hover over loading items */
+    .cancel-btn {
+      position: absolute;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--color-danger-500);
+      border: none;
+      border-radius: 50%;
+      color: white;
+      cursor: pointer;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.15s ease;
+      z-index: 10;
+    }
+
+    .cancel-btn svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .start-item-wrapper:hover .cancel-btn,
+    .miner-item:hover .cancel-btn {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .cancel-btn:hover {
+      background: var(--color-danger-400);
+      transform: scale(1.1);
+    }
+
+    .cancel-btn:active {
+      transform: scale(0.95);
+    }
   `]
 })
-export class MinerSwitcherComponent {
+export class MinerSwitcherComponent implements OnDestroy {
   private minerService = inject(MinerService);
+  private ws = inject(WebSocketService);
+  private wsSubscriptions: Subscription[] = [];
 
   // Output for edit action (navigate to profiles page)
   editProfile = output<string>();
@@ -572,6 +675,76 @@ export class MinerSwitcherComponent {
 
   // Track loading states for actions (e.g., "stop-minerName", "start-profileId")
   private loadingActions = signal<Set<string>>(new Set());
+
+  // Track pending start actions to match profile IDs with miner names
+  private pendingStarts = new Map<string, string>(); // profileId -> expected miner type
+
+  constructor() {
+    this.subscribeToWebSocketEvents();
+  }
+
+  ngOnDestroy(): void {
+    this.wsSubscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  /**
+   * Subscribe to WebSocket events to clear loading states when actions complete
+   */
+  private subscribeToWebSocketEvents(): void {
+    // When a miner starts, clear the loading state for its profile
+    const startedSub = this.ws.minerStarted$.subscribe(data => {
+      console.log('[MinerSwitcher] Miner started event:', data.name);
+      // Clear any start loading states that might match this miner
+      this.loadingActions.update(set => {
+        const newSet = new Set(set);
+        // Clear all start-* loading states since we got a miner.started event
+        for (const key of newSet) {
+          if (key.startsWith('start-')) {
+            newSet.delete(key);
+          }
+        }
+        return newSet;
+      });
+      this.pendingStarts.clear();
+    });
+    this.wsSubscriptions.push(startedSub);
+
+    // When a miner stops, clear the loading state
+    const stoppedSub = this.ws.minerStopped$.subscribe(data => {
+      console.log('[MinerSwitcher] Miner stopped event:', data.name);
+      const actionKey = `stop-${data.name}`;
+      this.setLoading(actionKey, false);
+
+      // If this was the selected miner, switch to all view
+      if (this.selectedMinerName() === data.name) {
+        this.minerService.selectAllMiners();
+      }
+
+      // Close context menu if it was for this miner
+      if (this.contextMenu().minerName === data.name) {
+        this.closeContextMenu();
+      }
+    });
+    this.wsSubscriptions.push(stoppedSub);
+
+    // On error, clear relevant loading states
+    const errorSub = this.ws.minerError$.subscribe(data => {
+      console.log('[MinerSwitcher] Miner error event:', data.name, data.error);
+      // Clear both start and stop loading states for this miner
+      this.loadingActions.update(set => {
+        const newSet = new Set(set);
+        newSet.delete(`stop-${data.name}`);
+        // Also clear any pending starts
+        for (const key of newSet) {
+          if (key.startsWith('start-')) {
+            newSet.delete(key);
+          }
+        }
+        return newSet;
+      });
+    });
+    this.wsSubscriptions.push(errorSub);
+  }
 
   isLoading(actionKey: string): boolean {
     return this.loadingActions().has(actionKey);
@@ -634,13 +807,11 @@ export class MinerSwitcherComponent {
     this.setLoading(actionKey, true);
     this.minerService.stopMiner(name).subscribe({
       next: () => {
-        // If this was the selected miner, switch to all view
-        if (this.selectedMinerName() === name) {
-          this.minerService.selectAllMiners();
-        }
-        this.setLoading(actionKey, false);
+        // Loading state will be cleared by WebSocket miner.stopped event
+        // Keep spinner spinning until we get confirmation the miner actually stopped
       },
       error: () => {
+        // On HTTP error, clear loading state immediately
         this.setLoading(actionKey, false);
       }
     });
@@ -661,15 +832,38 @@ export class MinerSwitcherComponent {
     if (this.isLoading(actionKey)) return;
 
     this.setLoading(actionKey, true);
+    this.pendingStarts.set(profileId, profileName);
+
     this.minerService.startMiner(profileId).subscribe({
       next: () => {
-        this.setLoading(actionKey, false);
+        // Loading state will be cleared by WebSocket miner.started event
+        // Keep spinner spinning until we get confirmation the miner actually started
         this.closeDropdown();
       },
       error: () => {
+        // On HTTP error, clear loading state immediately
         this.setLoading(actionKey, false);
+        this.pendingStarts.delete(profileId);
       }
     });
+  }
+
+  /**
+   * Cancel an in-progress action (clears loading state)
+   * For start actions, the miner may still start - this just clears the UI state
+   */
+  cancelAction(event: Event, actionKey: string) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    // Clear the loading state
+    this.setLoading(actionKey, false);
+
+    // If it was a start action, clear pending starts
+    if (actionKey.startsWith('start-')) {
+      const profileId = actionKey.replace('start-', '');
+      this.pendingStarts.delete(profileId);
+    }
   }
 
   getHashrate(miner: any): number {
@@ -741,13 +935,11 @@ export class MinerSwitcherComponent {
     this.setLoading(actionKey, true);
     this.minerService.stopMiner(minerName).subscribe({
       next: () => {
-        if (this.selectedMinerName() === minerName) {
-          this.minerService.selectAllMiners();
-        }
-        this.setLoading(actionKey, false);
-        this.closeContextMenu();
+        // Loading state and context menu will be cleared by WebSocket miner.stopped event
+        // Keep spinner spinning until we get confirmation the miner actually stopped
       },
       error: () => {
+        // On HTTP error, clear loading state immediately
         this.setLoading(actionKey, false);
         this.closeContextMenu();
       }

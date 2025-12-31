@@ -1,7 +1,8 @@
-import { Injectable, OnDestroy, signal, computed } from '@angular/core';
+import { Injectable, OnDestroy, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { of, forkJoin, Subscription, interval } from 'rxjs';
-import { switchMap, catchError, map, tap } from 'rxjs/operators';
+import { of, forkJoin, Subscription, interval, merge } from 'rxjs';
+import { switchMap, catchError, map, tap, filter, debounceTime } from 'rxjs/operators';
+import { WebSocketService, MinerEventData, MinerStatsData } from './websocket.service';
 
 // --- Interfaces ---
 export interface InstallationDetails {
@@ -47,6 +48,8 @@ export interface SystemState {
 export class MinerService implements OnDestroy {
   private apiBaseUrl = 'http://localhost:9090/api/v1/mining';
   private pollingSubscription?: Subscription;
+  private wsSubscriptions: Subscription[] = [];
+  private ws = inject(WebSocketService);
 
   // --- State Signals ---
   public state = signal<SystemState>({
@@ -111,11 +114,71 @@ export class MinerService implements OnDestroy {
     this.forceRefreshState();
     this.startPollingLive_Data();
     this.startPollingHistoricalData();
+    this.subscribeToWebSocketEvents();
   }
 
   ngOnDestroy(): void {
     this.stopPolling();
     this.historyPollingSubscription?.unsubscribe();
+    this.wsSubscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  // --- WebSocket Event Subscriptions ---
+
+  /**
+   * Subscribe to WebSocket events for real-time updates.
+   * This supplements polling with instant event-driven updates.
+   */
+  private subscribeToWebSocketEvents(): void {
+    // Listen for miner started/stopped events to refresh the miner list immediately
+    const minerLifecycleEvents = merge(
+      this.ws.minerStarted$,
+      this.ws.minerStopped$
+    ).pipe(
+      debounceTime(500) // Debounce to avoid rapid-fire updates
+    ).subscribe(() => {
+      // Refresh running miners when a miner starts or stops
+      this.getRunningMiners().pipe(
+        catchError(() => of([]))
+      ).subscribe(runningMiners => {
+        this.state.update(s => ({ ...s, runningMiners }));
+        this.updateHashrateHistory(runningMiners);
+      });
+    });
+    this.wsSubscriptions.push(minerLifecycleEvents);
+
+    // Listen for stats events to update hashrates in real-time
+    // This provides more immediate updates than the 5-second polling interval
+    const statsSubscription = this.ws.minerStats$.subscribe((stats: MinerStatsData) => {
+      // Update the running miners with fresh hashrate data
+      this.state.update(s => {
+        const runningMiners = s.runningMiners.map(miner => {
+          if (miner.name === stats.name) {
+            return {
+              ...miner,
+              stats: {
+                ...miner.stats,
+                hashrate: stats.hashrate,
+                shares: stats.shares,
+                rejected: stats.rejected,
+                uptime: stats.uptime,
+                algorithm: stats.algorithm || miner.stats?.algorithm,
+              }
+            };
+          }
+          return miner;
+        });
+        return { ...s, runningMiners };
+      });
+    });
+    this.wsSubscriptions.push(statsSubscription);
+
+    // Listen for error events to show notifications
+    const errorSubscription = this.ws.minerError$.subscribe((data: MinerEventData) => {
+      console.error(`[MinerService] Miner error for ${data.name}:`, data.error);
+      // Notification can be handled by components listening to this event
+    });
+    this.wsSubscriptions.push(errorSubscription);
   }
 
   // --- Data Loading and Polling Logic ---
@@ -136,7 +199,6 @@ export class MinerService implements OnDestroy {
       if (initialState) {
         this.state.set(initialState);
         this.updateHashrateHistory(initialState.runningMiners);
-        // Fetch historical data now that we know which miners are running
         this.fetchHistoricalHashrate();
       }
     });

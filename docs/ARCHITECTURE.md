@@ -62,3 +62,57 @@ The `Service` struct (`pkg/mining/service.go`) wraps the `Manager` and exposes i
 3.  **Manager Layer**: The manager looks up the appropriate `Miner` implementation.
 4.  **Miner Layer**: The miner instance interacts with the OS (filesystem, processes).
 5.  **Feedback**: Status and stats are returned up the stack to the user.
+
+## Real-Time Communication
+
+### WebSocket Events
+
+The system uses WebSocket for real-time event delivery to the UI (`pkg/mining/events.go`):
+
+```
+Angular UI <──WebSocket──> Go EventHub <── Manager (stats/events)
+                                       <── Miner processes
+```
+
+**Event Types:**
+- `miner.starting` / `miner.started` - Miner lifecycle
+- `miner.stopping` / `miner.stopped` - Miner shutdown
+- `miner.stats` - Periodic hashrate/share updates
+- `miner.error` - Connection or pool errors
+- `profile.*` - Profile CRUD events
+
+The `EventHub` manages client connections with automatic cleanup on disconnect.
+
+### Angular WebSocket Service
+
+The frontend (`ui/src/app/websocket.service.ts`) maintains a persistent WebSocket connection with:
+- Automatic reconnection with exponential backoff
+- Event filtering by type
+- Fallback to HTTP polling if WebSocket unavailable
+
+## Simulation Mode
+
+For development without mining hardware, the `SimulatedMiner` (`pkg/mining/simulated_miner.go`) provides:
+- Realistic hashrate generation with variance and sine-wave fluctuation
+- 30-second ramp-up period
+- Simulated share acceptance (98% success rate)
+- XMRig-compatible stats format for UI compatibility
+
+Usage: `miner-ctrl simulate --count 3 --preset cpu-high`
+
+## Supported Miners
+
+The system is designed to support multiple mining software through a plugin architecture:
+
+| Miner | Status | Type | API |
+|-------|--------|------|-----|
+| XMRig | Implemented | CPU/GPU | HTTP REST |
+| TT-Miner | Implemented | NVIDIA GPU | HTTP |
+| T-Rex | Planned | NVIDIA GPU | HTTP REST |
+| lolMiner | Planned | AMD/NVIDIA/Intel | HTTP JSON |
+| Rigel | Planned | NVIDIA GPU | HTTP REST |
+| BzMiner | Planned | AMD/NVIDIA | HTTP |
+| SRBMiner | Planned | CPU+GPU | HTTP |
+| TeamRedMiner | Planned | AMD GPU | Claymore API |
+| GMiner | Planned | GPU | HTTP |
+| NBMiner | Planned | GPU | HTTP REST |

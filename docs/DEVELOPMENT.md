@@ -12,6 +12,22 @@ This guide is for developers contributing to the Mining project.
 
 The project uses a `Makefile` to automate common tasks.
 
+### Simulation Mode
+
+For UI development without real mining hardware, use the simulation mode:
+
+```bash
+# Start with 3 simulated CPU miners
+miner-ctrl simulate --count 3 --preset cpu-high
+
+# Custom hashrate and algorithm
+miner-ctrl simulate --count 2 --hashrate 8000 --algorithm rx/0
+
+# Available presets: cpu-low, cpu-medium, cpu-high, gpu-ethash, gpu-kawpow
+```
+
+This generates realistic hashrate data with variance, share events, and pool connections for testing the UI.
+
 ### Building
 
 Build the CLI binary for the current platform:

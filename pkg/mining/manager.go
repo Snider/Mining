@@ -38,6 +38,27 @@ type Manager struct {
 	waitGroup   sync.WaitGroup
 	dbEnabled   bool
 	dbRetention int
+	eventHub    *EventHub
+	eventHubMu  sync.RWMutex // Separate mutex for eventHub to avoid deadlock with main mu
+}
+
+// SetEventHub sets the event hub for broadcasting miner events
+func (m *Manager) SetEventHub(hub *EventHub) {
+	m.eventHubMu.Lock()
+	defer m.eventHubMu.Unlock()
+	m.eventHub = hub
+}
+
+// emitEvent broadcasts an event if an event hub is configured
+// Uses separate eventHubMu to avoid deadlock when called while holding m.mu
+func (m *Manager) emitEvent(eventType EventType, data interface{}) {
+	m.eventHubMu.RLock()
+	hub := m.eventHub
+	m.eventHubMu.RUnlock()
+
+	if hub != nil {
+		hub.Broadcast(NewEvent(eventType, data))
+	}
 }
 
 var _ ManagerInterface = (*Manager)(nil)
@@ -52,6 +73,19 @@ func NewManager() *Manager {
 	m.syncMinersConfig() // Ensure config file is populated
 	m.initDatabase()
 	m.autostartMiners()
+	m.startStatsCollection()
+	return m
+}
+
+// NewManagerForSimulation creates a manager for simulation mode.
+// It skips autostarting real miners and config sync, suitable for UI testing.
+func NewManagerForSimulation() *Manager {
+	m := &Manager{
+		miners:    make(map[string]Miner),
+		stopChan:  make(chan struct{}),
+		waitGroup: sync.WaitGroup{},
+	}
+	// Skip syncMinersConfig and autostartMiners for simulation
 	m.startStatsCollection()
 	return m
 }
@@ -248,7 +282,17 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 		}
 	}
 
+	// Emit starting event before actually starting
+	m.emitEvent(EventMinerStarting, MinerEventData{
+		Name: instanceName,
+	})
+
 	if err := miner.Start(config); err != nil {
+		// Emit error event
+		m.emitEvent(EventMinerError, MinerEventData{
+			Name:  instanceName,
+			Error: err.Error(),
+		})
 		return nil, err
 	}
 
@@ -260,6 +304,11 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 
 	logMessage := fmt.Sprintf("CryptoCurrency Miner started: %s (Binary: %s)", miner.GetName(), miner.GetBinaryPath())
 	logToSyslog(logMessage)
+
+	// Emit started event
+	m.emitEvent(EventMinerStarted, MinerEventData{
+		Name: instanceName,
+	})
 
 	return miner, nil
 }
@@ -373,12 +422,27 @@ func (m *Manager) StopMiner(name string) error {
 		return fmt.Errorf("miner not found: %s", name)
 	}
 
+	// Emit stopping event
+	m.emitEvent(EventMinerStopping, MinerEventData{
+		Name: name,
+	})
+
 	// Try to stop the miner, but always remove it from the map
 	// This handles the case where a miner crashed or was killed externally
 	stopErr := miner.Stop()
 
 	// Always remove from map - if it's not running, we still want to clean it up
 	delete(m.miners, name)
+
+	// Emit stopped event
+	reason := "stopped"
+	if stopErr != nil && stopErr.Error() != "miner is not running" {
+		reason = stopErr.Error()
+	}
+	m.emitEvent(EventMinerStopped, MinerEventData{
+		Name:   name,
+		Reason: reason,
+	})
 
 	// Only return error if it wasn't just "miner is not running"
 	if stopErr != nil && stopErr.Error() != "miner is not running" {
@@ -408,6 +472,29 @@ func (m *Manager) ListMiners() []Miner {
 		miners = append(miners, miner)
 	}
 	return miners
+}
+
+// RegisterMiner registers an already-started miner with the manager.
+// This is useful for simulated miners or externally managed miners.
+func (m *Manager) RegisterMiner(miner Miner) error {
+	name := miner.GetName()
+
+	m.mu.Lock()
+	if _, exists := m.miners[name]; exists {
+		m.mu.Unlock()
+		return fmt.Errorf("miner %s is already registered", name)
+	}
+	m.miners[name] = miner
+	m.mu.Unlock()
+
+	log.Printf("Registered miner: %s", name)
+
+	// Emit miner started event (outside lock)
+	m.emitEvent(EventMinerStarted, map[string]interface{}{
+		"name": name,
+	})
+
+	return nil
 }
 
 // ListAvailableMiners returns a list of available miners that can be started.
@@ -506,6 +593,17 @@ func (m *Manager) collectMinerStats() {
 				log.Printf("Warning: failed to persist hashrate for %s: %v", minerName, err)
 			}
 		}
+
+		// Emit stats event for real-time WebSocket updates
+		m.emitEvent(EventMinerStats, MinerStatsData{
+			Name:        minerName,
+			Hashrate:    stats.Hashrate,
+			Shares:      stats.Shares,
+			Rejected:    stats.Rejected,
+			Uptime:      stats.Uptime,
+			Algorithm:   stats.Algorithm,
+			DiffCurrent: stats.DiffCurrent,
+		})
 	}
 }
 
