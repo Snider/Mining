@@ -10,6 +10,41 @@ The project is structured as a modular Go application. It consists of:
 3.  **REST API**: A Gin-based web server exposed via the `serve` command.
 4.  **Frontend**: An Angular-based dashboard for monitoring miners.
 
+```mermaid
+graph TB
+    subgraph "Frontend"
+        UI[Angular Dashboard]
+    end
+
+    subgraph "Backend"
+        CLI[CLI Commands]
+        API[REST API / Gin]
+        WS[WebSocket / EventHub]
+        SVC[Service Layer]
+        MGR[Manager]
+        FAC[MinerFactory]
+        DB[(SQLite Database)]
+    end
+
+    subgraph "Miners"
+        XMR[XMRig]
+        TTM[TT-Miner]
+        SIM[SimulatedMiner]
+    end
+
+    UI -->|HTTP| API
+    UI <-->|WebSocket| WS
+    CLI --> SVC
+    API --> SVC
+    SVC --> MGR
+    MGR --> FAC
+    FAC --> XMR
+    FAC --> TTM
+    FAC --> SIM
+    MGR --> DB
+    WS --> MGR
+```
+
 ## Core Components
 
 ### Manager Interface
@@ -63,15 +98,56 @@ The `Service` struct (`pkg/mining/service.go`) wraps the `Manager` and exposes i
 4.  **Miner Layer**: The miner instance interacts with the OS (filesystem, processes).
 5.  **Feedback**: Status and stats are returned up the stack to the user.
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI/API
+    participant Manager
+    participant MinerFactory
+    participant Miner
+    participant Pool
+
+    User->>CLI/API: Start Miner Request
+    CLI/API->>Manager: StartMiner(type, config)
+    Manager->>MinerFactory: CreateMiner(type)
+    MinerFactory-->>Manager: Miner instance
+    Manager->>Miner: Start(config)
+    Miner->>Pool: Connect to mining pool
+    Pool-->>Miner: Work assignments
+
+    loop Every 10 seconds
+        Manager->>Miner: GetStats()
+        Miner-->>Manager: PerformanceMetrics
+        Manager->>User: Stats via WebSocket
+    end
+```
+
 ## Real-Time Communication
 
 ### WebSocket Events
 
 The system uses WebSocket for real-time event delivery to the UI (`pkg/mining/events.go`):
 
-```
-Angular UI <──WebSocket──> Go EventHub <── Manager (stats/events)
-                                       <── Miner processes
+```mermaid
+graph LR
+    subgraph "Browser"
+        WS_SVC[WebSocket Service]
+        COMP[Angular Components]
+    end
+
+    subgraph "Server"
+        HUB[EventHub]
+        MGR[Manager]
+        M1[Miner 1]
+        M2[Miner 2]
+    end
+
+    WS_SVC <-->|WebSocket| HUB
+    WS_SVC --> COMP
+    MGR -->|Stats Events| HUB
+    MGR -->|Lifecycle Events| HUB
+    M1 -->|Output| MGR
+    M2 -->|Output| MGR
 ```
 
 **Event Types:**
