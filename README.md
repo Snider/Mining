@@ -65,6 +65,15 @@ Manages installation and configuration of:
 
 ## Quick Start
 
+### Docker (Fastest)
+
+```bash
+# Run with Docker - no dependencies required
+docker run -p 9090:9090 ghcr.io/snider/mining:latest
+
+# Access the dashboard at http://localhost:9090
+```
+
 ### CLI
 
 ```bash
@@ -191,11 +200,15 @@ Example profile:
 
 ## Contributing
 
+We welcome contributions! Please read our [Code of Conduct](CODE_OF_CONDUCT.md) and [Contributing Guidelines](docs/development/contributing.md) first.
+
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the list of contributors.
 
 ## License
 
