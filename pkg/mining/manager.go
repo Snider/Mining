@@ -351,7 +351,8 @@ func (m *Manager) updateMinerConfig(minerType string, autostart bool, config *Co
 	return SaveMinersConfig(cfg)
 }
 
-// StopMiner stops a running miner.
+// StopMiner stops a running miner and removes it from the manager.
+// If the miner is already stopped, it will still be removed from the manager.
 func (m *Manager) StopMiner(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -372,11 +373,18 @@ func (m *Manager) StopMiner(name string) error {
 		return fmt.Errorf("miner not found: %s", name)
 	}
 
-	if err := miner.Stop(); err != nil {
-		return err
+	// Try to stop the miner, but always remove it from the map
+	// This handles the case where a miner crashed or was killed externally
+	stopErr := miner.Stop()
+
+	// Always remove from map - if it's not running, we still want to clean it up
+	delete(m.miners, name)
+
+	// Only return error if it wasn't just "miner is not running"
+	if stopErr != nil && stopErr.Error() != "miner is not running" {
+		return stopErr
 	}
 
-	delete(m.miners, name)
 	return nil
 }
 
