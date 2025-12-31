@@ -209,6 +209,17 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("donate level must be between 0 and 100")
 	}
 
+	// CLIArgs validation - check for shell metacharacters
+	if c.CLIArgs != "" {
+		if containsShellChars(c.CLIArgs) {
+			return fmt.Errorf("CLI arguments contain invalid characters")
+		}
+		// Limit length to prevent abuse
+		if len(c.CLIArgs) > 1024 {
+			return fmt.Errorf("CLI arguments too long (max 1024 chars)")
+		}
+	}
+
 	return nil
 }
 

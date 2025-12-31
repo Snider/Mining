@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -55,6 +56,20 @@ type APIError struct {
 	Retryable  bool   `json:"retryable"`            // Can the client retry?
 }
 
+// debugErrorsEnabled controls whether internal error details are exposed in API responses.
+// In production, this should be false to prevent information disclosure.
+var debugErrorsEnabled = os.Getenv("DEBUG_ERRORS") == "true" || os.Getenv("GIN_MODE") != "release"
+
+// sanitizeErrorDetails filters potentially sensitive information from error details.
+// In production mode (debugErrorsEnabled=false), returns empty string.
+func sanitizeErrorDetails(details string) string {
+	if debugErrorsEnabled {
+		return details
+	}
+	// In production, don't expose internal error details
+	return ""
+}
+
 // Error codes are defined in errors.go
 
 // respondWithError sends a structured error response
@@ -62,7 +77,7 @@ func respondWithError(c *gin.Context, status int, code string, message string, d
 	apiErr := APIError{
 		Code:      code,
 		Message:   message,
-		Details:   details,
+		Details:   sanitizeErrorDetails(details),
 		Retryable: isRetryableError(status),
 	}
 
@@ -103,7 +118,7 @@ func respondWithMiningError(c *gin.Context, err *MiningError) {
 	apiErr := APIError{
 		Code:       err.Code,
 		Message:    err.Message,
-		Details:    details,
+		Details:    sanitizeErrorDetails(details),
 		Suggestion: err.Suggestion,
 		Retryable:  err.Retryable,
 	}
@@ -329,11 +344,17 @@ func requestTimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		// Replace request context
 		c.Request = c.Request.WithContext(ctx)
 
+		// Use atomic flag to prevent race condition between handler and timeout response
+		// Only one of them should write to the response
+		var responded int32
+
 		// Channel to signal completion
 		done := make(chan struct{})
 
 		go func() {
 			c.Next()
+			// Mark that the handler has completed (and likely written a response)
+			atomic.StoreInt32(&responded, 1)
 			close(done)
 		}()
 
@@ -341,10 +362,12 @@ func requestTimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		case <-done:
 			// Request completed normally
 		case <-ctx.Done():
-			// Timeout occurred
-			c.Abort()
-			respondWithError(c, http.StatusGatewayTimeout, ErrCodeTimeout,
-				"Request timed out", fmt.Sprintf("Request exceeded %s timeout", timeout))
+			// Timeout occurred - only respond if handler hasn't already
+			if atomic.CompareAndSwapInt32(&responded, 0, 1) {
+				c.Abort()
+				respondWithError(c, http.StatusGatewayTimeout, ErrCodeTimeout,
+					"Request timed out", fmt.Sprintf("Request exceeded %s timeout", timeout))
+			}
 		}
 	}
 }
@@ -989,6 +1012,12 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 		return
 	}
 
+	// Validate config from profile to prevent shell injection and other issues
+	if err := config.Validate(); err != nil {
+		respondWithMiningError(c, ErrInvalidConfig("profile config validation failed").WithCause(err))
+		return
+	}
+
 	miner, err := s.Manager.StartMiner(c.Request.Context(), profile.MinerType, &config)
 	if err != nil {
 		respondWithMiningError(c, ErrStartFailed(profile.Name).WithCause(err))
@@ -1366,9 +1395,10 @@ func (s *Service) handleWebSocketEvents(c *gin.Context) {
 	}
 
 	logging.Info("new WebSocket connection", logging.Fields{"remote": c.Request.RemoteAddr})
-	RecordWSConnection(true)
-	if !s.EventHub.ServeWs(conn) {
-		RecordWSConnection(false) // Undo increment on rejection
+	// Only record connection after successful registration to avoid metrics race
+	if s.EventHub.ServeWs(conn) {
+		RecordWSConnection(true)
+	} else {
 		logging.Warn("WebSocket connection rejected", logging.Fields{"remote": c.Request.RemoteAddr, "reason": "limit reached"})
 	}
 }

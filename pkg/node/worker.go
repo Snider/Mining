@@ -268,6 +268,12 @@ func (w *Worker) handleGetLogs(msg *Message) (*Message, error) {
 		return nil, fmt.Errorf("invalid get logs payload: %w", err)
 	}
 
+	// Validate and limit the Lines parameter to prevent resource exhaustion
+	const maxLogLines = 10000
+	if payload.Lines <= 0 || payload.Lines > maxLogLines {
+		payload.Lines = maxLogLines
+	}
+
 	miner, err := w.minerManager.GetMiner(payload.MinerName)
 	if err != nil {
 		return nil, fmt.Errorf("miner not found: %s", payload.MinerName)

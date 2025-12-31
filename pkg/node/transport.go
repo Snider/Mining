@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -204,8 +205,36 @@ func (t *Transport) Start() error {
 	mux.HandleFunc(t.config.WSPath, t.handleWSUpgrade)
 
 	t.server = &http.Server{
-		Addr:    t.config.ListenAddr,
-		Handler: mux,
+		Addr:              t.config.ListenAddr,
+		Handler:           mux,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	// Apply TLS hardening if TLS is enabled
+	if t.config.TLSCertPath != "" && t.config.TLSKeyPath != "" {
+		t.server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			CipherSuites: []uint16{
+				// TLS 1.3 ciphers (automatically used when available)
+				tls.TLS_AES_128_GCM_SHA256,
+				tls.TLS_AES_256_GCM_SHA384,
+				tls.TLS_CHACHA20_POLY1305_SHA256,
+				// TLS 1.2 secure ciphers
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			},
+			CurvePreferences: []tls.CurveID{
+				tls.X25519,
+				tls.CurveP256,
+			},
+		}
 	}
 
 	t.wg.Add(1)
@@ -467,7 +496,7 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 		logging.Warn("peer connection rejected: not in allowlist", logging.Fields{
 			"peer_id":    payload.Identity.ID,
 			"peer_name":  payload.Identity.Name,
-			"public_key": payload.Identity.PublicKey[:16] + "...",
+			"public_key": safeKeyPrefix(payload.Identity.PublicKey),
 		})
 		// Send rejection before closing
 		identity := t.node.GetIdentity()

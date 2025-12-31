@@ -364,6 +364,39 @@ import { interval, Subscription, switchMap } from 'rxjs';
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    /* ANSI color classes - prevents XSS via inline style injection */
+    .ansi-bold { font-weight: bold; }
+    .ansi-italic { font-style: italic; }
+    .ansi-underline { text-decoration: underline; }
+
+    /* Foreground colors */
+    .ansi-fg-30 { color: #1e1e1e; }
+    .ansi-fg-31 { color: #ef4444; }
+    .ansi-fg-32 { color: #22c55e; }
+    .ansi-fg-33 { color: #eab308; }
+    .ansi-fg-34 { color: #3b82f6; }
+    .ansi-fg-35 { color: #a855f7; }
+    .ansi-fg-36 { color: #06b6d4; }
+    .ansi-fg-37 { color: #e5e5e5; }
+    .ansi-fg-90 { color: #737373; }
+    .ansi-fg-91 { color: #fca5a5; }
+    .ansi-fg-92 { color: #86efac; }
+    .ansi-fg-93 { color: #fde047; }
+    .ansi-fg-94 { color: #93c5fd; }
+    .ansi-fg-95 { color: #d8b4fe; }
+    .ansi-fg-96 { color: #67e8f9; }
+    .ansi-fg-97 { color: #ffffff; }
+
+    /* Background colors */
+    .ansi-bg-40 { background: #1e1e1e; padding: 0 2px; }
+    .ansi-bg-41 { background: #dc2626; padding: 0 2px; }
+    .ansi-bg-42 { background: #16a34a; padding: 0 2px; }
+    .ansi-bg-43 { background: #ca8a04; padding: 0 2px; }
+    .ansi-bg-44 { background: #2563eb; padding: 0 2px; }
+    .ansi-bg-45 { background: #9333ea; padding: 0 2px; }
+    .ansi-bg-46 { background: #0891b2; padding: 0 2px; }
+    .ansi-bg-47 { background: #d4d4d4; padding: 0 2px; }
   `]
 })
 export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
@@ -497,52 +530,63 @@ export class ConsoleComponent implements OnInit, OnDestroy, AfterViewChecked {
     return lower.includes('warn') || lower.includes('timeout') || lower.includes('retry');
   }
 
-  // Convert ANSI escape codes to HTML with CSS styling
+  // Convert ANSI escape codes to HTML with CSS classes
+  // Security model:
+  // 1. Input is HTML-escaped FIRST before any processing (prevents XSS)
+  // 2. Only whitelisted ANSI codes produce output (no arbitrary injection)
+  // 3. Output uses predefined CSS classes only (no inline styles)
+  // 4. Length-limited to prevent DoS
   ansiToHtml(text: string): SafeHtml {
-    // ANSI color codes mapping
-    const colors: { [key: string]: string } = {
-      '30': '#1e1e1e', '31': '#ef4444', '32': '#22c55e', '33': '#eab308',
-      '34': '#3b82f6', '35': '#a855f7', '36': '#06b6d4', '37': '#e5e5e5',
-      '90': '#737373', '91': '#fca5a5', '92': '#86efac', '93': '#fde047',
-      '94': '#93c5fd', '95': '#d8b4fe', '96': '#67e8f9', '97': '#ffffff',
-    };
-    const bgColors: { [key: string]: string } = {
-      '40': '#1e1e1e', '41': '#dc2626', '42': '#16a34a', '43': '#ca8a04',
-      '44': '#2563eb', '45': '#9333ea', '46': '#0891b2', '47': '#d4d4d4',
-    };
+    // Length limit to prevent DoS (10KB per line should be more than enough for logs)
+    const maxLength = 10240;
+    if (text.length > maxLength) {
+      text = text.substring(0, maxLength) + '... [truncated]';
+    }
 
+    // Whitelist of valid ANSI codes - only these will be processed
+    const validFgCodes = new Set(['30', '31', '32', '33', '34', '35', '36', '37',
+                                   '90', '91', '92', '93', '94', '95', '96', '97']);
+    const validBgCodes = new Set(['40', '41', '42', '43', '44', '45', '46', '47']);
+
+    // CRITICAL: Escape HTML FIRST before any processing to prevent XSS
     let html = this.escapeHtml(text);
-    let currentStyles: string[] = [];
 
-    // Process ANSI escape sequences
+    // Process ANSI escape sequences using CSS classes instead of inline styles
+    // The regex only matches valid ANSI SGR sequences (numeric codes followed by 'm')
     html = html.replace(/\x1b\[([0-9;]*)m/g, (_, codes) => {
       if (!codes || codes === '0') {
-        currentStyles = [];
         return '</span>';
       }
 
-      const codeList = codes.split(';');
-      const styles: string[] = [];
-
-      for (const code of codeList) {
-        if (code === '1') styles.push('font-weight:bold');
-        else if (code === '3') styles.push('font-style:italic');
-        else if (code === '4') styles.push('text-decoration:underline');
-        else if (colors[code]) styles.push(`color:${colors[code]}`);
-        else if (bgColors[code]) styles.push(`background:${bgColors[code]};padding:0 2px`);
+      // Validate codes format - must be numeric values separated by semicolons
+      if (!/^[0-9;]+$/.test(codes)) {
+        return ''; // Invalid format, skip entirely
       }
 
-      if (styles.length > 0) {
-        currentStyles = styles;
-        return `<span style="${styles.join(';')}">`;
+      const codeList = codes.split(';');
+      const classes: string[] = [];
+
+      for (const code of codeList) {
+        // Only process whitelisted codes - ignore anything else
+        if (code === '1') classes.push('ansi-bold');
+        else if (code === '3') classes.push('ansi-italic');
+        else if (code === '4') classes.push('ansi-underline');
+        else if (validFgCodes.has(code)) classes.push(`ansi-fg-${code}`);
+        else if (validBgCodes.has(code)) classes.push(`ansi-bg-${code}`);
+        // All other codes are silently ignored for security
+      }
+
+      if (classes.length > 0) {
+        return `<span class="${classes.join(' ')}">`;
       }
       return '';
     });
 
-    // Clean up any unclosed spans
+    // Clean up any unclosed spans (limit to prevent DoS from malformed input)
     const openSpans = (html.match(/<span/g) || []).length;
     const closeSpans = (html.match(/<\/span>/g) || []).length;
-    for (let i = 0; i < openSpans - closeSpans; i++) {
+    const unclosed = Math.min(openSpans - closeSpans, 100); // Cap at 100 to prevent DoS
+    for (let i = 0; i < unclosed; i++) {
       html += '</span>';
     }
 

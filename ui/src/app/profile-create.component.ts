@@ -62,13 +62,63 @@ export class ProfileCreateComponent {
     this.model.config.hugePages = (event.target as HTMLInputElement).checked;
   }
 
+  /**
+   * Validates input for potential security issues (shell injection, etc.)
+   */
+  private validateInput(value: string, fieldName: string, maxLength: number): string | null {
+    if (!value || value.length === 0) {
+      return `${fieldName} is required`;
+    }
+    if (value.length > maxLength) {
+      return `${fieldName} is too long (max ${maxLength} characters)`;
+    }
+    // Check for shell metacharacters that could enable injection
+    const dangerousChars = /[;&|`$(){}\\<>'\"\n\r!]/;
+    if (dangerousChars.test(value)) {
+      return `${fieldName} contains invalid characters`;
+    }
+    return null;
+  }
+
+  /**
+   * Validates pool URL format
+   */
+  private validatePoolUrl(url: string): string | null {
+    if (!url) {
+      return 'Pool URL is required';
+    }
+    const validPrefixes = ['stratum+tcp://', 'stratum+ssl://', 'stratum://'];
+    if (!validPrefixes.some(prefix => url.startsWith(prefix))) {
+      return 'Pool URL must start with stratum+tcp://, stratum+ssl://, or stratum://';
+    }
+    return this.validateInput(url, 'Pool URL', 256);
+  }
+
   createProfile() {
     this.error = null;
     this.success = null;
 
-    // Basic validation check
-    if (!this.model.name || !this.model.minerType || !this.model.config.pool || !this.model.config.wallet) {
-      this.error = 'Please fill out all required fields.';
+    // Validate all inputs
+    const nameError = this.validateInput(this.model.name, 'Profile name', 100);
+    if (nameError) {
+      this.error = nameError;
+      return;
+    }
+
+    if (!this.model.minerType) {
+      this.error = 'Please select a miner type';
+      return;
+    }
+
+    const poolError = this.validatePoolUrl(this.model.config.pool);
+    if (poolError) {
+      this.error = poolError;
+      return;
+    }
+
+    const walletError = this.validateInput(this.model.config.wallet, 'Wallet address', 256);
+    if (walletError) {
+      this.error = walletError;
       return;
     }
 

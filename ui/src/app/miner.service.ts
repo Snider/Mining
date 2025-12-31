@@ -1,8 +1,9 @@
 import { Injectable, OnDestroy, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { of, forkJoin, Subscription, interval, merge } from 'rxjs';
-import { switchMap, catchError, map, tap, filter, debounceTime } from 'rxjs/operators';
+import { of, forkJoin, Subject, interval, merge } from 'rxjs';
+import { switchMap, catchError, map, tap, filter, debounceTime, takeUntil } from 'rxjs/operators';
 import { WebSocketService, MinerEventData, MinerStatsData } from './websocket.service';
+import { ApiConfigService } from './api-config.service';
 
 // --- Interfaces ---
 export interface InstallationDetails {
@@ -46,10 +47,14 @@ export interface SystemState {
   providedIn: 'root'
 })
 export class MinerService implements OnDestroy {
-  private apiBaseUrl = 'http://localhost:9090/api/v1/mining';
-  private pollingSubscription?: Subscription;
-  private wsSubscriptions: Subscription[] = [];
+  private readonly apiConfig = inject(ApiConfigService);
+  private destroy$ = new Subject<void>();
   private ws = inject(WebSocketService);
+
+  /** Get the API base URL from configuration */
+  private get apiBaseUrl(): string {
+    return this.apiConfig.apiBaseUrl;
+  }
 
   // --- State Signals ---
   public state = signal<SystemState>({
@@ -69,7 +74,6 @@ export class MinerService implements OnDestroy {
   // Historical hashrate data from database with configurable time range
   public historicalHashrate = signal<Map<string, HashratePoint[]>>(new Map());
   public selectedTimeRange = signal<number>(60); // Default 60 minutes
-  private historyPollingSubscription?: Subscription;
 
   // Available time ranges in minutes
   public readonly timeRanges = [
@@ -118,9 +122,9 @@ export class MinerService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.stopPolling();
-    this.historyPollingSubscription?.unsubscribe();
-    this.wsSubscriptions.forEach(sub => sub.unsubscribe());
+    // Complete the destroy$ subject to trigger takeUntil cleanup for all subscriptions
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   // --- WebSocket Event Subscriptions ---
@@ -128,28 +132,27 @@ export class MinerService implements OnDestroy {
   /**
    * Subscribe to WebSocket events for real-time updates.
    * This supplements polling with instant event-driven updates.
+   * All subscriptions use takeUntil(destroy$) for automatic cleanup.
    */
   private subscribeToWebSocketEvents(): void {
     // Listen for miner started/stopped events to refresh the miner list immediately
-    const minerLifecycleEvents = merge(
+    merge(
       this.ws.minerStarted$,
       this.ws.minerStopped$
     ).pipe(
-      debounceTime(500) // Debounce to avoid rapid-fire updates
-    ).subscribe(() => {
-      // Refresh running miners when a miner starts or stops
-      this.getRunningMiners().pipe(
-        catchError(() => of([]))
-      ).subscribe(runningMiners => {
-        this.state.update(s => ({ ...s, runningMiners }));
-        this.updateHashrateHistory(runningMiners);
-      });
+      takeUntil(this.destroy$),
+      debounceTime(500), // Debounce to avoid rapid-fire updates
+      switchMap(() => this.getRunningMiners().pipe(catchError(() => of([]))))
+    ).subscribe(runningMiners => {
+      this.state.update(s => ({ ...s, runningMiners }));
+      this.updateHashrateHistory(runningMiners);
     });
-    this.wsSubscriptions.push(minerLifecycleEvents);
 
     // Listen for stats events to update hashrates in real-time
     // This provides more immediate updates than the 5-second polling interval
-    const statsSubscription = this.ws.minerStats$.subscribe((stats: MinerStatsData) => {
+    this.ws.minerStats$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe((stats: MinerStatsData) => {
       // Update the running miners with fresh hashrate data
       this.state.update(s => {
         const runningMiners = s.runningMiners.map(miner => {
@@ -171,14 +174,14 @@ export class MinerService implements OnDestroy {
         return { ...s, runningMiners };
       });
     });
-    this.wsSubscriptions.push(statsSubscription);
 
     // Listen for error events to show notifications
-    const errorSubscription = this.ws.minerError$.subscribe((data: MinerEventData) => {
+    this.ws.minerError$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe((data: MinerEventData) => {
       console.error(`[MinerService] Miner error for ${data.name}:`, data.error);
       // Notification can be handled by components listening to this event
     });
-    this.wsSubscriptions.push(errorSubscription);
   }
 
   // --- Data Loading and Polling Logic ---
@@ -206,9 +209,11 @@ export class MinerService implements OnDestroy {
 
   /**
    * Starts a polling interval to fetch only live data (running miners and hashrates).
+   * Uses takeUntil(destroy$) for automatic cleanup.
    */
   private startPollingLive_Data() {
-    this.pollingSubscription = interval(5000).pipe(
+    interval(5000).pipe(
+      takeUntil(this.destroy$),
       switchMap(() => this.getRunningMiners().pipe(catchError(() => of([]))))
     ).subscribe(runningMiners => {
       this.state.update(s => ({ ...s, runningMiners }));
@@ -219,10 +224,13 @@ export class MinerService implements OnDestroy {
   /**
    * Starts a polling interval to fetch historical data from database.
    * Polls every 30 seconds. Initial fetch happens in forceRefreshState after miners are loaded.
+   * Uses takeUntil(destroy$) for automatic cleanup.
    */
   private startPollingHistoricalData() {
     // Poll every 30 seconds (initial fetch happens in forceRefreshState)
-    this.historyPollingSubscription = interval(30000).subscribe(() => {
+    interval(30000).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
       this.fetchHistoricalHashrate();
     });
   }
@@ -274,10 +282,6 @@ export class MinerService implements OnDestroy {
   public setTimeRange(minutes: number) {
     this.selectedTimeRange.set(minutes);
     this.fetchHistoricalHashrate();
-  }
-
-  private stopPolling() {
-    this.pollingSubscription?.unsubscribe();
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, OnDestroy, NgZone, inject } from '@angular/core';
 import { Subject, Observable, timer, Subscription, BehaviorSubject } from 'rxjs';
 import { filter, map, share, takeUntil } from 'rxjs/operators';
+import { ApiConfigService } from './api-config.service';
 
 // --- Event Types ---
 export type MiningEventType =
@@ -42,15 +43,28 @@ export interface MiningEvent<T = unknown> {
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
+// Security constants
+const MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB max message size
+const VALID_EVENT_TYPES = new Set<MiningEventType>([
+  'miner.starting', 'miner.started', 'miner.stopping', 'miner.stopped',
+  'miner.stats', 'miner.error', 'miner.connected',
+  'profile.created', 'profile.updated', 'profile.deleted', 'pong'
+]);
+
 @Injectable({
   providedIn: 'root'
 })
 export class WebSocketService implements OnDestroy {
   private ngZone = inject(NgZone);
+  private readonly apiConfig = inject(ApiConfigService);
 
   // WebSocket connection
   private socket: WebSocket | null = null;
-  private wsUrl = 'ws://localhost:9090/api/v1/mining/ws/events';
+
+  /** Get the WebSocket URL from configuration */
+  private get wsUrl(): string {
+    return this.apiConfig.wsUrl;
+  }
 
   // Connection state
   private connectionState = signal<ConnectionState>('disconnected');
@@ -149,7 +163,31 @@ export class WebSocketService implements OnDestroy {
       this.socket.onmessage = (event) => {
         this.ngZone.run(() => {
           try {
-            const data = JSON.parse(event.data) as MiningEvent;
+            // Security: Validate message size to prevent memory exhaustion
+            const rawData = event.data;
+            if (typeof rawData === 'string' && rawData.length > MAX_MESSAGE_SIZE) {
+              console.error('[WebSocket] Message too large, ignoring:', rawData.length);
+              return;
+            }
+
+            const data = JSON.parse(rawData) as MiningEvent;
+
+            // Security: Validate event type is known/expected
+            if (!data.type || !VALID_EVENT_TYPES.has(data.type)) {
+              console.warn('[WebSocket] Unknown event type, ignoring:', data.type);
+              return;
+            }
+
+            // Security: Validate timestamp is reasonable (within 24 hours)
+            if (data.timestamp) {
+              const eventTime = new Date(data.timestamp).getTime();
+              const now = Date.now();
+              if (isNaN(eventTime) || Math.abs(now - eventTime) > 24 * 60 * 60 * 1000) {
+                console.warn('[WebSocket] Invalid timestamp, ignoring');
+                return;
+              }
+            }
+
             this.eventsSubject.next(data);
 
             // Log non-stats events for debugging

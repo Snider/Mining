@@ -90,7 +90,14 @@ func (m *TTMiner) Start(config *Config) error {
 			if cmd.Process != nil {
 				cmd.Process.Kill()
 			}
-			err = <-done // Wait for the inner goroutine to finish
+			// Wait for inner goroutine with secondary timeout to prevent leak
+			select {
+			case err = <-done:
+				// Inner goroutine completed
+			case <-time.After(10 * time.Second):
+				logging.Error("TT-Miner process cleanup timed out after kill", logging.Fields{"miner": m.Name})
+				err = nil
+			}
 		}
 
 		m.mu.Lock()

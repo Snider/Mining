@@ -124,12 +124,22 @@ func (pm *ProfileManager) UpdateProfile(profile *MiningProfile) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	if _, exists := pm.profiles[profile.ID]; !exists {
+	oldProfile, exists := pm.profiles[profile.ID]
+	if !exists {
 		return fmt.Errorf("profile with ID %s not found", profile.ID)
 	}
+
+	// Update in-memory state
 	pm.profiles[profile.ID] = profile
 
-	return pm.saveProfiles()
+	// Save to disk - rollback if save fails
+	if err := pm.saveProfiles(); err != nil {
+		// Restore old profile on save failure
+		pm.profiles[profile.ID] = oldProfile
+		return fmt.Errorf("failed to save profile: %w", err)
+	}
+
+	return nil
 }
 
 // DeleteProfile removes a profile by its ID.
@@ -137,10 +147,18 @@ func (pm *ProfileManager) DeleteProfile(id string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	if _, exists := pm.profiles[id]; !exists {
+	profile, exists := pm.profiles[id]
+	if !exists {
 		return fmt.Errorf("profile with ID %s not found", id)
 	}
 	delete(pm.profiles, id)
 
-	return pm.saveProfiles()
+	// Save to disk - rollback if save fails
+	if err := pm.saveProfiles(); err != nil {
+		// Restore profile on save failure
+		pm.profiles[id] = profile
+		return fmt.Errorf("failed to delete profile: %w", err)
+	}
+
+	return nil
 }

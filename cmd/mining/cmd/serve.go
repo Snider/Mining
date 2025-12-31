@@ -98,11 +98,43 @@ var serveCmd = &cobra.Command{
 						fmt.Println("Example: start xmrig stratum+tcp://pool.example.com:3333 YOUR_WALLET_ADDRESS")
 					} else {
 						minerType := cmdArgs[0]
+						pool := cmdArgs[1]
+						wallet := cmdArgs[2]
+
+						// Validate pool URL format
+						if !strings.HasPrefix(pool, "stratum+tcp://") &&
+							!strings.HasPrefix(pool, "stratum+ssl://") &&
+							!strings.HasPrefix(pool, "stratum://") {
+							fmt.Fprintf(os.Stderr, "Error: Invalid pool URL (must start with stratum+tcp://, stratum+ssl://, or stratum://)\n")
+							fmt.Print(">> ")
+							continue
+						}
+						if len(pool) > 256 {
+							fmt.Fprintf(os.Stderr, "Error: Pool URL too long (max 256 chars)\n")
+							fmt.Print(">> ")
+							continue
+						}
+
+						// Validate wallet address length
+						if len(wallet) > 256 {
+							fmt.Fprintf(os.Stderr, "Error: Wallet address too long (max 256 chars)\n")
+							fmt.Print(">> ")
+							continue
+						}
+
 						config := &mining.Config{
-							Pool:      cmdArgs[1],
-							Wallet:    cmdArgs[2],
+							Pool:      pool,
+							Wallet:    wallet,
 							LogOutput: true,
 						}
+
+						// Validate config before starting
+						if err := config.Validate(); err != nil {
+							fmt.Fprintf(os.Stderr, "Error: Invalid configuration: %v\n", err)
+							fmt.Print(">> ")
+							continue
+						}
+
 						miner, err := mgr.StartMiner(context.Background(), minerType, config)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "Error starting miner: %v\n", err)
@@ -160,6 +192,11 @@ var serveCmd = &cobra.Command{
 				}
 				fmt.Print(">> ")
 			}
+
+			// Check for scanner errors (I/O issues)
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+			}
 		}()
 
 		select {
@@ -168,6 +205,9 @@ var serveCmd = &cobra.Command{
 			cancel()
 		case <-ctx.Done():
 		}
+
+		// Explicit cleanup of manager resources
+		mgr.Stop()
 
 		fmt.Println("Mining service stopped.")
 		return nil

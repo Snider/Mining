@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Snider/Mining/pkg/node"
@@ -10,8 +11,10 @@ import (
 )
 
 var (
-	controller *node.Controller
-	transport  *node.Transport
+	controller     *node.Controller
+	transport      *node.Transport
+	controllerOnce sync.Once
+	controllerErr  error
 )
 
 // remoteCmd represents the remote parent command
@@ -320,34 +323,32 @@ func init() {
 	remotePingCmd.Flags().IntP("count", "c", 4, "Number of pings to send")
 }
 
-// getController returns or creates the controller instance.
+// getController returns or creates the controller instance (thread-safe).
 func getController() (*node.Controller, error) {
-	if controller != nil {
-		return controller, nil
-	}
+	controllerOnce.Do(func() {
+		nm, err := getNodeManager()
+		if err != nil {
+			controllerErr = fmt.Errorf("failed to get node manager: %w", err)
+			return
+		}
 
-	nm, err := getNodeManager()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get node manager: %w", err)
-	}
+		if !nm.HasIdentity() {
+			controllerErr = fmt.Errorf("no node identity found. Run 'node init' first")
+			return
+		}
 
-	if !nm.HasIdentity() {
-		return nil, fmt.Errorf("no node identity found. Run 'node init' first")
-	}
+		pr, err := getPeerRegistry()
+		if err != nil {
+			controllerErr = fmt.Errorf("failed to get peer registry: %w", err)
+			return
+		}
 
-	pr, err := getPeerRegistry()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get peer registry: %w", err)
-	}
-
-	// Initialize transport if not done
-	if transport == nil {
+		// Initialize transport
 		config := node.DefaultTransportConfig()
 		transport = node.NewTransport(nm, pr, config)
-	}
-
-	controller = node.NewController(nm, pr, transport)
-	return controller, nil
+		controller = node.NewController(nm, pr, transport)
+	})
+	return controller, controllerErr
 }
 
 // findPeerByPartialID finds a peer by full or partial ID.

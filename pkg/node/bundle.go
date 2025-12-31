@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Snider/Borg/pkg/datanode"
 	"github.com/Snider/Borg/pkg/tim"
@@ -249,7 +250,14 @@ func createTarball(files map[string][]byte) ([]byte, error) {
 
 // extractTarball extracts a tar archive to a directory, returns first executable found.
 func extractTarball(tarData []byte, destDir string) (string, error) {
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	// Ensure destDir is an absolute, clean path for security checks
+	absDestDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve destination directory: %w", err)
+	}
+	absDestDir = filepath.Clean(absDestDir)
+
+	if err := os.MkdirAll(absDestDir, 0755); err != nil {
 		return "", err
 	}
 
@@ -265,34 +273,65 @@ func extractTarball(tarData []byte, destDir string) (string, error) {
 			return "", err
 		}
 
-		path := filepath.Join(destDir, hdr.Name)
+		// Security: Sanitize the tar entry name to prevent path traversal (Zip Slip)
+		cleanName := filepath.Clean(hdr.Name)
+
+		// Reject absolute paths
+		if filepath.IsAbs(cleanName) {
+			return "", fmt.Errorf("invalid tar entry: absolute path not allowed: %s", hdr.Name)
+		}
+
+		// Reject paths that escape the destination directory
+		if strings.HasPrefix(cleanName, ".."+string(os.PathSeparator)) || cleanName == ".." {
+			return "", fmt.Errorf("invalid tar entry: path traversal attempt: %s", hdr.Name)
+		}
+
+		// Build the full path and verify it's within destDir
+		fullPath := filepath.Join(absDestDir, cleanName)
+		fullPath = filepath.Clean(fullPath)
+
+		// Final security check: ensure the path is still within destDir
+		if !strings.HasPrefix(fullPath, absDestDir+string(os.PathSeparator)) && fullPath != absDestDir {
+			return "", fmt.Errorf("invalid tar entry: path escape attempt: %s", hdr.Name)
+		}
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(path, os.FileMode(hdr.Mode)); err != nil {
+			if err := os.MkdirAll(fullPath, os.FileMode(hdr.Mode)); err != nil {
 				return "", err
 			}
 		case tar.TypeReg:
 			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 				return "", err
 			}
 
-			f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
+			f, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
 			if err != nil {
 				return "", err
 			}
 
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
+			// Limit file size to prevent decompression bombs (100MB max per file)
+			const maxFileSize int64 = 100 * 1024 * 1024
+			limitedReader := io.LimitReader(tr, maxFileSize+1)
+			written, err := io.Copy(f, limitedReader)
+			f.Close()
+			if err != nil {
 				return "", err
 			}
-			f.Close()
+			if written > maxFileSize {
+				os.Remove(fullPath)
+				return "", fmt.Errorf("file %s exceeds maximum size of %d bytes", hdr.Name, maxFileSize)
+			}
 
 			// Track first executable
 			if hdr.Mode&0111 != 0 && firstExecutable == "" {
-				firstExecutable = path
+				firstExecutable = fullPath
 			}
+		// Explicitly ignore symlinks and hard links to prevent symlink attacks
+		case tar.TypeSymlink, tar.TypeLink:
+			// Skip symlinks and hard links for security
+			continue
 		}
 	}
 

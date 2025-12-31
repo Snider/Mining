@@ -56,6 +56,17 @@ const (
 // peerNameRegex validates peer names: alphanumeric, hyphens, underscores, and spaces
 var peerNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-_ ]{0,62}[a-zA-Z0-9]$|^[a-zA-Z0-9]$`)
 
+// safeKeyPrefix returns a truncated key for logging, handling short keys safely
+func safeKeyPrefix(key string) string {
+	if len(key) >= 16 {
+		return key[:16] + "..."
+	}
+	if len(key) == 0 {
+		return "(empty)"
+	}
+	return key
+}
+
 // validatePeerName checks if a peer name is valid.
 // Peer names must be 1-64 characters, start and end with alphanumeric,
 // and contain only alphanumeric, hyphens, underscores, and spaces.
@@ -156,7 +167,7 @@ func (r *PeerRegistry) AllowPublicKey(publicKey string) {
 	r.allowedPublicKeyMu.Lock()
 	defer r.allowedPublicKeyMu.Unlock()
 	r.allowedPublicKeys[publicKey] = true
-	logging.Debug("public key added to allowlist", logging.Fields{"key": publicKey[:16] + "..."})
+	logging.Debug("public key added to allowlist", logging.Fields{"key": safeKeyPrefix(publicKey)})
 }
 
 // RevokePublicKey removes a public key from the allowlist.
@@ -164,7 +175,7 @@ func (r *PeerRegistry) RevokePublicKey(publicKey string) {
 	r.allowedPublicKeyMu.Lock()
 	defer r.allowedPublicKeyMu.Unlock()
 	delete(r.allowedPublicKeys, publicKey)
-	logging.Debug("public key removed from allowlist", logging.Fields{"key": publicKey[:16] + "..."})
+	logging.Debug("public key removed from allowlist", logging.Fields{"key": safeKeyPrefix(publicKey)})
 }
 
 // IsPublicKeyAllowed checks if a public key is in the allowlist.

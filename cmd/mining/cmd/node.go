@@ -2,6 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Snider/Mining/pkg/node"
@@ -9,8 +13,13 @@ import (
 )
 
 var (
-	nodeManager  *node.NodeManager
-	peerRegistry *node.PeerRegistry
+	nodeManager     *node.NodeManager
+	nodeManagerOnce sync.Once
+	nodeManagerErr  error
+
+	peerRegistry     *node.PeerRegistry
+	peerRegistryOnce sync.Once
+	peerRegistryErr  error
 )
 
 // nodeCmd represents the node parent command
@@ -156,8 +165,31 @@ This allows other nodes to connect, send commands, and receive stats.`,
 		fmt.Println()
 		fmt.Println("Press Ctrl+C to stop...")
 
-		// Wait forever (or until signal)
-		select {}
+		// Set up signal handling for graceful shutdown (including SIGHUP for terminal disconnect)
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
+		// Wait for shutdown signal
+		sig := <-sigChan
+		fmt.Printf("\nReceived signal %v, shutting down...\n", sig)
+
+		// Graceful shutdown: stop transport and cleanup resources
+		if err := transport.Stop(); err != nil {
+			fmt.Printf("Warning: error during transport shutdown: %v\n", err)
+			// Force cleanup on Stop() failure
+			fmt.Println("Forcing resource cleanup...")
+			for _, peer := range pr.GetConnectedPeers() {
+				pr.SetConnected(peer.ID, false)
+			}
+		}
+
+		// Ensure peer registry is flushed to disk
+		if err := pr.Close(); err != nil {
+			fmt.Printf("Warning: error closing peer registry: %v\n", err)
+		}
+
+		fmt.Println("P2P server stopped.")
+		return nil
 	},
 }
 
@@ -217,26 +249,18 @@ func init() {
 	nodeResetCmd.Flags().BoolP("force", "f", false, "Force reset without confirmation")
 }
 
-// getNodeManager returns the singleton node manager
+// getNodeManager returns the singleton node manager (thread-safe)
 func getNodeManager() (*node.NodeManager, error) {
-	if nodeManager == nil {
-		var err error
-		nodeManager, err = node.NewNodeManager()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return nodeManager, nil
+	nodeManagerOnce.Do(func() {
+		nodeManager, nodeManagerErr = node.NewNodeManager()
+	})
+	return nodeManager, nodeManagerErr
 }
 
-// getPeerRegistry returns the singleton peer registry
+// getPeerRegistry returns the singleton peer registry (thread-safe)
 func getPeerRegistry() (*node.PeerRegistry, error) {
-	if peerRegistry == nil {
-		var err error
-		peerRegistry, err = node.NewPeerRegistry()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return peerRegistry, nil
+	peerRegistryOnce.Do(func() {
+		peerRegistry, peerRegistryErr = node.NewPeerRegistry()
+	})
+	return peerRegistry, peerRegistryErr
 }
