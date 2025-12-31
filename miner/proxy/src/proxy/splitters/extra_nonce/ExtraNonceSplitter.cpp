@@ -63,6 +63,10 @@ xmrig::ExtraNonceSplitter::~ExtraNonceSplitter()
 
 xmrig::Upstreams xmrig::ExtraNonceSplitter::upstreams() const
 {
+    // SECURITY FIX (CRIT-010): Add null check to prevent segfault before connect()
+    if (!m_upstream) {
+        return { 0U, 0U, 0U };
+    }
     return { m_upstream->isActive() ? 1U : 0U, m_upstream->isSuspended() ? 1U : 0U, 1U };
 }
 
@@ -76,7 +80,10 @@ void xmrig::ExtraNonceSplitter::connect()
 
 void xmrig::ExtraNonceSplitter::gc()
 {
-    m_upstream->gc();
+    // SECURITY FIX (CRIT-010): Add null check
+    if (m_upstream) {
+        m_upstream->gc();
+    }
 }
 
 
@@ -95,6 +102,10 @@ void xmrig::ExtraNonceSplitter::printConnections()
 
 void xmrig::ExtraNonceSplitter::tick(uint64_t ticks)
 {
+    // SECURITY FIX (CRIT-010): Add null check
+    if (!m_upstream) {
+        return;
+    }
     const uint64_t now = uv_now(uv_default_loop());
     m_upstream->tick(ticks, now);
 }
@@ -103,14 +114,18 @@ void xmrig::ExtraNonceSplitter::tick(uint64_t ticks)
 #ifdef APP_DEVEL
 void xmrig::ExtraNonceSplitter::printState()
 {
-    m_upstream->printState();
+    // SECURITY FIX (CRIT-010): Add null check
+    if (m_upstream) {
+        m_upstream->printState();
+    }
 }
 #endif
 
 
 void xmrig::ExtraNonceSplitter::onConfigChanged(Config *config, Config *previousConfig)
 {
-    if (config->pools() != previousConfig->pools()) {
+    // SECURITY FIX (CRIT-010): Add null check
+    if (m_upstream && config->pools() != previousConfig->pools()) {
         config->pools().print();
         m_upstream->reload(config->pools());
     }

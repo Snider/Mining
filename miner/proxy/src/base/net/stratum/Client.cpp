@@ -812,7 +812,11 @@ void xmrig::Client::parseResponse(int64_t id, const rapidjson::Value &result, co
     }
 
     if (error.IsObject()) {
-        const char *message = error["message"].GetString();
+        // SECURITY FIX (CRIT-011): Validate "message" field exists and is a string before accessing
+        const char *message = Json::getString(error, "message");
+        if (!message) {
+            message = "unknown error";
+        }
 
         if (!handleSubmitResponse(id, message) && !isQuiet()) {
             LOG_ERR("%s " RED("error: ") RED_BOLD("\"%s\"") RED(", code: ") RED_BOLD("%d"), tag(), message, Json::getInt(error, "code"));

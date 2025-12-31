@@ -22,6 +22,8 @@
  *   along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <climits>
+
 #include "base/io/log/Log.h"
 #include "proxy/Counters.h"
 #include "proxy/Miner.h"
@@ -34,7 +36,13 @@ bool xmrig::ExtraNonceStorage::add(Miner *miner)
 
     if (isActive()) {
         miner->setJob(m_job, m_extraNonce);
-        ++m_extraNonce;
+        // SECURITY FIX (HIGH-007): Handle overflow with wrap-around
+        if (m_extraNonce == INT64_MAX) {
+            m_extraNonce = 0;
+            LOG_WARN("ExtraNonce overflow, wrapping to 0");
+        } else {
+            ++m_extraNonce;
+        }
     }
 
     return true;
@@ -96,7 +104,13 @@ void xmrig::ExtraNonceStorage::setJob(const Job &job)
 
     for (const auto& m : m_miners) {
         m.second->setJob(m_job, m_extraNonce);
-        ++m_extraNonce;
+        // SECURITY FIX (HIGH-007): Handle overflow with wrap-around
+        if (m_extraNonce == INT64_MAX) {
+            m_extraNonce = 0;
+            LOG_WARN("ExtraNonce overflow during setJob, wrapping to 0");
+        } else {
+            ++m_extraNonce;
+        }
     }
 }
 

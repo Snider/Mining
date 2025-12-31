@@ -26,6 +26,7 @@
 #define XMRIG_EVENTS_H
 
 
+#include <atomic>
 #include <map>
 #include <vector>
 
@@ -45,7 +46,8 @@ public:
     static void subscribe(IEvent::Type type, IEventListener *listener);
 
 private:
-    static bool m_ready;
+    // THREAD SAFETY FIX (CRIT-013): Use atomic for thread-safe reentrancy guard
+    static std::atomic<bool> m_ready;
     static std::map<IEvent::Type, std::vector<IEventListener*> > m_listeners;
 };
 

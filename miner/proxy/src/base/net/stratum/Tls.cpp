@@ -45,6 +45,10 @@ xmrig::Client::Tls::Tls(Client *client) :
     m_write = BIO_new(BIO_s_mem());
     m_read  = BIO_new(BIO_s_mem());
     SSL_CTX_set_options(m_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    // SECURITY FIX (CRIT-008): Enable peer certificate verification
+    // When no fingerprint is configured, this ensures we at least validate the certificate chain
+    SSL_CTX_set_verify(m_ctx, SSL_VERIFY_PEER, nullptr);
 }
 
 

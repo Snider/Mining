@@ -24,6 +24,11 @@
 #include <stdexcept>
 #include <fstream>
 
+// SECURITY FIX (HIGH-002): Include for setting file permissions
+#ifndef _WIN32
+#   include <sys/stat.h>
+#endif
+
 
 namespace xmrig {
 
@@ -136,6 +141,11 @@ bool xmrig::TlsGen::write()
     if (!ret) {
         return false;
     }
+
+    // SECURITY FIX (HIGH-002): Set restrictive permissions on private key file (owner read/write only)
+#   ifndef _WIN32
+    chmod(m_certKey, S_IRUSR | S_IWUSR);  // 0600
+#   endif
 
     auto x509_file = fopen(m_cert, "wb");
     if (!x509_file) {

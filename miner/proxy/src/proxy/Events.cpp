@@ -22,13 +22,16 @@
  */
 
 
+#include <atomic>
+
 #include "base/io/log/Log.h"
 #include "proxy/Events.h"
 
 
 namespace xmrig {
 
-bool Events::m_ready = true;
+// THREAD SAFETY FIX (CRIT-013): Use atomic for thread-safe reentrancy guard
+std::atomic<bool> Events::m_ready{true};
 std::map<IEvent::Type, std::vector<IEventListener*> > Events::m_listeners;
 
 }
@@ -36,12 +39,12 @@ std::map<IEvent::Type, std::vector<IEventListener*> > Events::m_listeners;
 
 bool xmrig::Events::exec(IEvent *event)
 {
-    if (!m_ready) {
+    // THREAD SAFETY FIX (CRIT-013): Use atomic compare-and-swap for thread-safe guard
+    bool expected = true;
+    if (!m_ready.compare_exchange_strong(expected, false)) {
         LOG_ERR("failed start event %d", (int) event->type());
         return false;
     }
-
-    m_ready = false;
 
     std::vector<IEventListener*> &listeners = m_listeners[event->type()];
     for (IEventListener *listener : listeners) {
@@ -51,7 +54,7 @@ bool xmrig::Events::exec(IEvent *event)
     const bool rejected = event->isRejected();
     event->~IEvent();
 
-    m_ready = true;
+    m_ready.store(true);
     return !rejected;
 }
 

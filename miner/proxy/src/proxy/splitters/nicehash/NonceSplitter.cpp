@@ -196,7 +196,13 @@ void xmrig::NonceSplitter::remove(Miner *miner)
         return;
     }
 
-    m_upstreams[miner->mapperId()]->remove(miner);
+    // SECURITY FIX (CRIT-018): Add bounds check before vector access
+    const auto mapperId = static_cast<size_t>(miner->mapperId());
+    if (mapperId >= m_upstreams.size()) {
+        return;
+    }
+
+    m_upstreams[mapperId]->remove(miner);
 }
 
 
@@ -206,5 +212,11 @@ void xmrig::NonceSplitter::submit(SubmitEvent *event)
         return;
     }
 
-    m_upstreams[event->miner()->mapperId()]->submit(event);
+    // SECURITY FIX (CRIT-018): Add bounds check before vector access
+    const auto mapperId = static_cast<size_t>(event->miner()->mapperId());
+    if (mapperId >= m_upstreams.size()) {
+        return;
+    }
+
+    m_upstreams[mapperId]->submit(event);
 }

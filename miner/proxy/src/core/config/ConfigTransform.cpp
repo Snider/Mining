@@ -27,6 +27,9 @@
 #include "base/kernel/interfaces/IConfig.h"
 #include "proxy/BindHost.h"
 
+#include <cerrno>
+#include <climits>
+
 
 namespace xmrig
 {
@@ -82,7 +85,16 @@ void xmrig::ConfigTransform::transform(rapidjson::Document &doc, int key, const 
 
     case IConfig::CustomDiffKey: /* --custom-diff */
     case IConfig::ReuseTimeoutKey: /* --reuse-timeout */
-        return transformUint64(doc, key, static_cast<uint64_t>(strtol(arg, nullptr, 10)));
+        {
+            // SECURITY FIX (HIGH-004): Validate strtol result for errors and overflow
+            char *endptr = nullptr;
+            errno = 0;
+            const long val = strtol(arg, &endptr, 10);
+            if (endptr == arg || errno == ERANGE || val < 0) {
+                return;  // Invalid input, skip silently
+            }
+            return transformUint64(doc, key, static_cast<uint64_t>(val));
+        }
 
     case IConfig::LoginFileKey: /* --login-file */
         return set(doc, "login-file", arg);

@@ -351,8 +351,19 @@ void xmrig::Miner::parse(char *line, size_t len)
         return shutdown(true);
     }
 
+    // SECURITY FIX (HIGH-018): Validate all JSON fields before accessing
+    if (!doc.HasMember("id") || !doc.HasMember("method")) {
+        return shutdown(true);
+    }
+
     const rapidjson::Value &id = doc["id"];
-    if (id.IsInt64() && parseRequest(id.GetInt64(), doc["method"].GetString(), doc["params"])) {
+    const rapidjson::Value &method = doc["method"];
+
+    if (!id.IsInt64() || !method.IsString()) {
+        return shutdown(true);
+    }
+
+    if (parseRequest(id.GetInt64(), method.GetString(), doc.HasMember("params") ? doc["params"] : rapidjson::Value())) {
         return;
     }
 
