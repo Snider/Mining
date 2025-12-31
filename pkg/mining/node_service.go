@@ -3,6 +3,7 @@ package mining
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/Snider/Mining/pkg/node"
 	"github.com/gin-gonic/gin"
@@ -407,8 +408,8 @@ func (ns *NodeService) handleRemoteLogs(c *gin.Context) {
 	minerName := c.Param("miner")
 	lines := 100
 	if l := c.Query("lines"); l != "" {
-		if _, err := c.GetQuery("lines"); err {
-			// Use default
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			lines = parsed
 		}
 	}
 

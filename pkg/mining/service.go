@@ -81,7 +81,25 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 // After calling InitRouter, you can use the Router field directly as an http.Handler.
 func (s *Service) InitRouter() {
 	s.Router = gin.Default()
-	s.Router.Use(cors.Default())
+
+	// Configure CORS to only allow local origins
+	corsConfig := cors.Config{
+		AllowOrigins: []string{
+			"http://localhost:4200",  // Angular dev server
+			"http://127.0.0.1:4200",
+			"http://localhost:9090",  // Default API port
+			"http://127.0.0.1:9090",
+			"http://localhost:" + strings.Split(s.Server.Addr, ":")[len(strings.Split(s.Server.Addr, ":"))-1],
+			"http://127.0.0.1:" + strings.Split(s.Server.Addr, ":")[len(strings.Split(s.Server.Addr, ":"))-1],
+			"wails://wails",          // Wails desktop app
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}
+	s.Router.Use(cors.New(corsConfig))
 	s.SetupRoutes()
 }
 
@@ -207,6 +225,8 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 		switch availableMiner.Name {
 		case "xmrig":
 			miner = NewXMRigMiner()
+		case "tt-miner":
+			miner = NewTTMiner()
 		default:
 			continue
 		}
@@ -265,6 +285,8 @@ func (s *Service) handleUpdateCheck(c *gin.Context) {
 		switch availableMiner.Name {
 		case "xmrig":
 			miner = NewXMRigMiner()
+		case "tt-miner":
+			miner = NewTTMiner()
 		default:
 			continue
 		}
@@ -360,6 +382,8 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 	switch minerType {
 	case "xmrig":
 		miner = NewXMRigMiner()
+	case "tt-miner":
+		miner = NewTTMiner()
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown miner type"})
 		return

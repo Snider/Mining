@@ -212,6 +212,13 @@ func (m *Manager) StartMiner(minerType string, config *Config) (Miner, error) {
 		return nil, fmt.Errorf("a miner with a similar configuration is already running: %s", instanceName)
 	}
 
+	// Validate user-provided HTTPPort if specified
+	if config.HTTPPort != 0 {
+		if config.HTTPPort < 1024 || config.HTTPPort > 65535 {
+			return nil, fmt.Errorf("HTTPPort must be between 1024 and 65535, got %d", config.HTTPPort)
+		}
+	}
+
 	apiPort, err := findAvailablePort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to find an available port for the miner API: %w", err)
@@ -471,8 +478,17 @@ func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) 
 	return miner.GetHashrateHistory(), nil
 }
 
-// Stop stops the manager and its background goroutines.
+// Stop stops all running miners, background goroutines, and closes resources.
 func (m *Manager) Stop() {
+	// Stop all running miners first
+	m.mu.Lock()
+	for name, miner := range m.miners {
+		if err := miner.Stop(); err != nil {
+			log.Printf("Warning: failed to stop miner %s: %v", name, err)
+		}
+	}
+	m.mu.Unlock()
+
 	close(m.stopChan)
 	m.waitGroup.Wait()
 

@@ -81,6 +81,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 	}
 
 	if err := m.cmd.Start(); err != nil {
+		stdinPipe.Close()
 		return err
 	}
 

@@ -58,6 +58,7 @@ func (m *TTMiner) Start(config *Config) error {
 	}
 
 	if err := m.cmd.Start(); err != nil {
+		stdinPipe.Close()
 		return fmt.Errorf("failed to start TT-Miner: %w", err)
 	}
 
@@ -131,6 +132,33 @@ func addTTMinerCliArgs(config *Config, args *[]string) {
 	// Add any extra arguments passed via CLIArgs
 	if config.CLIArgs != "" {
 		extraArgs := strings.Fields(config.CLIArgs)
-		*args = append(*args, extraArgs...)
+		for _, arg := range extraArgs {
+			// Skip potentially dangerous arguments
+			if isValidCLIArg(arg) {
+				*args = append(*args, arg)
+			} else {
+				log.Printf("Warning: skipping invalid CLI argument: %s", arg)
+			}
+		}
 	}
+}
+
+// isValidCLIArg validates CLI arguments to prevent injection or dangerous patterns
+func isValidCLIArg(arg string) bool {
+	// Block shell metacharacters and dangerous patterns
+	dangerousPatterns := []string{";", "|", "&", "`", "$", "(", ")", "{", "}", "<", ">", "\n", "\r"}
+	for _, p := range dangerousPatterns {
+		if strings.Contains(arg, p) {
+			return false
+		}
+	}
+	// Block arguments that could override security-related settings
+	blockedArgs := []string{"--api-access-token", "--api-worker-id"}
+	lowerArg := strings.ToLower(arg)
+	for _, blocked := range blockedArgs {
+		if strings.HasPrefix(lowerArg, blocked) {
+			return false
+		}
+	}
+	return true
 }
