@@ -66,6 +66,13 @@ func (ns *NodeService) SetupRoutes(router *gin.RouterGroup) {
 		peerGroup.POST("/:id/ping", ns.handlePingPeer)
 		peerGroup.POST("/:id/connect", ns.handleConnectPeer)
 		peerGroup.POST("/:id/disconnect", ns.handleDisconnectPeer)
+
+		// Allowlist management
+		peerGroup.GET("/auth/mode", ns.handleGetAuthMode)
+		peerGroup.PUT("/auth/mode", ns.handleSetAuthMode)
+		peerGroup.GET("/auth/allowlist", ns.handleListAllowlist)
+		peerGroup.POST("/auth/allowlist", ns.handleAddToAllowlist)
+		peerGroup.DELETE("/auth/allowlist/:key", ns.handleRemoveFromAllowlist)
 	}
 
 	// Remote operations endpoints
@@ -440,4 +447,129 @@ func (ns *NodeService) handleRemoteLogs(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, logs)
+}
+
+// AuthModeResponse is the response for auth mode endpoints.
+type AuthModeResponse struct {
+	Mode string `json:"mode"`
+}
+
+// handleGetAuthMode godoc
+// @Summary Get peer authentication mode
+// @Description Get the current peer authentication mode (open or allowlist)
+// @Tags peers
+// @Produce json
+// @Success 200 {object} AuthModeResponse
+// @Router /peers/auth/mode [get]
+func (ns *NodeService) handleGetAuthMode(c *gin.Context) {
+	mode := ns.peerRegistry.GetAuthMode()
+	modeStr := "open"
+	if mode == node.PeerAuthAllowlist {
+		modeStr = "allowlist"
+	}
+	c.JSON(http.StatusOK, AuthModeResponse{Mode: modeStr})
+}
+
+// SetAuthModeRequest is the request for setting auth mode.
+type SetAuthModeRequest struct {
+	Mode string `json:"mode" binding:"required"`
+}
+
+// handleSetAuthMode godoc
+// @Summary Set peer authentication mode
+// @Description Set the peer authentication mode (open or allowlist)
+// @Tags peers
+// @Accept json
+// @Produce json
+// @Param request body SetAuthModeRequest true "Auth mode (open or allowlist)"
+// @Success 200 {object} AuthModeResponse
+// @Failure 400 {object} APIError "Invalid mode"
+// @Router /peers/auth/mode [put]
+func (ns *NodeService) handleSetAuthMode(c *gin.Context) {
+	var req SetAuthModeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var mode node.PeerAuthMode
+	switch req.Mode {
+	case "open":
+		mode = node.PeerAuthOpen
+	case "allowlist":
+		mode = node.PeerAuthAllowlist
+	default:
+		respondWithError(c, http.StatusBadRequest, "INVALID_MODE", "mode must be 'open' or 'allowlist'", "")
+		return
+	}
+
+	ns.peerRegistry.SetAuthMode(mode)
+	c.JSON(http.StatusOK, AuthModeResponse{Mode: req.Mode})
+}
+
+// AllowlistResponse is the response for listing allowlisted keys.
+type AllowlistResponse struct {
+	PublicKeys []string `json:"publicKeys"`
+}
+
+// handleListAllowlist godoc
+// @Summary List allowlisted public keys
+// @Description Get all public keys in the peer allowlist
+// @Tags peers
+// @Produce json
+// @Success 200 {object} AllowlistResponse
+// @Router /peers/auth/allowlist [get]
+func (ns *NodeService) handleListAllowlist(c *gin.Context) {
+	keys := ns.peerRegistry.ListAllowedPublicKeys()
+	c.JSON(http.StatusOK, AllowlistResponse{PublicKeys: keys})
+}
+
+// AddAllowlistRequest is the request for adding a key to the allowlist.
+type AddAllowlistRequest struct {
+	PublicKey string `json:"publicKey" binding:"required"`
+}
+
+// handleAddToAllowlist godoc
+// @Summary Add public key to allowlist
+// @Description Add a public key to the peer allowlist
+// @Tags peers
+// @Accept json
+// @Produce json
+// @Param request body AddAllowlistRequest true "Public key to allow"
+// @Success 201 {object} map[string]string
+// @Failure 400 {object} APIError "Invalid request"
+// @Router /peers/auth/allowlist [post]
+func (ns *NodeService) handleAddToAllowlist(c *gin.Context) {
+	var req AddAllowlistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.PublicKey) < 16 {
+		respondWithError(c, http.StatusBadRequest, "INVALID_KEY", "public key too short", "")
+		return
+	}
+
+	ns.peerRegistry.AllowPublicKey(req.PublicKey)
+	c.JSON(http.StatusCreated, gin.H{"status": "added"})
+}
+
+// handleRemoveFromAllowlist godoc
+// @Summary Remove public key from allowlist
+// @Description Remove a public key from the peer allowlist
+// @Tags peers
+// @Produce json
+// @Param key path string true "Public key to remove (URL-encoded)"
+// @Success 200 {object} map[string]string
+// @Router /peers/auth/allowlist/{key} [delete]
+func (ns *NodeService) handleRemoveFromAllowlist(c *gin.Context) {
+	key := c.Param("key")
+	if key == "" {
+		respondWithError(c, http.StatusBadRequest, "MISSING_KEY", "public key required", "")
+		return
+	}
+
+	ns.peerRegistry.RevokePublicKey(key)
+	c.JSON(http.StatusOK, gin.H{"status": "removed"})
 }

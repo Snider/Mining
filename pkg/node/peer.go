@@ -36,12 +36,27 @@ type Peer struct {
 // saveDebounceInterval is the minimum time between disk writes.
 const saveDebounceInterval = 5 * time.Second
 
+// PeerAuthMode controls how unknown peers are handled
+type PeerAuthMode int
+
+const (
+	// PeerAuthOpen allows any peer to connect (original behavior)
+	PeerAuthOpen PeerAuthMode = iota
+	// PeerAuthAllowlist only allows pre-registered peers or those with allowed public keys
+	PeerAuthAllowlist
+)
+
 // PeerRegistry manages known peers with KD-tree based selection.
 type PeerRegistry struct {
 	peers  map[string]*Peer
 	kdTree *poindexter.KDTree[string] // KD-tree with peer ID as payload
 	path   string
 	mu     sync.RWMutex
+
+	// Authentication settings
+	authMode           PeerAuthMode      // How to handle unknown peers
+	allowedPublicKeys  map[string]bool   // Allowlist of public keys (when authMode is Allowlist)
+	allowedPublicKeyMu sync.RWMutex      // Protects allowedPublicKeys
 
 	// Debounce disk writes
 	dirty        bool          // Whether there are unsaved changes
@@ -74,9 +89,11 @@ func NewPeerRegistry() (*PeerRegistry, error) {
 // This is primarily useful for testing to avoid xdg path caching issues.
 func NewPeerRegistryWithPath(peersPath string) (*PeerRegistry, error) {
 	pr := &PeerRegistry{
-		peers:    make(map[string]*Peer),
-		path:     peersPath,
-		stopChan: make(chan struct{}),
+		peers:             make(map[string]*Peer),
+		path:              peersPath,
+		stopChan:          make(chan struct{}),
+		authMode:          PeerAuthOpen, // Default to open for backward compatibility
+		allowedPublicKeys: make(map[string]bool),
 	}
 
 	// Try to load existing peers
@@ -88,6 +105,84 @@ func NewPeerRegistryWithPath(peersPath string) (*PeerRegistry, error) {
 
 	pr.rebuildKDTree()
 	return pr, nil
+}
+
+// SetAuthMode sets the authentication mode for peer connections.
+func (r *PeerRegistry) SetAuthMode(mode PeerAuthMode) {
+	r.allowedPublicKeyMu.Lock()
+	defer r.allowedPublicKeyMu.Unlock()
+	r.authMode = mode
+	logging.Info("peer auth mode changed", logging.Fields{"mode": mode})
+}
+
+// GetAuthMode returns the current authentication mode.
+func (r *PeerRegistry) GetAuthMode() PeerAuthMode {
+	r.allowedPublicKeyMu.RLock()
+	defer r.allowedPublicKeyMu.RUnlock()
+	return r.authMode
+}
+
+// AllowPublicKey adds a public key to the allowlist.
+func (r *PeerRegistry) AllowPublicKey(publicKey string) {
+	r.allowedPublicKeyMu.Lock()
+	defer r.allowedPublicKeyMu.Unlock()
+	r.allowedPublicKeys[publicKey] = true
+	logging.Debug("public key added to allowlist", logging.Fields{"key": publicKey[:16] + "..."})
+}
+
+// RevokePublicKey removes a public key from the allowlist.
+func (r *PeerRegistry) RevokePublicKey(publicKey string) {
+	r.allowedPublicKeyMu.Lock()
+	defer r.allowedPublicKeyMu.Unlock()
+	delete(r.allowedPublicKeys, publicKey)
+	logging.Debug("public key removed from allowlist", logging.Fields{"key": publicKey[:16] + "..."})
+}
+
+// IsPublicKeyAllowed checks if a public key is in the allowlist.
+func (r *PeerRegistry) IsPublicKeyAllowed(publicKey string) bool {
+	r.allowedPublicKeyMu.RLock()
+	defer r.allowedPublicKeyMu.RUnlock()
+	return r.allowedPublicKeys[publicKey]
+}
+
+// IsPeerAllowed checks if a peer is allowed to connect based on auth mode.
+// Returns true if:
+// - AuthMode is Open (allow all)
+// - AuthMode is Allowlist AND (peer is pre-registered OR public key is allowlisted)
+func (r *PeerRegistry) IsPeerAllowed(peerID string, publicKey string) bool {
+	r.allowedPublicKeyMu.RLock()
+	authMode := r.authMode
+	keyAllowed := r.allowedPublicKeys[publicKey]
+	r.allowedPublicKeyMu.RUnlock()
+
+	// Open mode allows everyone
+	if authMode == PeerAuthOpen {
+		return true
+	}
+
+	// Allowlist mode: check if peer is pre-registered
+	r.mu.RLock()
+	_, isRegistered := r.peers[peerID]
+	r.mu.RUnlock()
+
+	if isRegistered {
+		return true
+	}
+
+	// Check if public key is allowlisted
+	return keyAllowed
+}
+
+// ListAllowedPublicKeys returns all allowlisted public keys.
+func (r *PeerRegistry) ListAllowedPublicKeys() []string {
+	r.allowedPublicKeyMu.RLock()
+	defer r.allowedPublicKeyMu.RUnlock()
+
+	keys := make([]string, 0, len(r.allowedPublicKeys))
+	for key := range r.allowedPublicKeys {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 // AddPeer adds a new peer to the registry.

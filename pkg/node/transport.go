@@ -337,10 +337,34 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create peer if not exists
+	// Check if peer is allowed to connect (allowlist check)
+	if !t.registry.IsPeerAllowed(payload.Identity.ID, payload.Identity.PublicKey) {
+		logging.Warn("peer connection rejected: not in allowlist", logging.Fields{
+			"peer_id":    payload.Identity.ID,
+			"peer_name":  payload.Identity.Name,
+			"public_key": payload.Identity.PublicKey[:16] + "...",
+		})
+		// Send rejection before closing
+		identity := t.node.GetIdentity()
+		if identity != nil {
+			rejectPayload := HandshakeAckPayload{
+				Identity: *identity,
+				Accepted: false,
+				Reason:   "peer not authorized",
+			}
+			rejectMsg, _ := NewMessage(MsgHandshakeAck, identity.ID, payload.Identity.ID, rejectPayload)
+			if rejectData, err := json.Marshal(rejectMsg); err == nil {
+				conn.WriteMessage(websocket.TextMessage, rejectData)
+			}
+		}
+		conn.Close()
+		return
+	}
+
+	// Create peer if not exists (only if auth passed)
 	peer := t.registry.GetPeer(payload.Identity.ID)
 	if peer == nil {
-		// Auto-register for now (could require pre-registration)
+		// Auto-register the peer since they passed allowlist check
 		peer = &Peer{
 			ID:        payload.Identity.ID,
 			Name:      payload.Identity.Name,
@@ -350,6 +374,10 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 			Score:     50,
 		}
 		t.registry.AddPeer(peer)
+		logging.Info("auto-registered new peer", logging.Fields{
+			"peer_id":   peer.ID,
+			"peer_name": peer.Name,
+		})
 	}
 
 	pc := &PeerConnection{
