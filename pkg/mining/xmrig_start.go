@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Start launches the XMRig miner with the specified configuration.
@@ -90,7 +91,26 @@ func (m *XMRigMiner) Start(config *Config) error {
 	// Capture cmd locally to avoid race with Stop()
 	cmd := m.cmd
 	go func() {
-		cmd.Wait()
+		// Use a channel to detect if Wait() completes
+		done := make(chan struct{})
+		go func() {
+			cmd.Wait()
+			close(done)
+		}()
+
+		// Wait with timeout to prevent goroutine leak on zombie processes
+		select {
+		case <-done:
+			// Normal exit
+		case <-time.After(5 * time.Minute):
+			// Process didn't exit after 5 minutes - force cleanup
+			log.Printf("Miner process wait timeout, forcing cleanup")
+			if cmd.Process != nil {
+				cmd.Process.Kill()
+			}
+			<-done // Wait for the inner goroutine to finish
+		}
+
 		m.mu.Lock()
 		// Only clear if this is still the same command (not restarted)
 		if m.cmd == cmd {

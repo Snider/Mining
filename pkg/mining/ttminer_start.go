@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Start launches the TT-Miner with the given configuration.
@@ -67,7 +68,26 @@ func (m *TTMiner) Start(config *Config) error {
 	// Capture cmd locally to avoid race with Stop()
 	cmd := m.cmd
 	go func() {
-		err := cmd.Wait()
+		// Use a channel to detect if Wait() completes
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		// Wait with timeout to prevent goroutine leak on zombie processes
+		var err error
+		select {
+		case err = <-done:
+			// Normal exit
+		case <-time.After(5 * time.Minute):
+			// Process didn't exit after 5 minutes - force cleanup
+			log.Printf("TT-Miner process wait timeout, forcing cleanup")
+			if cmd.Process != nil {
+				cmd.Process.Kill()
+			}
+			err = <-done // Wait for the inner goroutine to finish
+		}
+
 		m.mu.Lock()
 		// Only clear if this is still the same command (not restarted)
 		if m.cmd == cmd {

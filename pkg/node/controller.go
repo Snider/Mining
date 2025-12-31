@@ -83,11 +83,12 @@ func (c *Controller) sendRequest(peerID string, msg *Message, timeout time.Durat
 	c.pending[msg.ID] = respCh
 	c.mu.Unlock()
 
-	// Clean up on exit
+	// Clean up on exit - ensure channel is closed and removed from map
 	defer func() {
 		c.mu.Lock()
 		delete(c.pending, msg.ID)
 		c.mu.Unlock()
+		close(respCh) // Close channel to allow garbage collection
 	}()
 
 	// Send the message
@@ -341,6 +342,9 @@ func (c *Controller) GetTotalHashrate() float64 {
 	var total float64
 
 	for _, stats := range allStats {
+		if stats == nil {
+			continue
+		}
 		for _, miner := range stats.Miners {
 			total += miner.Hashrate
 		}

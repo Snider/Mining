@@ -68,7 +68,11 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 		ProfileManager: profileManager,
 		NodeService:    nodeService,
 		Server: &http.Server{
-			Addr: listenAddr,
+			Addr:              listenAddr,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
 		},
 		DisplayAddr:         displayAddr,
 		SwaggerInstanceName: instanceName,
@@ -83,6 +87,14 @@ func NewService(manager ManagerInterface, listenAddr string, displayAddr string,
 func (s *Service) InitRouter() {
 	s.Router = gin.Default()
 
+	// Extract port safely from server address for CORS
+	serverPort := "9090" // default fallback
+	if s.Server.Addr != "" {
+		if _, port, err := net.SplitHostPort(s.Server.Addr); err == nil && port != "" {
+			serverPort = port
+		}
+	}
+
 	// Configure CORS to only allow local origins
 	corsConfig := cors.Config{
 		AllowOrigins: []string{
@@ -90,8 +102,8 @@ func (s *Service) InitRouter() {
 			"http://127.0.0.1:4200",
 			"http://localhost:9090",  // Default API port
 			"http://127.0.0.1:9090",
-			"http://localhost:" + strings.Split(s.Server.Addr, ":")[len(strings.Split(s.Server.Addr, ":"))-1],
-			"http://127.0.0.1:" + strings.Split(s.Server.Addr, ":")[len(strings.Split(s.Server.Addr, ":"))-1],
+			"http://localhost:" + serverPort,
+			"http://127.0.0.1:" + serverPort,
 			"wails://wails",          // Wails desktop app
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -101,6 +113,13 @@ func (s *Service) InitRouter() {
 		MaxAge:           12 * time.Hour,
 	}
 	s.Router.Use(cors.New(corsConfig))
+
+	// Add request body size limit middleware (1MB max)
+	s.Router.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20) // 1MB
+		c.Next()
+	})
+
 	s.SetupRoutes()
 }
 

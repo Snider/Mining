@@ -34,6 +34,7 @@ type Manager struct {
 	miners      map[string]Miner
 	mu          sync.RWMutex
 	stopChan    chan struct{}
+	stopOnce    sync.Once
 	waitGroup   sync.WaitGroup
 	dbEnabled   bool
 	dbRetention int
@@ -505,25 +506,28 @@ func (m *Manager) GetMinerHashrateHistory(name string) ([]HashratePoint, error) 
 }
 
 // Stop stops all running miners, background goroutines, and closes resources.
+// Safe to call multiple times - subsequent calls are no-ops.
 func (m *Manager) Stop() {
-	// Stop all running miners first
-	m.mu.Lock()
-	for name, miner := range m.miners {
-		if err := miner.Stop(); err != nil {
-			log.Printf("Warning: failed to stop miner %s: %v", name, err)
+	m.stopOnce.Do(func() {
+		// Stop all running miners first
+		m.mu.Lock()
+		for name, miner := range m.miners {
+			if err := miner.Stop(); err != nil {
+				log.Printf("Warning: failed to stop miner %s: %v", name, err)
+			}
 		}
-	}
-	m.mu.Unlock()
+		m.mu.Unlock()
 
-	close(m.stopChan)
-	m.waitGroup.Wait()
+		close(m.stopChan)
+		m.waitGroup.Wait()
 
-	// Close the database
-	if m.dbEnabled {
-		if err := database.Close(); err != nil {
-			log.Printf("Warning: failed to close database: %v", err)
+		// Close the database
+		if m.dbEnabled {
+			if err := database.Close(); err != nil {
+				log.Printf("Warning: failed to close database: %v", err)
+			}
 		}
-	}
+	})
 }
 
 // GetMinerHistoricalStats returns historical stats from the database for a miner.

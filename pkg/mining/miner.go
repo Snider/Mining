@@ -39,6 +39,9 @@ func NewLogBuffer(maxLines int) *LogBuffer {
 	}
 }
 
+// maxLineLength is the maximum length of a single log line to prevent memory bloat.
+const maxLineLength = 2000
+
 // Write implements io.Writer for capturing output.
 func (lb *LogBuffer) Write(p []byte) (n int, err error) {
 	lb.mu.Lock()
@@ -52,13 +55,19 @@ func (lb *LogBuffer) Write(p []byte) (n int, err error) {
 		if line == "" {
 			continue
 		}
+		// Truncate excessively long lines to prevent memory bloat
+		if len(line) > maxLineLength {
+			line = line[:maxLineLength] + "... [truncated]"
+		}
 		// Add timestamp prefix
 		timestampedLine := fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), line)
 		lb.lines = append(lb.lines, timestampedLine)
 
-		// Trim if over max
+		// Trim if over max - force reallocation to release memory
 		if len(lb.lines) > lb.maxLines {
-			lb.lines = lb.lines[len(lb.lines)-lb.maxLines:]
+			newSlice := make([]string, lb.maxLines)
+			copy(newSlice, lb.lines[len(lb.lines)-lb.maxLines:])
+			lb.lines = newSlice
 		}
 	}
 	return len(p), nil
@@ -225,6 +234,8 @@ func (b *BaseMiner) InstallFromURL(url string) error {
 	}
 
 	if _, err := io.Copy(tmpfile, resp.Body); err != nil {
+		// Drain remaining body to allow connection reuse
+		io.Copy(io.Discard, resp.Body)
 		return err
 	}
 
@@ -438,7 +449,14 @@ func (b *BaseMiner) ReduceHashrateHistory(now time.Time) {
 			newHighResHistory = append(newHighResHistory, p)
 		}
 	}
-	b.HashrateHistory = newHighResHistory
+	// Force reallocation if significantly oversized to free memory
+	if cap(b.HashrateHistory) > 1000 && len(newHighResHistory) < cap(b.HashrateHistory)/2 {
+		trimmed := make([]HashratePoint, len(newHighResHistory))
+		copy(trimmed, newHighResHistory)
+		b.HashrateHistory = trimmed
+	} else {
+		b.HashrateHistory = newHighResHistory
+	}
 
 	if len(pointsToAggregate) == 0 {
 		b.LastLowResAggregation = now
@@ -480,7 +498,16 @@ func (b *BaseMiner) ReduceHashrateHistory(now time.Time) {
 			firstValidLowResIndex = len(b.LowResHashrateHistory)
 		}
 	}
-	b.LowResHashrateHistory = b.LowResHashrateHistory[firstValidLowResIndex:]
+
+	// Force reallocation if significantly oversized to free memory
+	newLowResLen := len(b.LowResHashrateHistory) - firstValidLowResIndex
+	if cap(b.LowResHashrateHistory) > 1000 && newLowResLen < cap(b.LowResHashrateHistory)/2 {
+		trimmed := make([]HashratePoint, newLowResLen)
+		copy(trimmed, b.LowResHashrateHistory[firstValidLowResIndex:])
+		b.LowResHashrateHistory = trimmed
+	} else {
+		b.LowResHashrateHistory = b.LowResHashrateHistory[firstValidLowResIndex:]
+	}
 	b.LastLowResAggregation = now
 }
 

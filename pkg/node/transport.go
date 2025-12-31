@@ -77,7 +77,20 @@ func NewTransport(node *NodeManager, registry *PeerRegistry, config TransportCon
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			CheckOrigin:     func(r *http.Request) bool { return true }, // Allow all origins
+			CheckOrigin: func(r *http.Request) bool {
+				// Allow local connections only for security
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true // No origin header (non-browser client)
+				}
+				// Allow localhost and 127.0.0.1 origins
+				u, err := url.Parse(origin)
+				if err != nil {
+					return false
+				}
+				host := u.Hostname()
+				return host == "localhost" || host == "127.0.0.1" || host == "::1"
+			},
 		},
 		ctx:    ctx,
 		cancel: cancel,
@@ -238,6 +251,16 @@ func (t *Transport) GetConnection(peerID string) *PeerConnection {
 
 // handleWSUpgrade handles incoming WebSocket connections.
 func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
+	// Enforce MaxConns limit
+	t.mu.RLock()
+	currentConns := len(t.conns)
+	t.mu.RUnlock()
+
+	if currentConns >= t.config.MaxConns {
+		http.Error(w, "Too many connections", http.StatusServiceUnavailable)
+		return
+	}
+
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -415,6 +438,13 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 		default:
 		}
 
+		// Set read deadline to prevent blocking forever on unresponsive connections
+		readDeadline := t.config.PingInterval + t.config.PongTimeout
+		if err := pc.Conn.SetReadDeadline(time.Now().Add(readDeadline)); err != nil {
+			log.Printf("[readLoop] SetReadDeadline error for %s: %v", pc.Peer.ID, err)
+			return
+		}
+
 		_, data, err := pc.Conn.ReadMessage()
 		if err != nil {
 			log.Printf("[readLoop] Read error from %s: %v", pc.Peer.ID, err)
@@ -493,6 +523,11 @@ func (pc *PeerConnection) Send(msg *Message) error {
 	data, err := pc.transport.encryptMessage(msg, pc.SharedSecret)
 	if err != nil {
 		return err
+	}
+
+	// Set write deadline to prevent blocking forever
+	if err := pc.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return fmt.Errorf("failed to set write deadline: %w", err)
 	}
 
 	return pc.Conn.WriteMessage(websocket.BinaryMessage, data)
