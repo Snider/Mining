@@ -32,6 +32,12 @@
 namespace xmrig {
 
 
+/**
+ * IMPORTANT LIFETIME CONSTRAINT (HIGH-010):
+ * The `miner` pointer is only valid during synchronous event dispatch.
+ * The Miner object is deleted immediately after CloseEvent::start() returns.
+ * Do NOT store the miner pointer - access data within the event handler only.
+ */
 class CloseEvent : public MinerEvent
 {
 public:

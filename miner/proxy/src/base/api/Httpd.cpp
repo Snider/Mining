@@ -23,8 +23,11 @@
 #include "base/net/http/HttpApiResponse.h"
 #include "base/net/http/HttpData.h"
 #include "base/net/tools/TcpServer.h"
+#include "base/tools/Chrono.h"
 #include "core/config/Config.h"
 #include "core/Controller.h"
+
+#include <map>
 
 // SECURITY FIX (HIGH-024): Include for constant-time comparison
 #ifdef XMRIG_FEATURE_TLS
@@ -38,6 +41,17 @@
 namespace xmrig {
 
 static const char *kAuthorization = "authorization";
+
+// SECURITY FIX (HIGH-006): Rate limiting for authentication
+struct AuthAttempt {
+    int failures = 0;
+    uint64_t lastAttempt = 0;
+};
+static std::map<std::string, AuthAttempt> authRateLimit;
+static constexpr int kMaxAuthFailures = 5;           // Max failures before blocking
+static constexpr uint64_t kAuthBlockTime = 300000;   // 5 minutes in ms
+static constexpr uint64_t kAuthCleanupInterval = 60000;  // 1 minute
+static uint64_t lastCleanup = 0;
 
 #ifdef _WIN32
 static const char *favicon = nullptr;
@@ -179,6 +193,33 @@ void xmrig::Httpd::onHttpData(const HttpData &data)
 int xmrig::Httpd::auth(const HttpData &req) const
 {
     const Http &config = m_base->config()->http();
+    const std::string clientIp = req.ip();
+    const uint64_t now = Chrono::steadyMSecs();
+
+    // SECURITY FIX (HIGH-006): Rate limiting - clean up old entries periodically
+    if (now - lastCleanup > kAuthCleanupInterval) {
+        for (auto it = authRateLimit.begin(); it != authRateLimit.end(); ) {
+            if (now - it->second.lastAttempt > kAuthBlockTime) {
+                it = authRateLimit.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        lastCleanup = now;
+    }
+
+    // Check if IP is rate-limited
+    auto it = authRateLimit.find(clientIp);
+    if (it != authRateLimit.end()) {
+        if (it->second.failures >= kMaxAuthFailures) {
+            if (now - it->second.lastAttempt < kAuthBlockTime) {
+                LOG_WARN("Auth blocked for IP %s (rate limited)", clientIp.c_str());
+                return 429 /* TOO_MANY_REQUESTS */;
+            }
+            // Block time expired, reset
+            it->second.failures = 0;
+        }
+    }
 
     if (!req.headers.count(kAuthorization)) {
         return config.isAuthRequired() ? 401 /* UNAUTHORIZED */ : 200;
@@ -192,6 +233,8 @@ int xmrig::Httpd::auth(const HttpData &req) const
     const size_t size        = token.size();
 
     if (token.size() < 8 || config.token().size() != size - 7 || memcmp("Bearer ", token.c_str(), 7) != 0) {
+        authRateLimit[clientIp].failures++;
+        authRateLimit[clientIp].lastAttempt = now;
         return 403 /* FORBIDDEN */;
     }
 
@@ -205,5 +248,14 @@ int xmrig::Httpd::auth(const HttpData &req) const
         result |= config.token().data()[i] ^ token[i + 7];
     }
 #   endif
-    return result == 0 ? 200 : 403 /* FORBIDDEN */;
+
+    if (result != 0) {
+        authRateLimit[clientIp].failures++;
+        authRateLimit[clientIp].lastAttempt = now;
+        return 403 /* FORBIDDEN */;
+    }
+
+    // Successful auth - clear any failure count
+    authRateLimit.erase(clientIp);
+    return 200;
 }

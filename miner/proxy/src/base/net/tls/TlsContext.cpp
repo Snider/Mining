@@ -149,7 +149,7 @@ bool xmrig::TlsContext::load(const TlsConfig &config)
         return false;
     }
 
-    // SECURITY: Disable deprecated protocols and enable hardening options
+    // SECURITY FIX (MED-003): TLS hardening options
     SSL_CTX_set_options(m_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_options(m_ctx, SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);  // Disable TLS 1.0/1.1 (POODLE, BEAST)
     SSL_CTX_set_options(m_ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
@@ -157,7 +157,7 @@ bool xmrig::TlsContext::load(const TlsConfig &config)
     SSL_CTX_set_options(m_ctx, SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE);  // Forward secrecy
 
 #   if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER)
-    SSL_CTX_set_max_early_data(m_ctx, 0);
+    SSL_CTX_set_max_early_data(m_ctx, 0);  // Disable 0-RTT
     SSL_CTX_set_options(m_ctx, SSL_OP_NO_RENEGOTIATION);  // Disable renegotiation attacks
 #   endif
 

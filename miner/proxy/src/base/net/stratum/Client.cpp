@@ -1023,6 +1023,9 @@ bool xmrig::Client::isCriticalError(const char *message)
 }
 
 
+// NOTE (CRIT-016): Safety mechanism uses m_storage to track valid Client instances.
+// The null check prevents use-after-free: if the client was already deleted via
+// deleteLater(), it won't be in m_storage and getClient returns nullptr.
 void xmrig::Client::onClose(uv_handle_t *handle)
 {
     auto client = getClient(handle->data);
