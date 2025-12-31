@@ -185,7 +185,6 @@ import { MinerService } from '../../miner.service';
     .dropdown-menu {
       position: absolute;
       top: calc(100% + 4px);
-      left: 0;
       right: 0;
       min-width: 260px;
       background: var(--color-surface-100);
