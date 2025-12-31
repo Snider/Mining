@@ -59,6 +59,12 @@ func NewNodeManager() (*NodeManager, error) {
 		return nil, fmt.Errorf("failed to get config path: %w", err)
 	}
 
+	return NewNodeManagerWithPaths(keyPath, configPath)
+}
+
+// NewNodeManagerWithPaths creates a NodeManager with custom paths.
+// This is primarily useful for testing to avoid xdg path caching issues.
+func NewNodeManagerWithPaths(keyPath, configPath string) (*NodeManager, error) {
 	nm := &NodeManager{
 		keyPath:    keyPath,
 		configPath: configPath,

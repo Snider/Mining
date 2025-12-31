@@ -6,27 +6,33 @@ import (
 	"testing"
 )
 
-func TestNodeIdentity(t *testing.T) {
-	// Create temp directory for test
+// setupTestNodeManager creates a NodeManager with paths in a temp directory.
+func setupTestNodeManager(t *testing.T) (*NodeManager, func()) {
 	tmpDir, err := os.MkdirTemp("", "node-identity-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
 
-	// Override XDG paths for testing
-	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
-	os.Setenv("XDG_DATA_HOME", filepath.Join(tmpDir, "data"))
-	defer func() {
-		os.Unsetenv("XDG_CONFIG_HOME")
-		os.Unsetenv("XDG_DATA_HOME")
-	}()
+	keyPath := filepath.Join(tmpDir, "private.key")
+	configPath := filepath.Join(tmpDir, "node.json")
 
+	nm, err := NewNodeManagerWithPaths(keyPath, configPath)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("failed to create node manager: %v", err)
+	}
+
+	cleanup := func() {
+		os.RemoveAll(tmpDir)
+	}
+
+	return nm, cleanup
+}
+
+func TestNodeIdentity(t *testing.T) {
 	t.Run("NewNodeManager", func(t *testing.T) {
-		nm, err := NewNodeManager()
-		if err != nil {
-			t.Fatalf("failed to create node manager: %v", err)
-		}
+		nm, cleanup := setupTestNodeManager(t)
+		defer cleanup()
 
 		if nm.HasIdentity() {
 			t.Error("new node manager should not have identity")
@@ -34,12 +40,10 @@ func TestNodeIdentity(t *testing.T) {
 	})
 
 	t.Run("GenerateIdentity", func(t *testing.T) {
-		nm, err := NewNodeManager()
-		if err != nil {
-			t.Fatalf("failed to create node manager: %v", err)
-		}
+		nm, cleanup := setupTestNodeManager(t)
+		defer cleanup()
 
-		err = nm.GenerateIdentity("test-node", RoleDual)
+		err := nm.GenerateIdentity("test-node", RoleDual)
 		if err != nil {
 			t.Fatalf("failed to generate identity: %v", err)
 		}
@@ -71,8 +75,17 @@ func TestNodeIdentity(t *testing.T) {
 	})
 
 	t.Run("LoadExistingIdentity", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "node-load-test")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		keyPath := filepath.Join(tmpDir, "private.key")
+		configPath := filepath.Join(tmpDir, "node.json")
+
 		// First, create an identity
-		nm1, err := NewNodeManager()
+		nm1, err := NewNodeManagerWithPaths(keyPath, configPath)
 		if err != nil {
 			t.Fatalf("failed to create first node manager: %v", err)
 		}
@@ -86,7 +99,7 @@ func TestNodeIdentity(t *testing.T) {
 		originalPubKey := nm1.GetIdentity().PublicKey
 
 		// Create a new manager - should load existing identity
-		nm2, err := NewNodeManager()
+		nm2, err := NewNodeManagerWithPaths(keyPath, configPath)
 		if err != nil {
 			t.Fatalf("failed to create second node manager: %v", err)
 		}
@@ -106,17 +119,17 @@ func TestNodeIdentity(t *testing.T) {
 	})
 
 	t.Run("DeriveSharedSecret", func(t *testing.T) {
-		// Create two node managers with fresh XDG paths
+		// Create two node managers with separate temp directories
 		tmpDir1, _ := os.MkdirTemp("", "node1")
 		tmpDir2, _ := os.MkdirTemp("", "node2")
 		defer os.RemoveAll(tmpDir1)
 		defer os.RemoveAll(tmpDir2)
 
 		// Node 1
-		os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir1, "config"))
-		os.Setenv("XDG_DATA_HOME", filepath.Join(tmpDir1, "data"))
-
-		nm1, err := NewNodeManager()
+		nm1, err := NewNodeManagerWithPaths(
+			filepath.Join(tmpDir1, "private.key"),
+			filepath.Join(tmpDir1, "node.json"),
+		)
 		if err != nil {
 			t.Fatalf("failed to create node manager 1: %v", err)
 		}
@@ -126,10 +139,10 @@ func TestNodeIdentity(t *testing.T) {
 		}
 
 		// Node 2
-		os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir2, "config"))
-		os.Setenv("XDG_DATA_HOME", filepath.Join(tmpDir2, "data"))
-
-		nm2, err := NewNodeManager()
+		nm2, err := NewNodeManagerWithPaths(
+			filepath.Join(tmpDir2, "private.key"),
+			filepath.Join(tmpDir2, "node.json"),
+		)
 		if err != nil {
 			t.Fatalf("failed to create node manager 2: %v", err)
 		}
@@ -162,18 +175,10 @@ func TestNodeIdentity(t *testing.T) {
 	})
 
 	t.Run("DeleteIdentity", func(t *testing.T) {
-		tmpDirDel, _ := os.MkdirTemp("", "node-delete")
-		defer os.RemoveAll(tmpDirDel)
+		nm, cleanup := setupTestNodeManager(t)
+		defer cleanup()
 
-		os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDirDel, "config"))
-		os.Setenv("XDG_DATA_HOME", filepath.Join(tmpDirDel, "data"))
-
-		nm, err := NewNodeManager()
-		if err != nil {
-			t.Fatalf("failed to create node manager: %v", err)
-		}
-
-		err = nm.GenerateIdentity("delete-me", RoleDual)
+		err := nm.GenerateIdentity("delete-me", RoleDual)
 		if err != nil {
 			t.Fatalf("failed to generate identity: %v", err)
 		}
