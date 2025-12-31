@@ -174,6 +174,132 @@ func logWithRequestID(c *gin.Context, level string, message string, fields loggi
 	}
 }
 
+// csrfMiddleware protects against CSRF attacks for browser-based requests.
+// For state-changing methods (POST, PUT, DELETE), it requires one of:
+// - Authorization header (API clients)
+// - X-Requested-With header (AJAX clients)
+// - Origin header matching allowed origins (already handled by CORS)
+// GET requests are always allowed as they should be idempotent.
+func csrfMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Only check state-changing methods
+		method := c.Request.Method
+		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+			c.Next()
+			return
+		}
+
+		// Allow if Authorization header present (API client)
+		if c.GetHeader("Authorization") != "" {
+			c.Next()
+			return
+		}
+
+		// Allow if X-Requested-With header present (AJAX/XHR request)
+		if c.GetHeader("X-Requested-With") != "" {
+			c.Next()
+			return
+		}
+
+		// Allow if Content-Type is application/json (not sent by HTML forms)
+		contentType := c.GetHeader("Content-Type")
+		if strings.HasPrefix(contentType, "application/json") {
+			c.Next()
+			return
+		}
+
+		// Reject the request as potential CSRF
+		respondWithError(c, http.StatusForbidden, "CSRF_PROTECTION",
+			"Request blocked by CSRF protection",
+			"Include X-Requested-With header or use application/json content type")
+		c.Abort()
+	}
+}
+
+// DefaultRequestTimeout is the default timeout for API requests.
+const DefaultRequestTimeout = 30 * time.Second
+
+// Cache-Control header constants
+const (
+	CacheNoStore    = "no-store"
+	CacheNoCache    = "no-cache"
+	CachePublic1Min = "public, max-age=60"
+	CachePublic5Min = "public, max-age=300"
+)
+
+// cacheMiddleware adds Cache-Control headers based on the endpoint.
+func cacheMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Only cache GET requests
+		if c.Request.Method != http.MethodGet {
+			c.Header("Cache-Control", CacheNoStore)
+			c.Next()
+			return
+		}
+
+		path := c.Request.URL.Path
+
+		// Static-ish resources that can be cached briefly
+		switch {
+		case strings.HasSuffix(path, "/available"):
+			// Available miners list - can be cached for 5 minutes
+			c.Header("Cache-Control", CachePublic5Min)
+		case strings.HasSuffix(path, "/info"):
+			// System info - can be cached for 1 minute
+			c.Header("Cache-Control", CachePublic1Min)
+		case strings.Contains(path, "/swagger"):
+			// Swagger docs - can be cached
+			c.Header("Cache-Control", CachePublic5Min)
+		default:
+			// Dynamic data (stats, miners, profiles) - don't cache
+			c.Header("Cache-Control", CacheNoCache)
+		}
+
+		c.Next()
+	}
+}
+
+// requestTimeoutMiddleware adds a timeout to request handling.
+// This prevents slow requests from consuming resources indefinitely.
+func requestTimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Skip timeout for WebSocket upgrades and streaming endpoints
+		if c.GetHeader("Upgrade") == "websocket" {
+			c.Next()
+			return
+		}
+		if strings.HasSuffix(c.Request.URL.Path, "/events") {
+			c.Next()
+			return
+		}
+
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		defer cancel()
+
+		// Replace request context
+		c.Request = c.Request.WithContext(ctx)
+
+		// Channel to signal completion
+		done := make(chan struct{})
+
+		go func() {
+			c.Next()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// Request completed normally
+		case <-ctx.Done():
+			// Timeout occurred
+			c.Abort()
+			respondWithError(c, http.StatusGatewayTimeout, ErrCodeTimeout,
+				"Request timed out", fmt.Sprintf("Request exceeded %s timeout", timeout))
+		}
+	}
+}
+
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -315,7 +441,7 @@ func (s *Service) InitRouter() {
 			"http://wails.localhost", // Wails desktop app (uses localhost origin)
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -327,6 +453,16 @@ func (s *Service) InitRouter() {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20) // 1MB
 		c.Next()
 	})
+
+	// Add CSRF protection for browser requests (SEC-MED-3)
+	// Requires X-Requested-With or Authorization header for state-changing methods
+	s.Router.Use(csrfMiddleware())
+
+	// Add request timeout middleware (RESIL-MED-8)
+	s.Router.Use(requestTimeoutMiddleware(DefaultRequestTimeout))
+
+	// Add cache headers middleware (API-MED-7)
+	s.Router.Use(cacheMiddleware())
 
 	// Add X-Request-ID middleware for request tracing
 	s.Router.Use(requestIDMiddleware())
