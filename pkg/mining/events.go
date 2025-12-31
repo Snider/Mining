@@ -302,7 +302,10 @@ func (c *wsClient) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			if _, err := w.Write(message); err != nil {
+				logging.Debug("WebSocket write error", logging.Fields{"error": err})
+				return
+			}
 
 			if err := w.Close(); err != nil {
 				return

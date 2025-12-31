@@ -216,11 +216,17 @@ func (b *BaseMiner) WriteStdin(input string) error {
 		input += "\n"
 	}
 
-	// Write with timeout to prevent blocking indefinitely
+	// Write with timeout to prevent blocking indefinitely.
+	// Use buffered channel size 1 so goroutine can exit even if we don't read the result.
 	done := make(chan error, 1)
 	go func() {
 		_, err := stdinPipe.Write([]byte(input))
-		done <- err
+		// Non-blocking send - if timeout already fired, this won't block
+		select {
+		case done <- err:
+		default:
+			// Timeout already occurred, goroutine exits cleanly
+		}
 	}()
 
 	select {
@@ -252,13 +258,13 @@ func (b *BaseMiner) InstallFromURL(url string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse
+		_, _ = io.Copy(io.Discard, resp.Body) // Drain body to allow connection reuse (error ignored intentionally)
 		return fmt.Errorf("failed to download release: unexpected status code %d", resp.StatusCode)
 	}
 
 	if _, err := io.Copy(tmpfile, resp.Body); err != nil {
-		// Drain remaining body to allow connection reuse
-		io.Copy(io.Discard, resp.Body)
+		// Drain remaining body to allow connection reuse (error ignored intentionally)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return err
 	}
 
@@ -548,7 +554,9 @@ func (b *BaseMiner) unzip(src, dest string) error {
 			return fmt.Errorf("%s: illegal file path", fpath)
 		}
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
+			if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", fpath, err)
+			}
 			continue
 		}
 

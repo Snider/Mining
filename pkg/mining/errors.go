@@ -24,6 +24,7 @@ const (
 	ErrCodeProfileNotFound    = "PROFILE_NOT_FOUND"
 	ErrCodeProfileExists      = "PROFILE_EXISTS"
 	ErrCodeInternalError      = "INTERNAL_ERROR"
+	ErrCodeInternal           = "INTERNAL_ERROR" // Alias for consistency
 )
 
 // MiningError is a structured error type for the mining package

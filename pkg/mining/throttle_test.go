@@ -141,7 +141,7 @@ func TestCPUThrottleThreadCount(t *testing.T) {
 	defer manager.Stop()
 
 	numCPU := runtime.NumCPU()
-	targetThreads := 1 // Use only 1 thread
+	targetThreads := 1                                                              // Use only 1 thread
 	expectedMaxCPU := float64(100) / float64(numCPU) * float64(targetThreads) * 1.5 // 50% tolerance
 
 	config := &Config{

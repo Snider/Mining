@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Snider/Mining/pkg/node"
 	"github.com/gin-gonic/gin"
@@ -90,8 +91,8 @@ func (ns *NodeService) StopTransport() error {
 
 // Node Info Response
 type NodeInfoResponse struct {
-	HasIdentity    bool                `json:"hasIdentity"`
-	Identity       *node.NodeIdentity  `json:"identity,omitempty"`
+	HasIdentity     bool               `json:"hasIdentity"`
+	Identity        *node.NodeIdentity `json:"identity,omitempty"`
 	RegisteredPeers int                `json:"registeredPeers"`
 	ConnectedPeers  int                `json:"connectedPeers"`
 }
@@ -257,12 +258,17 @@ func (ns *NodeService) handleRemovePeer(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Peer ID"
 // @Success 200 {object} map[string]float64
+// @Failure 404 {object} APIError "Peer not found"
 // @Router /peers/{id}/ping [post]
 func (ns *NodeService) handlePingPeer(c *gin.Context) {
 	peerID := c.Param("id")
 	rtt, err := ns.controller.PingPeer(peerID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "not connected") {
+			respondWithError(c, http.StatusNotFound, "PEER_NOT_FOUND", "peer not found or not connected", err.Error())
+			return
+		}
+		respondWithError(c, http.StatusInternalServerError, ErrCodeInternal, "ping failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"rtt_ms": rtt})
@@ -275,11 +281,16 @@ func (ns *NodeService) handlePingPeer(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Peer ID"
 // @Success 200 {object} map[string]string
+// @Failure 404 {object} APIError "Peer not found"
 // @Router /peers/{id}/connect [post]
 func (ns *NodeService) handleConnectPeer(c *gin.Context) {
 	peerID := c.Param("id")
 	if err := ns.controller.ConnectToPeer(peerID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if strings.Contains(err.Error(), "not found") {
+			respondWithError(c, http.StatusNotFound, "PEER_NOT_FOUND", "peer not found", err.Error())
+			return
+		}
+		respondWithError(c, http.StatusInternalServerError, ErrCodeConnectionFailed, "connection failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "connected"})
@@ -287,7 +298,7 @@ func (ns *NodeService) handleConnectPeer(c *gin.Context) {
 
 // handleDisconnectPeer godoc
 // @Summary Disconnect from a peer
-// @Description Close the connection to a peer
+// @Description Close the connection to a peer. Idempotent - returns success if peer not connected.
 // @Tags peers
 // @Produce json
 // @Param id path string true "Peer ID"
@@ -296,7 +307,12 @@ func (ns *NodeService) handleConnectPeer(c *gin.Context) {
 func (ns *NodeService) handleDisconnectPeer(c *gin.Context) {
 	peerID := c.Param("id")
 	if err := ns.controller.DisconnectFromPeer(peerID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// Make disconnect idempotent - if peer not connected, still return success
+		if strings.Contains(err.Error(), "not connected") {
+			c.JSON(http.StatusOK, gin.H{"status": "disconnected"})
+			return
+		}
+		respondWithError(c, http.StatusInternalServerError, ErrCodeInternal, "disconnect failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "disconnected"})

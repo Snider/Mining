@@ -144,6 +144,35 @@ func generateRequestID() string {
 	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b[:4])
 }
 
+// getRequestID extracts the request ID from gin context
+func getRequestID(c *gin.Context) string {
+	if id, exists := c.Get("requestID"); exists {
+		if s, ok := id.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// logWithRequestID logs a message with request ID correlation
+func logWithRequestID(c *gin.Context, level string, message string, fields logging.Fields) {
+	if fields == nil {
+		fields = logging.Fields{}
+	}
+	if reqID := getRequestID(c); reqID != "" {
+		fields["request_id"] = reqID
+	}
+	switch level {
+	case "error":
+		logging.Error(message, fields)
+	case "warn":
+		logging.Warn(message, fields)
+	case "info":
+		logging.Info(message, fields)
+	default:
+		logging.Debug(message, fields)
+	}
+}
 
 // WebSocket upgrader for the events endpoint
 var wsUpgrader = websocket.Upgrader{
@@ -272,9 +301,9 @@ func (s *Service) InitRouter() {
 	// Configure CORS to only allow local origins
 	corsConfig := cors.Config{
 		AllowOrigins: []string{
-			"http://localhost:4200",  // Angular dev server
+			"http://localhost:4200", // Angular dev server
 			"http://127.0.0.1:4200",
-			"http://localhost:9090",  // Default API port
+			"http://localhost:9090", // Default API port
 			"http://127.0.0.1:9090",
 			"http://localhost:" + serverPort,
 			"http://127.0.0.1:" + serverPort,
@@ -312,6 +341,14 @@ func (s *Service) Stop() {
 	if s.EventHub != nil {
 		s.EventHub.Stop()
 	}
+	if s.auth != nil {
+		s.auth.Stop()
+	}
+	if s.NodeService != nil {
+		if err := s.NodeService.StopTransport(); err != nil {
+			logging.Warn("failed to stop node service transport", logging.Fields{"error": err})
+		}
+	}
 }
 
 // ServiceStartup initializes the router and starts the HTTP server.
@@ -333,6 +370,7 @@ func (s *Service) ServiceStartup(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
+		s.Stop() // Clean up service resources (auth, event hub, node service)
 		s.Manager.Stop()
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -377,6 +415,7 @@ func (s *Service) SetupRoutes() {
 
 	{
 		apiGroup.GET("/info", s.handleGetInfo)
+		apiGroup.GET("/metrics", s.handleMetrics)
 		apiGroup.POST("/doctor", s.handleDoctor)
 		apiGroup.POST("/update", s.handleUpdateCheck)
 
@@ -824,17 +863,28 @@ func (s *Service) handleListProfiles(c *gin.Context) {
 // @Produce  json
 // @Param profile body MiningProfile true "Mining Profile"
 // @Success 201 {object} MiningProfile
+// @Failure 400 {object} APIError "Invalid profile data"
 // @Router /profiles [post]
 func (s *Service) handleCreateProfile(c *gin.Context) {
 	var profile MiningProfile
 	if err := c.ShouldBindJSON(&profile); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithError(c, http.StatusBadRequest, ErrCodeInvalidInput, "invalid profile data", err.Error())
+		return
+	}
+
+	// Validate required fields
+	if profile.Name == "" {
+		respondWithError(c, http.StatusBadRequest, ErrCodeInvalidInput, "profile name is required", "")
+		return
+	}
+	if profile.MinerType == "" {
+		respondWithError(c, http.StatusBadRequest, ErrCodeInvalidInput, "miner type is required", "")
 		return
 	}
 
 	createdProfile, err := s.ProfileManager.CreateProfile(&profile)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create profile", "details": err.Error()})
+		respondWithError(c, http.StatusInternalServerError, ErrCodeInternal, "failed to create profile", err.Error())
 		return
 	}
 
@@ -868,18 +918,24 @@ func (s *Service) handleGetProfile(c *gin.Context) {
 // @Param id path string true "Profile ID"
 // @Param profile body MiningProfile true "Updated Mining Profile"
 // @Success 200 {object} MiningProfile
+// @Failure 404 {object} APIError "Profile not found"
 // @Router /profiles/{id} [put]
 func (s *Service) handleUpdateProfile(c *gin.Context) {
 	profileID := c.Param("id")
 	var profile MiningProfile
 	if err := c.ShouldBindJSON(&profile); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithError(c, http.StatusBadRequest, ErrCodeInvalidInput, "invalid profile data", err.Error())
 		return
 	}
 	profile.ID = profileID
 
 	if err := s.ProfileManager.UpdateProfile(&profile); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile", "details": err.Error()})
+		// Check if error is "not found"
+		if strings.Contains(err.Error(), "not found") {
+			respondWithError(c, http.StatusNotFound, ErrCodeProfileNotFound, "profile not found", err.Error())
+			return
+		}
+		respondWithError(c, http.StatusInternalServerError, ErrCodeInternal, "failed to update profile", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, profile)
@@ -887,7 +943,7 @@ func (s *Service) handleUpdateProfile(c *gin.Context) {
 
 // handleDeleteProfile godoc
 // @Summary Delete a mining profile
-// @Description Delete a mining profile by its ID
+// @Description Delete a mining profile by its ID. Idempotent - returns success even if profile doesn't exist.
 // @Tags profiles
 // @Produce  json
 // @Param id path string true "Profile ID"
@@ -896,7 +952,12 @@ func (s *Service) handleUpdateProfile(c *gin.Context) {
 func (s *Service) handleDeleteProfile(c *gin.Context) {
 	profileID := c.Param("id")
 	if err := s.ProfileManager.DeleteProfile(profileID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete profile", "details": err.Error()})
+		// Make DELETE idempotent - if profile doesn't exist, still return success
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusOK, gin.H{"status": "profile deleted"})
+			return
+		}
+		respondWithError(c, http.StatusInternalServerError, ErrCodeInternal, "failed to delete profile", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "profile deleted"})
@@ -1030,7 +1091,20 @@ func (s *Service) handleWebSocketEvents(c *gin.Context) {
 	}
 
 	logging.Info("new WebSocket connection", logging.Fields{"remote": c.Request.RemoteAddr})
+	RecordWSConnection(true)
 	if !s.EventHub.ServeWs(conn) {
+		RecordWSConnection(false) // Undo increment on rejection
 		logging.Warn("WebSocket connection rejected", logging.Fields{"remote": c.Request.RemoteAddr, "reason": "limit reached"})
 	}
+}
+
+// handleMetrics godoc
+// @Summary Get internal metrics
+// @Description Returns internal metrics for monitoring and debugging
+// @Tags system
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /metrics [get]
+func (s *Service) handleMetrics(c *gin.Context) {
+	c.JSON(http.StatusOK, GetMetricsSnapshot())
 }

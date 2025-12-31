@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Snider/Mining/pkg/logging"
 )
 
 // Controller manages remote peer operations from a controller node.
@@ -248,6 +250,11 @@ func (c *Controller) GetAllStats() map[string]*StatsPayload {
 			defer wg.Done()
 			stats, err := c.GetRemoteStats(p.ID)
 			if err != nil {
+				logging.Debug("failed to get stats from peer", logging.Fields{
+					"peer_id": p.ID,
+					"peer":    p.Name,
+					"error":   err.Error(),
+				})
 				return // Skip failed peers
 			}
 			mu.Lock()

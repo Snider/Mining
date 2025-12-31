@@ -144,9 +144,9 @@ func TestExtractProfileBundle(t *testing.T) {
 func TestTarballFunctions(t *testing.T) {
 	t.Run("CreateAndExtractTarball", func(t *testing.T) {
 		files := map[string][]byte{
-			"file1.txt":        []byte("content of file 1"),
-			"dir/file2.json":   []byte(`{"key":"value"}`),
-			"miners/xmrig":     []byte("binary content"),
+			"file1.txt":      []byte("content of file 1"),
+			"dir/file2.json": []byte(`{"key":"value"}`),
+			"miners/xmrig":   []byte("binary content"),
 		}
 
 		tarData, err := createTarball(files)

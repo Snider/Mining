@@ -55,4 +55,3 @@ func FetchJSONStats[T any](ctx context.Context, config HTTPStatsConfig, target *
 
 	return nil
 }
-

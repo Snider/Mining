@@ -33,8 +33,8 @@ func TestDualMiningCPUAndGPU(t *testing.T) {
 
 		// GPU config - explicit device selection required!
 		GPUEnabled: true,
-		OpenCL:     true,  // AMD GPU
-		Devices:    "0",   // Device 0 only - user must pick
+		OpenCL:     true, // AMD GPU
+		Devices:    "0",  // Device 0 only - user must pick
 	}
 
 	minerInstance, err := manager.StartMiner(context.Background(), "xmrig", config)

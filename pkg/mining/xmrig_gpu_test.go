@@ -43,9 +43,9 @@ func TestXMRigDualMiningConfig(t *testing.T) {
 		GPUPool:    "stratum+tcp://ravencoin.pool.com:3333",
 		GPUWallet:  "gpu_wallet_address",
 		GPUAlgo:    "kawpow",
-		CUDA:       true,  // NVIDIA
+		CUDA:       true, // NVIDIA
 		OpenCL:     false,
-		Devices:    "0",   // Explicit device selection required
+		Devices:    "0", // Explicit device selection required
 	}
 
 	err := miner.createConfig(config)
@@ -146,7 +146,7 @@ func TestXMRigGPUOnlyConfig(t *testing.T) {
 		Pool:       "stratum+tcp://pool.supportxmr.com:3333",
 		Wallet:     "test_wallet",
 		Algo:       "rx/0",
-		NoCPU:      true,  // Disable CPU
+		NoCPU:      true, // Disable CPU
 		GPUEnabled: true,
 		OpenCL:     true,  // AMD GPU
 		CUDA:       true,  // Also NVIDIA

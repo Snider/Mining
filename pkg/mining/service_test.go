@@ -30,10 +30,10 @@ type MockMiner struct {
 	WriteStdinFunc            func(input string) error
 }
 
-func (m *MockMiner) Install() error                         { return m.InstallFunc() }
-func (m *MockMiner) Uninstall() error                       { return m.UninstallFunc() }
-func (m *MockMiner) Start(config *Config) error             { return m.StartFunc(config) }
-func (m *MockMiner) Stop() error                            { return m.StopFunc() }
+func (m *MockMiner) Install() error             { return m.InstallFunc() }
+func (m *MockMiner) Uninstall() error           { return m.UninstallFunc() }
+func (m *MockMiner) Start(config *Config) error { return m.StartFunc(config) }
+func (m *MockMiner) Stop() error                { return m.StopFunc() }
 func (m *MockMiner) GetStats(ctx context.Context) (*PerformanceMetrics, error) {
 	return m.GetStatsFunc(ctx)
 }
@@ -43,9 +43,9 @@ func (m *MockMiner) GetType() string {
 	}
 	return "mock"
 }
-func (m *MockMiner) GetName() string                        { return m.GetNameFunc() }
-func (m *MockMiner) GetPath() string                        { return m.GetPathFunc() }
-func (m *MockMiner) GetBinaryPath() string                  { return m.GetBinaryPathFunc() }
+func (m *MockMiner) GetName() string       { return m.GetNameFunc() }
+func (m *MockMiner) GetPath() string       { return m.GetPathFunc() }
+func (m *MockMiner) GetBinaryPath() string { return m.GetBinaryPathFunc() }
 func (m *MockMiner) CheckInstallation() (*InstallationDetails, error) {
 	return m.CheckInstallationFunc()
 }

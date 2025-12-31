@@ -99,21 +99,33 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	// Capture cmd locally to avoid race with Stop()
 	cmd := m.cmd
+	minerName := m.Name // Capture name for logging
 	go func() {
 		// Use a channel to detect if Wait() completes
 		done := make(chan struct{})
+		var waitErr error
 		go func() {
-			cmd.Wait()
+			waitErr = cmd.Wait()
 			close(done)
 		}()
 
 		// Wait with timeout to prevent goroutine leak on zombie processes
 		select {
 		case <-done:
-			// Normal exit
+			// Normal exit - log the exit status
+			if waitErr != nil {
+				logging.Info("miner process exited", logging.Fields{
+					"miner": minerName,
+					"error": waitErr.Error(),
+				})
+			} else {
+				logging.Info("miner process exited normally", logging.Fields{
+					"miner": minerName,
+				})
+			}
 		case <-time.After(5 * time.Minute):
 			// Process didn't exit after 5 minutes - force cleanup
-			logging.Warn("miner process wait timeout, forcing cleanup", logging.Fields{"miner": m.Name})
+			logging.Warn("miner process wait timeout, forcing cleanup", logging.Fields{"miner": minerName})
 			if cmd.Process != nil {
 				cmd.Process.Kill()
 			}
@@ -122,7 +134,7 @@ func (m *XMRigMiner) Start(config *Config) error {
 			case <-done:
 				// Inner goroutine completed
 			case <-time.After(10 * time.Second):
-				logging.Error("process cleanup timed out after kill", logging.Fields{"miner": m.Name})
+				logging.Error("process cleanup timed out after kill", logging.Fields{"miner": minerName})
 			}
 		}
 

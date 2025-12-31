@@ -12,11 +12,11 @@ type MessageType string
 
 const (
 	// Connection lifecycle
-	MsgHandshake MessageType = "handshake"
+	MsgHandshake    MessageType = "handshake"
 	MsgHandshakeAck MessageType = "handshake_ack"
-	MsgPing      MessageType = "ping"
-	MsgPong      MessageType = "pong"
-	MsgDisconnect MessageType = "disconnect"
+	MsgPing         MessageType = "ping"
+	MsgPong         MessageType = "pong"
+	MsgDisconnect   MessageType = "disconnect"
 
 	// Miner operations
 	MsgGetStats   MessageType = "get_stats"
@@ -39,10 +39,10 @@ const (
 
 // Message represents a P2P message between nodes.
 type Message struct {
-	ID        string          `json:"id"`        // UUID
+	ID        string          `json:"id"` // UUID
 	Type      MessageType     `json:"type"`
-	From      string          `json:"from"`      // Sender node ID
-	To        string          `json:"to"`        // Recipient node ID (empty for broadcast)
+	From      string          `json:"from"` // Sender node ID
+	To        string          `json:"to"`   // Recipient node ID (empty for broadcast)
 	Timestamp time.Time       `json:"ts"`
 	Payload   json.RawMessage `json:"payload"`
 	ReplyTo   string          `json:"replyTo,omitempty"` // ID of message being replied to
@@ -98,10 +98,10 @@ type HandshakePayload struct {
 
 // HandshakeAckPayload is the response to a handshake.
 type HandshakeAckPayload struct {
-	Identity        NodeIdentity `json:"identity"`
-	ChallengeResponse []byte     `json:"challengeResponse,omitempty"`
-	Accepted        bool         `json:"accepted"`
-	Reason          string       `json:"reason,omitempty"` // If not accepted
+	Identity          NodeIdentity `json:"identity"`
+	ChallengeResponse []byte       `json:"challengeResponse,omitempty"`
+	Accepted          bool         `json:"accepted"`
+	Reason            string       `json:"reason,omitempty"` // If not accepted
 }
 
 // PingPayload for keepalive/latency measurement.
@@ -117,7 +117,7 @@ type PongPayload struct {
 
 // StartMinerPayload requests starting a miner.
 type StartMinerPayload struct {
-	MinerType string          `json:"minerType"`           // Required: miner type (e.g., "xmrig", "tt-miner")
+	MinerType string          `json:"minerType"` // Required: miner type (e.g., "xmrig", "tt-miner")
 	ProfileID string          `json:"profileId,omitempty"`
 	Config    json.RawMessage `json:"config,omitempty"` // Override profile config
 }
@@ -158,7 +158,7 @@ type StatsPayload struct {
 // GetLogsPayload requests console logs from a miner.
 type GetLogsPayload struct {
 	MinerName string `json:"minerName"`
-	Lines     int    `json:"lines"` // Number of lines to fetch
+	Lines     int    `json:"lines"`           // Number of lines to fetch
 	Since     int64  `json:"since,omitempty"` // Unix timestamp, logs after this time
 }
 

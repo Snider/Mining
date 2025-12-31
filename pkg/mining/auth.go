@@ -69,16 +69,29 @@ func AuthConfigFromEnv() AuthConfig {
 
 // DigestAuth implements HTTP Digest Authentication middleware
 type DigestAuth struct {
-	config AuthConfig
-	nonces sync.Map // map[string]time.Time for nonce expiry tracking
+	config   AuthConfig
+	nonces   sync.Map // map[string]time.Time for nonce expiry tracking
+	stopChan chan struct{}
+	stopOnce sync.Once
 }
 
 // NewDigestAuth creates a new digest auth middleware
 func NewDigestAuth(config AuthConfig) *DigestAuth {
-	da := &DigestAuth{config: config}
+	da := &DigestAuth{
+		config:   config,
+		stopChan: make(chan struct{}),
+	}
 	// Start nonce cleanup goroutine
 	go da.cleanupNonces()
 	return da
+}
+
+// Stop gracefully shuts down the DigestAuth, stopping the cleanup goroutine.
+// Safe to call multiple times.
+func (da *DigestAuth) Stop() {
+	da.stopOnce.Do(func() {
+		close(da.stopChan)
+	})
 }
 
 // Middleware returns a Gin middleware that enforces digest authentication
@@ -209,14 +222,19 @@ func (da *DigestAuth) cleanupNonces() {
 	ticker := time.NewTicker(da.config.NonceExpiry)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		da.nonces.Range(func(key, value interface{}) bool {
-			if now.Sub(value.(time.Time)) > da.config.NonceExpiry {
-				da.nonces.Delete(key)
-			}
-			return true
-		})
+	for {
+		select {
+		case <-da.stopChan:
+			return
+		case <-ticker.C:
+			now := time.Now()
+			da.nonces.Range(func(key, value interface{}) bool {
+				if now.Sub(value.(time.Time)) > da.config.NonceExpiry {
+					da.nonces.Delete(key)
+				}
+				return true
+			})
+		}
 	}
 }
 

@@ -218,7 +218,6 @@ func (c *Container) ProfileManager() *ProfileManager {
 	return c.profileManager
 }
 
-
 // NodeService returns the node service (may be nil if P2P is unavailable).
 func (c *Container) NodeService() *NodeService {
 	c.mu.RLock()

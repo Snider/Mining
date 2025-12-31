@@ -8,12 +8,19 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Snider/Borg/pkg/smsg"
 	"github.com/Snider/Mining/pkg/logging"
 	"github.com/gorilla/websocket"
 )
+
+// debugLogCounter tracks message counts for rate limiting debug logs
+var debugLogCounter atomic.Int64
+
+// debugLogInterval controls how often we log debug messages in hot paths (1 in N)
+const debugLogInterval = 100
 
 // TransportConfig configures the WebSocket transport.
 type TransportConfig struct {
@@ -404,28 +411,28 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 
 	msg, err := NewMessage(MsgHandshake, identity.ID, pc.Peer.ID, payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("create handshake message: %w", err)
 	}
 
 	// First message is unencrypted (peer needs our public key)
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal handshake message: %w", err)
 	}
 
 	if err := pc.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
-		return err
+		return fmt.Errorf("send handshake: %w", err)
 	}
 
 	// Wait for ack
 	_, ackData, err := pc.Conn.ReadMessage()
 	if err != nil {
-		return err
+		return fmt.Errorf("read handshake ack: %w", err)
 	}
 
 	var ackMsg Message
 	if err := json.Unmarshal(ackData, &ackMsg); err != nil {
-		return err
+		return fmt.Errorf("unmarshal handshake ack: %w", err)
 	}
 
 	if ackMsg.Type != MsgHandshakeAck {
@@ -434,7 +441,7 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 
 	var ackPayload HandshakeAckPayload
 	if err := ackMsg.ParsePayload(&ackPayload); err != nil {
-		return err
+		return fmt.Errorf("parse handshake ack payload: %w", err)
 	}
 
 	if !ackPayload.Accepted {
@@ -490,7 +497,10 @@ func (t *Transport) readLoop(pc *PeerConnection) {
 			continue // Skip invalid messages
 		}
 
-		logging.Debug("received message from peer", logging.Fields{"type": msg.Type, "peer_id": pc.Peer.ID, "reply_to": msg.ReplyTo})
+		// Rate limit debug logs in hot path to reduce noise (log 1 in N messages)
+		if debugLogCounter.Add(1)%debugLogInterval == 0 {
+			logging.Debug("received message from peer", logging.Fields{"type": msg.Type, "peer_id": pc.Peer.ID, "reply_to": msg.ReplyTo, "sample": "1/100"})
+		}
 
 		// Dispatch to handler (read handler under lock to avoid race)
 		t.mu.RLock()

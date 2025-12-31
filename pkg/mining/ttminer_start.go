@@ -197,10 +197,10 @@ func isValidCLIArg(arg string) bool {
 	// Block arguments that could override security-related settings
 	blockedPrefixes := []string{
 		"--api-access-token", "--api-worker-id", // TT-Miner API settings
-		"--config",       // Could load arbitrary config
-		"--log-file",     // Could write to arbitrary locations
-		"--coin-file",    // Could load arbitrary coin configs
-		"-o", "--out",    // Output redirection
+		"--config",    // Could load arbitrary config
+		"--log-file",  // Could write to arbitrary locations
+		"--coin-file", // Could load arbitrary coin configs
+		"-o", "--out", // Output redirection
 	}
 	lowerArg := strings.ToLower(arg)
 	for _, blocked := range blockedPrefixes {

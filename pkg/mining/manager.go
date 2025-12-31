@@ -312,6 +312,7 @@ func (m *Manager) StartMiner(ctx context.Context, minerType string, config *Conf
 		Name: instanceName,
 	})
 
+	RecordMinerStart()
 	return miner, nil
 }
 
@@ -454,6 +455,7 @@ func (m *Manager) StopMiner(ctx context.Context, name string) error {
 		return stopErr
 	}
 
+	RecordMinerStop()
 	return nil
 }
 
@@ -574,20 +576,54 @@ func (m *Manager) collectMinerStats() {
 	wg.Wait()
 }
 
-// collectSingleMinerStats collects stats from a single miner.
+// statsRetryCount is the number of retries for transient stats failures.
+const statsRetryCount = 2
+
+// statsRetryDelay is the delay between stats collection retries.
+const statsRetryDelay = 500 * time.Millisecond
+
+// collectSingleMinerStats collects stats from a single miner with retry logic.
 // This is called concurrently for each miner.
 func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now time.Time, dbEnabled bool) {
 	minerName := miner.GetName()
 
-	// Use context with timeout to prevent hanging on unresponsive miner APIs
-	ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
-	defer cancel() // Ensure context is released after all operations
+	var stats *PerformanceMetrics
+	var lastErr error
 
-	stats, err := miner.GetStats(ctx)
-	if err != nil {
-		logging.Error("failed to get miner stats", logging.Fields{"miner": minerName, "error": err})
+	// Retry loop for transient failures
+	for attempt := 0; attempt <= statsRetryCount; attempt++ {
+		// Use context with timeout to prevent hanging on unresponsive miner APIs
+		ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
+		stats, lastErr = miner.GetStats(ctx)
+		cancel() // Release context immediately
+
+		if lastErr == nil {
+			break // Success
+		}
+
+		// Log retry attempts at debug level
+		if attempt < statsRetryCount {
+			logging.Debug("retrying stats collection", logging.Fields{
+				"miner":   minerName,
+				"attempt": attempt + 1,
+				"error":   lastErr.Error(),
+			})
+			time.Sleep(statsRetryDelay)
+		}
+	}
+
+	if lastErr != nil {
+		logging.Error("failed to get miner stats after retries", logging.Fields{
+			"miner":   minerName,
+			"error":   lastErr.Error(),
+			"retries": statsRetryCount,
+		})
+		RecordStatsCollection(true, true)
 		return
 	}
+
+	// Record stats collection (retried if we did any retries)
+	RecordStatsCollection(stats != nil && lastErr == nil, false)
 
 	point := HashratePoint{
 		Timestamp: now,
@@ -605,10 +641,12 @@ func (m *Manager) collectSingleMinerStats(miner Miner, minerType string, now tim
 			Timestamp: point.Timestamp,
 			Hashrate:  point.Hashrate,
 		}
-		// Use the same context for DB writes so they respect timeout/cancellation
-		if err := database.InsertHashratePoint(ctx, minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
+		// Create a new context for DB writes (original context is from retry loop)
+		dbCtx, dbCancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
+		if err := database.InsertHashratePoint(dbCtx, minerName, minerType, dbPoint, database.ResolutionHigh); err != nil {
 			logging.Warn("failed to persist hashrate", logging.Fields{"miner": minerName, "error": err})
 		}
+		dbCancel()
 	}
 
 	// Emit stats event for real-time WebSocket updates

@@ -15,31 +15,31 @@ const MinerTypeSimulated = "simulated"
 // SimulatedMiner is a mock miner that generates realistic-looking stats for UI testing.
 type SimulatedMiner struct {
 	// Exported fields for JSON serialization
-	Name             string           `json:"name"`
-	MinerType        string           `json:"miner_type"`
-	Version          string           `json:"version"`
-	URL              string           `json:"url"`
-	Path             string           `json:"path"`
-	MinerBinary      string           `json:"miner_binary"`
-	Running          bool             `json:"running"`
-	Algorithm        string           `json:"algorithm"`
-	HashrateHistory  []HashratePoint  `json:"hashrateHistory"`
-	LowResHistory    []HashratePoint  `json:"lowResHashrateHistory"`
-	Stats            *PerformanceMetrics `json:"stats,omitempty"`
-	FullStats        *XMRigSummary       `json:"full_stats,omitempty"` // XMRig-compatible format for UI
+	Name            string              `json:"name"`
+	MinerType       string              `json:"miner_type"`
+	Version         string              `json:"version"`
+	URL             string              `json:"url"`
+	Path            string              `json:"path"`
+	MinerBinary     string              `json:"miner_binary"`
+	Running         bool                `json:"running"`
+	Algorithm       string              `json:"algorithm"`
+	HashrateHistory []HashratePoint     `json:"hashrateHistory"`
+	LowResHistory   []HashratePoint     `json:"lowResHashrateHistory"`
+	Stats           *PerformanceMetrics `json:"stats,omitempty"`
+	FullStats       *XMRigSummary       `json:"full_stats,omitempty"` // XMRig-compatible format for UI
 
 	// Internal fields (not exported)
-	baseHashrate     int
-	peakHashrate     int
-	variance         float64
-	startTime        time.Time
-	shares           int
-	rejected         int
-	logs             []string
-	mu               sync.RWMutex
-	stopChan         chan struct{}
-	poolName         string
-	difficultyBase   int
+	baseHashrate   int
+	peakHashrate   int
+	variance       float64
+	startTime      time.Time
+	shares         int
+	rejected       int
+	logs           []string
+	mu             sync.RWMutex
+	stopChan       chan struct{}
+	poolName       string
+	difficultyBase int
 }
 
 // SimulatedMinerConfig holds configuration for creating a simulated miner.
