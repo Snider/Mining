@@ -52,7 +52,7 @@ type Message struct {
 func NewMessage(msgType MessageType, from, to string, payload interface{}) (*Message, error) {
 	var payloadBytes json.RawMessage
 	if payload != nil {
-		data, err := json.Marshal(payload)
+		data, err := MarshalJSON(payload)
 		if err != nil {
 			return nil, err
 		}

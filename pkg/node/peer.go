@@ -338,6 +338,95 @@ func (r *PeerRegistry) SetConnected(id string, connected bool) {
 	}
 }
 
+// Score adjustment constants
+const (
+	ScoreSuccessIncrement = 1.0   // Increment for successful interaction
+	ScoreFailureDecrement = 5.0   // Decrement for failed interaction
+	ScoreTimeoutDecrement = 3.0   // Decrement for timeout
+	ScoreMinimum          = 0.0   // Minimum score
+	ScoreMaximum          = 100.0 // Maximum score
+	ScoreDefault          = 50.0  // Default score for new peers
+)
+
+// RecordSuccess records a successful interaction with a peer, improving their score.
+func (r *PeerRegistry) RecordSuccess(id string) {
+	r.mu.Lock()
+	peer, exists := r.peers[id]
+	if !exists {
+		r.mu.Unlock()
+		return
+	}
+
+	peer.Score = min(peer.Score+ScoreSuccessIncrement, ScoreMaximum)
+	peer.LastSeen = time.Now()
+	r.mu.Unlock()
+	r.save()
+}
+
+// RecordFailure records a failed interaction with a peer, reducing their score.
+func (r *PeerRegistry) RecordFailure(id string) {
+	r.mu.Lock()
+	peer, exists := r.peers[id]
+	if !exists {
+		r.mu.Unlock()
+		return
+	}
+
+	peer.Score = max(peer.Score-ScoreFailureDecrement, ScoreMinimum)
+	newScore := peer.Score
+	r.mu.Unlock()
+	r.save()
+
+	logging.Debug("peer score decreased", logging.Fields{
+		"peer_id":   id,
+		"new_score": newScore,
+		"reason":    "failure",
+	})
+}
+
+// RecordTimeout records a timeout when communicating with a peer.
+func (r *PeerRegistry) RecordTimeout(id string) {
+	r.mu.Lock()
+	peer, exists := r.peers[id]
+	if !exists {
+		r.mu.Unlock()
+		return
+	}
+
+	peer.Score = max(peer.Score-ScoreTimeoutDecrement, ScoreMinimum)
+	newScore := peer.Score
+	r.mu.Unlock()
+	r.save()
+
+	logging.Debug("peer score decreased", logging.Fields{
+		"peer_id":   id,
+		"new_score": newScore,
+		"reason":    "timeout",
+	})
+}
+
+// GetPeersByScore returns peers sorted by score (highest first).
+func (r *PeerRegistry) GetPeersByScore() []*Peer {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	peers := make([]*Peer, 0, len(r.peers))
+	for _, p := range r.peers {
+		peers = append(peers, p)
+	}
+
+	// Sort by score descending
+	for i := 0; i < len(peers)-1; i++ {
+		for j := i + 1; j < len(peers); j++ {
+			if peers[j].Score > peers[i].Score {
+				peers[i], peers[j] = peers[j], peers[i]
+			}
+		}
+	}
+
+	return peers
+}
+
 // SelectOptimalPeer returns the best peer based on multi-factor optimization.
 // Uses Poindexter KD-tree to find the peer closest to ideal metrics.
 func (r *PeerRegistry) SelectOptimalPeer() *Peer {

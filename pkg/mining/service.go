@@ -578,7 +578,7 @@ func (s *Service) handleReady(c *gin.Context) {
 func (s *Service) handleGetInfo(c *gin.Context) {
 	systemInfo, err := s.updateInstallationCache()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get system info", "details": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to get system info").WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, systemInfo)
@@ -644,7 +644,7 @@ func (s *Service) updateInstallationCache() (*SystemInfo, error) {
 func (s *Service) handleDoctor(c *gin.Context) {
 	systemInfo, err := s.updateInstallationCache()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update cache", "details": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to update cache").WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, systemInfo)
@@ -709,7 +709,7 @@ func (s *Service) handleUpdateCheck(c *gin.Context) {
 func (s *Service) handleUninstallMiner(c *gin.Context) {
 	minerType := c.Param("miner_name")
 	if err := s.Manager.UninstallMiner(c.Request.Context(), minerType); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to uninstall miner").WithCause(err))
 		return
 	}
 	if _, err := s.updateInstallationCache(); err != nil {
@@ -754,12 +754,12 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 	minerType := c.Param("miner_name")
 	miner, err := CreateMiner(minerType)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown miner type"})
+		respondWithMiningError(c, ErrUnsupportedMiner(minerType))
 		return
 	}
 
 	if err := miner.Install(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrInstallFailed(minerType).WithCause(err))
 		return
 	}
 
@@ -769,7 +769,7 @@ func (s *Service) handleInstallMiner(c *gin.Context) {
 
 	details, err := miner.CheckInstallation()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify installation", "details": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to verify installation").WithCause(err))
 		return
 	}
 
@@ -794,13 +794,13 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 
 	var config Config
 	if err := json.Unmarshal(profile.Config, &config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse profile config", "details": err.Error()})
+		respondWithMiningError(c, ErrInvalidConfig("failed to parse profile config").WithCause(err))
 		return
 	}
 
 	miner, err := s.Manager.StartMiner(c.Request.Context(), profile.MinerType, &config)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrStartFailed(profile.Name).WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, miner)
@@ -817,7 +817,7 @@ func (s *Service) handleStartMinerWithProfile(c *gin.Context) {
 func (s *Service) handleStopMiner(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	if err := s.Manager.StopMiner(c.Request.Context(), minerName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrStopFailed(minerName).WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "stopped"})
@@ -840,7 +840,7 @@ func (s *Service) handleGetMinerStats(c *gin.Context) {
 	}
 	stats, err := miner.GetStats(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to get miner stats").WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, stats)
@@ -858,7 +858,7 @@ func (s *Service) handleGetMinerHashrateHistory(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	history, err := s.Manager.GetMinerHashrateHistory(minerName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrMinerNotFound(minerName).WithCause(err))
 		return
 	}
 	c.JSON(http.StatusOK, history)
@@ -915,12 +915,12 @@ func (s *Service) handleMinerStdin(c *gin.Context) {
 
 	var input StdinInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input: " + err.Error()})
+		respondWithMiningError(c, ErrInvalidConfig("invalid input format").WithCause(err))
 		return
 	}
 
 	if err := miner.WriteStdin(input.Input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrInternal("failed to write to stdin").WithCause(err))
 		return
 	}
 
@@ -1075,13 +1075,13 @@ func (s *Service) handleHistoryStatus(c *gin.Context) {
 func (s *Service) handleAllMinersHistoricalStats(c *gin.Context) {
 	manager, ok := s.Manager.(*Manager)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		respondWithMiningError(c, ErrInternal("manager type not supported"))
 		return
 	}
 
 	stats, err := manager.GetAllMinerHistoricalStats()
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrDatabaseError("get historical stats").WithCause(err))
 		return
 	}
 
@@ -1100,18 +1100,18 @@ func (s *Service) handleMinerHistoricalStats(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	manager, ok := s.Manager.(*Manager)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		respondWithMiningError(c, ErrInternal("manager type not supported"))
 		return
 	}
 
 	stats, err := manager.GetMinerHistoricalStats(minerName)
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrDatabaseError("get miner stats").WithCause(err))
 		return
 	}
 
 	if stats == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no historical data found for miner"})
+		respondWithMiningError(c, ErrMinerNotFound(minerName).WithDetails("no historical data found"))
 		return
 	}
 
@@ -1132,7 +1132,7 @@ func (s *Service) handleMinerHistoricalHashrate(c *gin.Context) {
 	minerName := c.Param("miner_name")
 	manager, ok := s.Manager.(*Manager)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "manager type not supported"})
+		respondWithMiningError(c, ErrInternal("manager type not supported"))
 		return
 	}
 
@@ -1153,7 +1153,7 @@ func (s *Service) handleMinerHistoricalHashrate(c *gin.Context) {
 
 	history, err := manager.GetMinerHistoricalHashrate(minerName, since, until)
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		respondWithMiningError(c, ErrDatabaseError("get hashrate history").WithCause(err))
 		return
 	}
 

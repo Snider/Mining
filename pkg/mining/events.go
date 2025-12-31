@@ -156,7 +156,7 @@ func (h *EventHub) Run() {
 							Timestamp: time.Now(),
 							Data:      state,
 						}
-						data, err := json.Marshal(event)
+						data, err := MarshalJSON(event)
 						if err != nil {
 							logging.Error("failed to marshal state sync", logging.Fields{"error": err})
 							return
@@ -180,7 +180,7 @@ func (h *EventHub) Run() {
 			logging.Debug("client disconnected", logging.Fields{"total": len(h.clients)})
 
 		case event := <-h.broadcast:
-			data, err := json.Marshal(event)
+			data, err := MarshalJSON(event)
 			if err != nil {
 				logging.Error("failed to marshal event", logging.Fields{"error": err})
 				continue

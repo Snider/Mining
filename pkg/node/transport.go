@@ -245,10 +245,10 @@ func (t *Transport) Start() error {
 func (t *Transport) Stop() error {
 	t.cancel()
 
-	// Close all connections
+	// Gracefully close all connections with shutdown message
 	t.mu.Lock()
 	for _, pc := range t.conns {
-		pc.Close()
+		pc.GracefulClose("server shutdown", DisconnectShutdown)
 	}
 	t.mu.Unlock()
 
@@ -450,7 +450,7 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 				Reason:   "peer not authorized",
 			}
 			rejectMsg, _ := NewMessage(MsgHandshakeAck, identity.ID, payload.Identity.ID, rejectPayload)
-			if rejectData, err := json.Marshal(rejectMsg); err == nil {
+			if rejectData, err := MarshalJSON(rejectMsg); err == nil {
 				conn.WriteMessage(websocket.TextMessage, rejectData)
 			}
 		}
@@ -512,7 +512,7 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// First ack is unencrypted (peer needs to know our public key)
-	ackData, err := json.Marshal(ackMsg)
+	ackData, err := MarshalJSON(ackMsg)
 	if err != nil {
 		conn.Close()
 		return
@@ -575,7 +575,7 @@ func (t *Transport) performHandshake(pc *PeerConnection) error {
 	}
 
 	// First message is unencrypted (peer needs our public key)
-	data, err := json.Marshal(msg)
+	data, err := MarshalJSON(msg)
 	if err != nil {
 		return fmt.Errorf("marshal handshake message: %w", err)
 	}
@@ -788,10 +788,52 @@ func (pc *PeerConnection) Close() error {
 	return err
 }
 
+// DisconnectPayload contains reason for disconnect.
+type DisconnectPayload struct {
+	Reason string `json:"reason"`
+	Code   int    `json:"code"` // Optional disconnect code
+}
+
+// Disconnect codes
+const (
+	DisconnectNormal      = 1000 // Normal closure
+	DisconnectGoingAway   = 1001 // Server/peer going away
+	DisconnectProtocolErr = 1002 // Protocol error
+	DisconnectTimeout     = 1003 // Idle timeout
+	DisconnectShutdown    = 1004 // Server shutdown
+)
+
+// GracefulClose sends a disconnect message before closing the connection.
+func (pc *PeerConnection) GracefulClose(reason string, code int) error {
+	var err error
+	pc.closeOnce.Do(func() {
+		// Try to send disconnect message (best effort)
+		if pc.transport != nil && pc.SharedSecret != nil {
+			identity := pc.transport.node.GetIdentity()
+			if identity != nil {
+				payload := DisconnectPayload{
+					Reason: reason,
+					Code:   code,
+				}
+				msg, msgErr := NewMessage(MsgDisconnect, identity.ID, pc.Peer.ID, payload)
+				if msgErr == nil {
+					// Set short deadline for disconnect message
+					pc.Conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+					pc.Send(msg)
+				}
+			}
+		}
+
+		// Close the underlying connection
+		err = pc.Conn.Close()
+	})
+	return err
+}
+
 // encryptMessage encrypts a message using SMSG with the shared secret.
 func (t *Transport) encryptMessage(msg *Message, sharedSecret []byte) ([]byte, error) {
-	// Serialize message to JSON
-	msgData, err := json.Marshal(msg)
+	// Serialize message to JSON (using pooled buffer for efficiency)
+	msgData, err := MarshalJSON(msg)
 	if err != nil {
 		return nil, err
 	}
