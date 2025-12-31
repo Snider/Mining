@@ -353,3 +353,145 @@ func TestIsInitialized(t *testing.T) {
 		t.Error("Should not be initialized after Close()")
 	}
 }
+
+func TestSchemaCreation(t *testing.T) {
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Verify tables exist by querying sqlite_master
+	dbMu.RLock()
+	defer dbMu.RUnlock()
+
+	// Check hashrate_history table
+	var tableName string
+	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='hashrate_history'").Scan(&tableName)
+	if err != nil {
+		t.Errorf("hashrate_history table should exist: %v", err)
+	}
+
+	// Check miner_sessions table
+	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='miner_sessions'").Scan(&tableName)
+	if err != nil {
+		t.Errorf("miner_sessions table should exist: %v", err)
+	}
+
+	// Verify indexes exist
+	var indexName string
+	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_hashrate_miner_time'").Scan(&indexName)
+	if err != nil {
+		t.Errorf("idx_hashrate_miner_time index should exist: %v", err)
+	}
+
+	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_sessions_miner'").Scan(&indexName)
+	if err != nil {
+		t.Errorf("idx_sessions_miner index should exist: %v", err)
+	}
+}
+
+func TestReInitializeExistingDB(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "reinit_test.db")
+
+	cfg := Config{
+		Enabled:       true,
+		Path:          dbPath,
+		RetentionDays: 7,
+	}
+
+	// First initialization
+	if err := Initialize(cfg); err != nil {
+		t.Fatalf("First initialization failed: %v", err)
+	}
+
+	// Insert some data
+	minerName := "reinit-test-miner"
+	point := HashratePoint{
+		Timestamp: time.Now(),
+		Hashrate:  1234,
+	}
+	if err := InsertHashratePoint(nil, minerName, "xmrig", point, ResolutionHigh); err != nil {
+		t.Fatalf("Failed to insert point: %v", err)
+	}
+
+	// Close and re-initialize (simulates app restart)
+	if err := Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	// Re-initialize with same path
+	if err := Initialize(cfg); err != nil {
+		t.Fatalf("Re-initialization failed: %v", err)
+	}
+	defer func() {
+		Close()
+		os.Remove(dbPath)
+	}()
+
+	// Verify data persisted
+	history, err := GetHashrateHistory(minerName, ResolutionHigh, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("Failed to get history after reinit: %v", err)
+	}
+
+	if len(history) != 1 {
+		t.Errorf("Expected 1 point after reinit, got %d", len(history))
+	}
+
+	if len(history) > 0 && history[0].Hashrate != 1234 {
+		t.Errorf("Expected hashrate 1234, got %d", history[0].Hashrate)
+	}
+}
+
+func TestConcurrentDatabaseAccess(t *testing.T) {
+	cleanup := setupTestDB(t)
+	defer cleanup()
+
+	const numGoroutines = 10
+	const numOpsPerGoroutine = 20
+
+	done := make(chan bool, numGoroutines)
+	errors := make(chan error, numGoroutines*numOpsPerGoroutine)
+
+	now := time.Now()
+
+	// Launch multiple goroutines doing concurrent reads/writes
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			minerName := "concurrent-miner-" + string(rune('A'+id))
+			for j := 0; j < numOpsPerGoroutine; j++ {
+				// Write
+				point := HashratePoint{
+					Timestamp: now.Add(time.Duration(-j) * time.Second),
+					Hashrate:  1000 + j,
+				}
+				if err := InsertHashratePoint(nil, minerName, "xmrig", point, ResolutionHigh); err != nil {
+					errors <- err
+				}
+
+				// Read
+				_, err := GetHashrateHistory(minerName, ResolutionHigh, now.Add(-time.Hour), now)
+				if err != nil {
+					errors <- err
+				}
+			}
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+	close(errors)
+
+	// Check for errors
+	var errCount int
+	for err := range errors {
+		t.Errorf("Concurrent access error: %v", err)
+		errCount++
+	}
+
+	if errCount > 0 {
+		t.Errorf("Got %d errors during concurrent access", errCount)
+	}
+}
