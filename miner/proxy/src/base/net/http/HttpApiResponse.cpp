@@ -56,7 +56,7 @@ void xmrig::HttpApiResponse::end()
     setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE");
     setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 
-    // Security headers
+    // SECURITY FIX (MED-002): Add standard security headers
     setHeader("X-Content-Type-Options", "nosniff");
     setHeader("X-Frame-Options", "DENY");
     setHeader("Content-Security-Policy", "default-src 'none'");

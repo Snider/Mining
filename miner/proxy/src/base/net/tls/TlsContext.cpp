@@ -273,15 +273,12 @@ void xmrig::TlsContext::setProtocols(uint32_t protocols)
         return;
     }
 
-    if (!(protocols & TlsConfig::TLSv1)) {
-        SSL_CTX_set_options(m_ctx, SSL_OP_NO_TLSv1);
-    }
+    // SECURITY FIX (HIGH-005): Always disable TLSv1.0 and TLSv1.1
+    // These protocols have known vulnerabilities (BEAST, POODLE)
+    SSL_CTX_set_options(m_ctx, SSL_OP_NO_TLSv1);
 
 #   ifdef SSL_OP_NO_TLSv1_1
-    SSL_CTX_clear_options(m_ctx, SSL_OP_NO_TLSv1_1);
-    if (!(protocols & TlsConfig::TLSv1_1)) {
-        SSL_CTX_set_options(m_ctx, SSL_OP_NO_TLSv1_1);
-    }
+    SSL_CTX_set_options(m_ctx, SSL_OP_NO_TLSv1_1);
 #   endif
 
 #   ifdef SSL_OP_NO_TLSv1_2

@@ -744,6 +744,7 @@ void xmrig::Client::parse(char *line, size_t len)
         return reconnect();
     }
 
+    // NOTE (HIGH-023): IsInt64() check ensures safe access to GetInt64()
     if (id.IsInt64()) {
         return parseResponse(id.GetInt64(), Json::getValue(doc, "result"), error);
     }

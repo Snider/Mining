@@ -58,6 +58,9 @@ xmrig::Signals::~Signals()
 }
 
 
+// NOTE (HIGH-008): This callback is invoked from the libuv event loop, NOT directly
+// from a signal handler. libuv internally handles signal safety and defers to the
+// event loop, making these LOG_* calls safe. Do NOT convert to direct signal() handler.
 void xmrig::Signals::onSignal(uv_signal_t *handle, int signum)
 {
     switch (signum)

@@ -37,9 +37,10 @@ static std::map<uint64_t, HttpContext *> storage;
 static uint64_t SEQUENCE = 0;
 
 // SECURITY FIX: Add size limits to prevent DoS via memory exhaustion
-static constexpr size_t MAX_HTTP_BODY_SIZE   = 1024 * 1024;  // 1 MB
-static constexpr size_t MAX_HTTP_HEADER_SIZE = 8192;         // 8 KB per header
-static constexpr size_t MAX_HTTP_URL_SIZE    = 8192;         // 8 KB
+static constexpr size_t MAX_HTTP_BODY_SIZE    = 1024 * 1024;  // 1 MB
+static constexpr size_t MAX_HTTP_HEADER_SIZE  = 8192;         // 8 KB per header
+static constexpr size_t MAX_HTTP_URL_SIZE     = 8192;         // 8 KB
+static constexpr size_t MAX_HTTP_HEADER_COUNT = 64;           // Max number of headers
 
 
 class HttpWriteBaton : public Baton<uv_write_t>
@@ -249,7 +250,7 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
     settings->on_url = [](llhttp_t *parser, const char *at, size_t length) -> int
     {
-        // SECURITY FIX: Limit URL size to prevent memory exhaustion
+        // SECURITY FIX (MED-007): Limit URL size to prevent memory exhaustion
         if (length > MAX_HTTP_URL_SIZE) {
             return HPE_USER;
         }
@@ -305,6 +306,13 @@ void xmrig::HttpContext::attach(llhttp_settings_t *settings)
 
 void xmrig::HttpContext::setHeader()
 {
+    // SECURITY FIX (CRIT-017): Limit header count to prevent memory exhaustion
+    if (headers.size() >= MAX_HTTP_HEADER_COUNT) {
+        m_lastHeaderField.clear();
+        m_lastHeaderValue.clear();
+        return;
+    }
+
     std::transform(m_lastHeaderField.begin(), m_lastHeaderField.end(), m_lastHeaderField.begin(), ::tolower);
     headers.insert({ m_lastHeaderField, m_lastHeaderValue });
 

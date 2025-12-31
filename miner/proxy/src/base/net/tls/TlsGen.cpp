@@ -117,7 +117,9 @@ bool xmrig::TlsGen::generate_x509(const char *commonName)
 
     ASN1_INTEGER_set(X509_get_serialNumber(m_x509), 1);
     X509_gmtime_adj(X509_get_notBefore(m_x509), 0);
-    X509_gmtime_adj(X509_get_notAfter(m_x509), 315360000L);
+    // SECURITY FIX (MED-009): Reduce cert validity from 10 years to 1 year
+    // Industry best practice is max 1 year for self-signed certificates
+    X509_gmtime_adj(X509_get_notAfter(m_x509), 31536000L);  // 365 days
 
     auto name = X509_get_subject_name(m_x509);
     X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<const uint8_t *>(commonName), -1, -1, 0);

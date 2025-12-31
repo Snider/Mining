@@ -124,12 +124,10 @@ bool xmrig::BindHost::parseHost(const char *host)
             return false;
         }
 
-        const size_t size = end - host;
-        char *buf         = new char[size]();
-        memcpy(buf, host + 1, size - 1);
-
+        // SECURITY FIX (HIGH-011): Use String copy constructor instead of raw new[]
+        const size_t size = end - host - 1;  // Length of content between brackets
         m_version = 6;
-        m_host    = buf;
+        m_host    = String(host + 1, size);
     }
     else {
         m_version = strchr(host, ':') != nullptr ? 6 : 4;
@@ -147,12 +145,11 @@ void xmrig::BindHost::parseIPv4(const char *addr)
         return;
     }
 
+    // SECURITY FIX (HIGH-011): Use String copy constructor instead of raw new[]
     m_version = 4;
-    const size_t size = port++ - addr + 1;
-    char *host = new char[size]();
-    memcpy(host, addr, size - 1);
-
-    m_host = host;
+    const size_t size = port - addr;  // Length of host part
+    m_host = String(addr, size);
+    port++;  // Move past ':'
 
     // SECURITY FIX: Validate strtol result
     char *endptr = nullptr;
@@ -175,12 +172,10 @@ void xmrig::BindHost::parseIPv6(const char *addr)
         return;
     }
 
+    // SECURITY FIX (HIGH-011): Use String copy constructor instead of raw new[]
     m_version = 6;
-    const size_t size = end - addr;
-    char *host = new char[size]();
-    memcpy(host, addr + 1, size - 1);
-
-    m_host = host;
+    const size_t size = end - addr - 1;  // Length of content between brackets
+    m_host = String(addr + 1, size);
 
     // SECURITY FIX: Validate strtol result
     char *endptr = nullptr;

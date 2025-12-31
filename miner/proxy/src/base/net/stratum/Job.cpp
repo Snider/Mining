@@ -70,11 +70,12 @@ bool xmrig::Job::setBlob(const char *blob)
     size /= 2;
 
     const size_t minSize = nonceOffset() + nonceSize();
-    if (size < minSize || size >= sizeof(m_blob)) {
+    // SECURITY FIX (CRIT-012): Use explicit kMaxBlobSize constant for bounds checking
+    if (size < minSize || size >= kMaxBlobSize) {
         return false;
     }
 
-    if (!Cvt::fromHex(m_blob, sizeof(m_blob), blob, size * 2)) {
+    if (!Cvt::fromHex(m_blob, kMaxBlobSize, blob, size * 2)) {
         return false;
     }
 
@@ -83,6 +84,8 @@ bool xmrig::Job::setBlob(const char *blob)
     }
 
 #   ifdef XMRIG_PROXY_PROJECT
+    // Compile-time check: ensure m_rawBlob can hold hex representation
+    static_assert(sizeof(m_rawBlob) >= kMaxBlobSize * 2, "m_rawBlob too small");
     memset(m_rawBlob, 0, sizeof(m_rawBlob));
     memcpy(m_rawBlob, blob, size * 2);
 #   endif
