@@ -151,31 +151,30 @@ func (m *TTMiner) Uninstall() error {
 }
 
 // CheckInstallation verifies if the TT-Miner is installed correctly.
+// Thread-safe: properly locks before modifying shared fields.
 func (m *TTMiner) CheckInstallation() (*InstallationDetails, error) {
 	binaryPath, err := m.findMinerBinary()
 	if err != nil {
 		return &InstallationDetails{IsInstalled: false}, err
 	}
 
-	m.MinerBinary = binaryPath
-	m.Path = filepath.Dir(binaryPath)
-
-	// TT-Miner uses --version to check version
+	// Run version command before acquiring lock (I/O operation)
 	cmd := exec.Command(binaryPath, "--version")
 	var out bytes.Buffer
 	cmd.Stdout = &out
+	var version string
 	if err := cmd.Run(); err != nil {
-		m.Version = "Unknown (could not run executable)"
+		version = "Unknown (could not run executable)"
 	} else {
 		// Parse version from output
 		output := strings.TrimSpace(out.String())
 		fields := strings.Fields(output)
 		if len(fields) >= 2 {
-			m.Version = fields[1]
+			version = fields[1]
 		} else if len(fields) >= 1 {
-			m.Version = fields[0]
+			version = fields[0]
 		} else {
-			m.Version = "Unknown (could not parse version)"
+			version = "Unknown (could not parse version)"
 		}
 	}
 
@@ -185,11 +184,18 @@ func (m *TTMiner) CheckInstallation() (*InstallationDetails, error) {
 		configPath = "Error: Could not determine config path"
 	}
 
+	// Update shared fields under lock
+	m.mu.Lock()
+	m.MinerBinary = binaryPath
+	m.Path = filepath.Dir(binaryPath)
+	m.Version = version
+	m.mu.Unlock()
+
 	return &InstallationDetails{
 		IsInstalled: true,
-		MinerBinary: m.MinerBinary,
-		Path:        m.Path,
-		Version:     m.Version,
+		MinerBinary: binaryPath,
+		Path:        filepath.Dir(binaryPath),
+		Version:     version,
 		ConfigPath:  configPath,
 	}, nil
 }

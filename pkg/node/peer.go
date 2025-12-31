@@ -3,6 +3,7 @@ package node
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,12 +33,22 @@ type Peer struct {
 	Connected bool `json:"-"`
 }
 
+// saveDebounceInterval is the minimum time between disk writes.
+const saveDebounceInterval = 5 * time.Second
+
 // PeerRegistry manages known peers with KD-tree based selection.
 type PeerRegistry struct {
 	peers  map[string]*Peer
 	kdTree *poindexter.KDTree[string] // KD-tree with peer ID as payload
 	path   string
 	mu     sync.RWMutex
+
+	// Debounce disk writes
+	dirty        bool          // Whether there are unsaved changes
+	saveTimer    *time.Timer   // Timer for debounced save
+	saveMu       sync.Mutex    // Protects dirty and saveTimer
+	stopChan     chan struct{} // Signal to stop background save
+	saveStopOnce sync.Once     // Ensure stopChan is closed only once
 }
 
 // Dimension weights for peer selection
@@ -63,8 +74,9 @@ func NewPeerRegistry() (*PeerRegistry, error) {
 // This is primarily useful for testing to avoid xdg path caching issues.
 func NewPeerRegistryWithPath(peersPath string) (*PeerRegistry, error) {
 	pr := &PeerRegistry{
-		peers: make(map[string]*Peer),
-		path:  peersPath,
+		peers:    make(map[string]*Peer),
+		path:     peersPath,
+		stopChan: make(chan struct{}),
 	}
 
 	// Try to load existing peers
@@ -81,13 +93,14 @@ func NewPeerRegistryWithPath(peersPath string) (*PeerRegistry, error) {
 // AddPeer adds a new peer to the registry.
 func (r *PeerRegistry) AddPeer(peer *Peer) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if peer.ID == "" {
+		r.mu.Unlock()
 		return fmt.Errorf("peer ID is required")
 	}
 
 	if _, exists := r.peers[peer.ID]; exists {
+		r.mu.Unlock()
 		return fmt.Errorf("peer %s already exists", peer.ID)
 	}
 
@@ -101,6 +114,7 @@ func (r *PeerRegistry) AddPeer(peer *Peer) error {
 
 	r.peers[peer.ID] = peer
 	r.rebuildKDTree()
+	r.mu.Unlock()
 
 	return r.save()
 }
@@ -108,14 +122,15 @@ func (r *PeerRegistry) AddPeer(peer *Peer) error {
 // UpdatePeer updates an existing peer's information.
 func (r *PeerRegistry) UpdatePeer(peer *Peer) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if _, exists := r.peers[peer.ID]; !exists {
+		r.mu.Unlock()
 		return fmt.Errorf("peer %s not found", peer.ID)
 	}
 
 	r.peers[peer.ID] = peer
 	r.rebuildKDTree()
+	r.mu.Unlock()
 
 	return r.save()
 }
@@ -123,14 +138,15 @@ func (r *PeerRegistry) UpdatePeer(peer *Peer) error {
 // RemovePeer removes a peer from the registry.
 func (r *PeerRegistry) RemovePeer(id string) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if _, exists := r.peers[id]; !exists {
+		r.mu.Unlock()
 		return fmt.Errorf("peer %s not found", id)
 	}
 
 	delete(r.peers, id)
 	r.rebuildKDTree()
+	r.mu.Unlock()
 
 	return r.save()
 }
@@ -166,10 +182,10 @@ func (r *PeerRegistry) ListPeers() []*Peer {
 // UpdateMetrics updates a peer's performance metrics.
 func (r *PeerRegistry) UpdateMetrics(id string, pingMS, geoKM float64, hops int) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	peer, exists := r.peers[id]
 	if !exists {
+		r.mu.Unlock()
 		return fmt.Errorf("peer %s not found", id)
 	}
 
@@ -179,6 +195,7 @@ func (r *PeerRegistry) UpdateMetrics(id string, pingMS, geoKM float64, hops int)
 	peer.LastSeen = time.Now()
 
 	r.rebuildKDTree()
+	r.mu.Unlock()
 
 	return r.save()
 }
@@ -186,10 +203,10 @@ func (r *PeerRegistry) UpdateMetrics(id string, pingMS, geoKM float64, hops int)
 // UpdateScore updates a peer's reliability score.
 func (r *PeerRegistry) UpdateScore(id string, score float64) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	peer, exists := r.peers[id]
 	if !exists {
+		r.mu.Unlock()
 		return fmt.Errorf("peer %s not found", id)
 	}
 
@@ -202,6 +219,7 @@ func (r *PeerRegistry) UpdateScore(id string, score float64) error {
 
 	peer.Score = score
 	r.rebuildKDTree()
+	r.mu.Unlock()
 
 	return r.save()
 }
@@ -329,8 +347,43 @@ func (r *PeerRegistry) rebuildKDTree() {
 	r.kdTree = tree
 }
 
-// save persists peers to disk.
-func (r *PeerRegistry) save() error {
+// scheduleSave schedules a debounced save operation.
+// Multiple calls within saveDebounceInterval will be coalesced into a single save.
+// Must NOT be called with r.mu held.
+func (r *PeerRegistry) scheduleSave() {
+	r.saveMu.Lock()
+	defer r.saveMu.Unlock()
+
+	r.dirty = true
+
+	// If timer already running, let it handle the save
+	if r.saveTimer != nil {
+		return
+	}
+
+	// Start a new timer
+	r.saveTimer = time.AfterFunc(saveDebounceInterval, func() {
+		r.saveMu.Lock()
+		r.saveTimer = nil
+		shouldSave := r.dirty
+		r.dirty = false
+		r.saveMu.Unlock()
+
+		if shouldSave {
+			r.mu.RLock()
+			err := r.saveNow()
+			r.mu.RUnlock()
+			if err != nil {
+				// Log error but continue - best effort persistence
+				log.Printf("Warning: failed to save peer registry: %v", err)
+			}
+		}
+	})
+}
+
+// saveNow persists peers to disk immediately.
+// Must be called with r.mu held (at least RLock).
+func (r *PeerRegistry) saveNow() error {
 	// Ensure directory exists
 	dir := filepath.Dir(r.path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -348,11 +401,52 @@ func (r *PeerRegistry) save() error {
 		return fmt.Errorf("failed to marshal peers: %w", err)
 	}
 
-	if err := os.WriteFile(r.path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write peers: %w", err)
+	// Use atomic write pattern: write to temp file, then rename
+	tmpPath := r.path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write peers temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, r.path); err != nil {
+		os.Remove(tmpPath) // Clean up temp file
+		return fmt.Errorf("failed to rename peers file: %w", err)
 	}
 
 	return nil
+}
+
+// Close flushes any pending changes and releases resources.
+func (r *PeerRegistry) Close() error {
+	r.saveStopOnce.Do(func() {
+		close(r.stopChan)
+	})
+
+	// Cancel pending timer and save immediately if dirty
+	r.saveMu.Lock()
+	if r.saveTimer != nil {
+		r.saveTimer.Stop()
+		r.saveTimer = nil
+	}
+	shouldSave := r.dirty
+	r.dirty = false
+	r.saveMu.Unlock()
+
+	if shouldSave {
+		r.mu.RLock()
+		err := r.saveNow()
+		r.mu.RUnlock()
+		return err
+	}
+
+	return nil
+}
+
+// save is a helper that schedules a debounced save.
+// Kept for backward compatibility but now debounces writes.
+// Must NOT be called with r.mu held.
+func (r *PeerRegistry) save() error {
+	r.scheduleSave()
+	return nil // Errors will be logged asynchronously
 }
 
 // load reads peers from disk.

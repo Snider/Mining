@@ -1,9 +1,40 @@
 package database
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"time"
 )
+
+// dbOperationTimeout is the maximum time for database operations
+const dbOperationTimeout = 30 * time.Second
+
+// parseSQLiteTimestamp parses timestamp strings from SQLite which may use various formats.
+// Logs a warning if parsing fails and returns zero time.
+func parseSQLiteTimestamp(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+
+	// Try common SQLite timestamp formats
+	formats := []string{
+		"2006-01-02 15:04:05.999999999-07:00",
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t
+		}
+	}
+
+	log.Printf("Warning: failed to parse timestamp '%s' from database", s)
+	return time.Time{}
+}
 
 // Resolution indicates the data resolution type
 type Resolution string
@@ -49,13 +80,17 @@ func InsertHashratePoints(minerName, minerType string, points []HashratePoint, r
 		return nil
 	}
 
-	tx, err := db.Begin()
+	// Use context with timeout to prevent hanging on locked database
+	ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+	defer cancel()
+
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Prepare(`
+	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO hashrate_history (miner_name, miner_type, timestamp, hashrate, resolution)
 		VALUES (?, ?, ?, ?, ?)
 	`)
@@ -65,7 +100,7 @@ func InsertHashratePoints(minerName, minerType string, points []HashratePoint, r
 	defer stmt.Close()
 
 	for _, point := range points {
-		_, err := stmt.Exec(minerName, minerType, point.Timestamp, point.Hashrate, string(resolution))
+		_, err := stmt.ExecContext(ctx, minerName, minerType, point.Timestamp, point.Hashrate, string(resolution))
 		if err != nil {
 			return fmt.Errorf("failed to insert point: %w", err)
 		}
@@ -235,15 +270,9 @@ func GetHashrateStats(minerName string) (*HashrateStats, error) {
 		return nil, err
 	}
 
-	// Parse timestamps
-	stats.FirstSeen, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", firstSeenStr)
-	if stats.FirstSeen.IsZero() {
-		stats.FirstSeen, _ = time.Parse(time.RFC3339Nano, firstSeenStr)
-	}
-	stats.LastSeen, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", lastSeenStr)
-	if stats.LastSeen.IsZero() {
-		stats.LastSeen, _ = time.Parse(time.RFC3339Nano, lastSeenStr)
-	}
+	// Parse timestamps using helper that logs errors
+	stats.FirstSeen = parseSQLiteTimestamp(firstSeenStr)
+	stats.LastSeen = parseSQLiteTimestamp(lastSeenStr)
 
 	return &stats, nil
 }
@@ -290,15 +319,9 @@ func GetAllMinerStats() ([]HashrateStats, error) {
 		); err != nil {
 			return nil, err
 		}
-		// Parse timestamps
-		stats.FirstSeen, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", firstSeenStr)
-		if stats.FirstSeen.IsZero() {
-			stats.FirstSeen, _ = time.Parse(time.RFC3339Nano, firstSeenStr)
-		}
-		stats.LastSeen, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", lastSeenStr)
-		if stats.LastSeen.IsZero() {
-			stats.LastSeen, _ = time.Parse(time.RFC3339Nano, lastSeenStr)
-		}
+		// Parse timestamps using helper that logs errors
+		stats.FirstSeen = parseSQLiteTimestamp(firstSeenStr)
+		stats.LastSeen = parseSQLiteTimestamp(lastSeenStr)
 		allStats = append(allStats, stats)
 	}
 

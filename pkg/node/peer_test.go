@@ -345,6 +345,11 @@ func TestPeerRegistry_Persistence(t *testing.T) {
 
 	pr1.AddPeer(peer)
 
+	// Flush pending changes before reloading
+	if err := pr1.Close(); err != nil {
+		t.Fatalf("failed to close first registry: %v", err)
+	}
+
 	// Load in new registry from same path
 	pr2, err := NewPeerRegistryWithPath(peersPath)
 	if err != nil {

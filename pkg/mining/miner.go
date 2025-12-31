@@ -191,12 +191,17 @@ func (b *BaseMiner) Stop() error {
 	return nil
 }
 
+// stdinWriteTimeout is the maximum time to wait for stdin write to complete.
+const stdinWriteTimeout = 5 * time.Second
+
 // WriteStdin sends input to the miner's stdin (for console commands).
 func (b *BaseMiner) WriteStdin(input string) error {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	stdinPipe := b.stdinPipe
+	running := b.Running
+	b.mu.RUnlock()
 
-	if !b.Running || b.stdinPipe == nil {
+	if !running || stdinPipe == nil {
 		return errors.New("miner is not running or stdin not available")
 	}
 
@@ -205,8 +210,19 @@ func (b *BaseMiner) WriteStdin(input string) error {
 		input += "\n"
 	}
 
-	_, err := b.stdinPipe.Write([]byte(input))
-	return err
+	// Write with timeout to prevent blocking indefinitely
+	done := make(chan error, 1)
+	go func() {
+		_, err := stdinPipe.Write([]byte(input))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(stdinWriteTimeout):
+		return errors.New("stdin write timeout: miner may be unresponsive")
+	}
 }
 
 // Uninstall removes all files related to the miner.

@@ -152,41 +152,52 @@ func (m *XMRigMiner) Uninstall() error {
 }
 
 // CheckInstallation verifies if the XMRig miner is installed correctly.
+// Thread-safe: properly locks before modifying shared fields.
 func (m *XMRigMiner) CheckInstallation() (*InstallationDetails, error) {
 	binaryPath, err := m.findMinerBinary()
 	if err != nil {
 		return &InstallationDetails{IsInstalled: false}, err
 	}
 
-	m.MinerBinary = binaryPath
-	m.Path = filepath.Dir(binaryPath)
-
+	// Run version command before acquiring lock (I/O operation)
 	cmd := exec.Command(binaryPath, "--version")
 	var out bytes.Buffer
 	cmd.Stdout = &out
+	var version string
 	if err := cmd.Run(); err != nil {
-		m.Version = "Unknown (could not run executable)"
+		version = "Unknown (could not run executable)"
 	} else {
 		fields := strings.Fields(out.String())
 		if len(fields) >= 2 {
-			m.Version = fields[1]
+			version = fields[1]
 		} else {
-			m.Version = "Unknown (could not parse version)"
+			version = "Unknown (could not parse version)"
 		}
 	}
 
 	// Get the config path using the helper (use instance name if set)
-	configPath, err := getXMRigConfigPath(m.Name)
+	m.mu.RLock()
+	instanceName := m.Name
+	m.mu.RUnlock()
+
+	configPath, err := getXMRigConfigPath(instanceName)
 	if err != nil {
 		// Log the error but don't fail CheckInstallation if config path can't be determined
 		configPath = "Error: Could not determine config path"
 	}
 
+	// Update shared fields under lock
+	m.mu.Lock()
+	m.MinerBinary = binaryPath
+	m.Path = filepath.Dir(binaryPath)
+	m.Version = version
+	m.mu.Unlock()
+
 	return &InstallationDetails{
 		IsInstalled: true,
-		MinerBinary: m.MinerBinary,
-		Path:        m.Path,
-		Version:     m.Version,
-		ConfigPath:  configPath, // Include the config path
+		MinerBinary: binaryPath,
+		Path:        filepath.Dir(binaryPath),
+		Version:     version,
+		ConfigPath:  configPath,
 	}, nil
 }

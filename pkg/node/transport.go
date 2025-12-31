@@ -266,6 +266,10 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set handshake timeout to prevent slow/malicious clients from blocking
+	handshakeTimeout := 10 * time.Second
+	conn.SetReadDeadline(time.Now().Add(handshakeTimeout))
+
 	// Wait for handshake from client
 	_, data, err := conn.ReadMessage()
 	if err != nil {
@@ -365,6 +369,16 @@ func (t *Transport) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 
 // performHandshake initiates handshake with a peer.
 func (t *Transport) performHandshake(pc *PeerConnection) error {
+	// Set handshake timeout
+	handshakeTimeout := 10 * time.Second
+	pc.Conn.SetWriteDeadline(time.Now().Add(handshakeTimeout))
+	pc.Conn.SetReadDeadline(time.Now().Add(handshakeTimeout))
+	defer func() {
+		// Reset deadlines after handshake
+		pc.Conn.SetWriteDeadline(time.Time{})
+		pc.Conn.SetReadDeadline(time.Time{})
+	}()
+
 	identity := t.node.GetIdentity()
 
 	payload := HandshakePayload{

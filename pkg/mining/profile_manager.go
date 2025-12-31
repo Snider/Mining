@@ -67,6 +67,7 @@ func (pm *ProfileManager) loadProfiles() error {
 
 // saveProfiles writes the current profiles from memory to the JSON file.
 // This is an internal method and assumes the caller holds the appropriate lock.
+// Uses atomic write pattern: write to temp file, sync, then rename.
 func (pm *ProfileManager) saveProfiles() error {
 	profileList := make([]*MiningProfile, 0, len(pm.profiles))
 	for _, p := range pm.profiles {
@@ -78,7 +79,49 @@ func (pm *ProfileManager) saveProfiles() error {
 		return err
 	}
 
-	return os.WriteFile(pm.configPath, data, 0600)
+	// Atomic write: write to temp file in same directory, then rename
+	dir := filepath.Dir(pm.configPath)
+	tmpFile, err := os.CreateTemp(dir, "profiles-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// Clean up temp file on any error
+	success := false
+	defer func() {
+		if !success {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	// Sync to ensure data is flushed to disk before rename
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	// Set permissions before rename
+	if err := os.Chmod(tmpPath, 0600); err != nil {
+		return fmt.Errorf("failed to set temp file permissions: %w", err)
+	}
+
+	// Atomic rename (on POSIX systems)
+	if err := os.Rename(tmpPath, pm.configPath); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	success = true
+	return nil
 }
 
 // CreateProfile adds a new profile and saves it.

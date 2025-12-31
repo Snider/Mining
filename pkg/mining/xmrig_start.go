@@ -83,7 +83,11 @@ func (m *XMRigMiner) Start(config *Config) error {
 
 	if err := m.cmd.Start(); err != nil {
 		stdinPipe.Close()
-		return err
+		// Clean up config file on failed start
+		if m.ConfigPath != "" {
+			os.Remove(m.ConfigPath)
+		}
+		return fmt.Errorf("failed to start miner: %w", err)
 	}
 
 	m.Running = true

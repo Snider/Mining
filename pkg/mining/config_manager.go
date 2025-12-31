@@ -83,6 +83,7 @@ func LoadMinersConfig() (*MinersConfig, error) {
 }
 
 // SaveMinersConfig saves the miners configuration to the file system.
+// Uses atomic write pattern: write to temp file, then rename.
 func SaveMinersConfig(cfg *MinersConfig) error {
 	configMu.Lock()
 	defer configMu.Unlock()
@@ -92,7 +93,8 @@ func SaveMinersConfig(cfg *MinersConfig) error {
 		return fmt.Errorf("could not determine miners config path: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -101,8 +103,43 @@ func SaveMinersConfig(cfg *MinersConfig) error {
 		return fmt.Errorf("failed to marshal miners config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write miners config file: %w", err)
+	// Atomic write: write to temp file, then rename
+	tmpFile, err := os.CreateTemp(dir, "miners-config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
+	tmpPath := tmpFile.Name()
+
+	// Clean up temp file on error
+	success := false
+	defer func() {
+		if !success {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Chmod(tmpPath, 0600); err != nil {
+		return fmt.Errorf("failed to set temp file permissions: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	success = true
 	return nil
 }

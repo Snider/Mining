@@ -435,6 +435,9 @@ func (m *Manager) startStatsCollection() {
 	}()
 }
 
+// statsCollectionTimeout is the maximum time to wait for stats from a single miner.
+const statsCollectionTimeout = 5 * time.Second
+
 // collectMinerStats iterates through active miners and collects their stats.
 func (m *Manager) collectMinerStats() {
 	m.mu.RLock()
@@ -465,7 +468,11 @@ func (m *Manager) collectMinerStats() {
 			continue // Miner was removed, skip it
 		}
 
-		stats, err := miner.GetStats(context.Background())
+		// Use context with timeout to prevent hanging on unresponsive miner APIs
+		ctx, cancel := context.WithTimeout(context.Background(), statsCollectionTimeout)
+		stats, err := miner.GetStats(ctx)
+		cancel() // Release context resources immediately
+
 		if err != nil {
 			log.Printf("Error getting stats for miner %s: %v\n", minerName, err)
 			continue
