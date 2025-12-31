@@ -10,12 +10,12 @@ Mining Platform supports multiple Proof-of-Work (PoW) algorithms across CPU and 
 
 | Algorithm | Type | CPU | GPU (OpenCL) | GPU (CUDA) | Primary Coin | Difficulty |
 |-----------|------|-----|--------------|------------|--------------|------------|
-| RandomX | Memory-hard | ✅ | ✅ | ✅ | Monero (XMR) | Medium |
-| KawPow | GPU-optimized | ❌ | ✅ | ✅ | Ravencoin (RVN) | High |
-| ETChash | GPU-optimized | ❌ | ✅ | ✅ | Ethereum Classic (ETC) | High |
-| ProgPowZ | GPU-optimized | ❌ | ✅ | ✅ | Zano (ZANO) | High |
-| Blake3 | CPU/GPU hybrid | ✅ | ✅ | ✅ | Decred (DCR) | Low |
-| CryptoNight | Memory-hard | ✅ | ✅ | ✅ | Various | Medium |
+| [RandomX](https://miningpoolstats.stream/monero) | Memory-hard | ✅ | ✅ | ✅ | [Monero (XMR)](https://www.getmonero.org/) | Medium |
+| [KawPow](https://miningpoolstats.stream/ravencoin) | GPU-optimized | ❌ | ✅ | ✅ | [Ravencoin (RVN)](https://ravencoin.org/) | High |
+| [ETChash](https://miningpoolstats.stream/ethereumclassic) | GPU-optimized | ❌ | ✅ | ✅ | [Ethereum Classic (ETC)](https://ethereumclassic.org/) | High |
+| [ProgPowZ](https://miningpoolstats.stream/zano) | GPU-optimized | ❌ | ✅ | ✅ | [Zano (ZANO)](https://zano.org/) | High |
+| [Blake3](https://miningpoolstats.stream/decred) | CPU/GPU hybrid | ✅ | ✅ | ✅ | [Decred (DCR)](https://decred.org/) | Low |
+| [CryptoNight](https://miningpoolstats.stream/monero) | Memory-hard | ✅ | ✅ | ✅ | Various | Medium |
 
 ## RandomX
 
@@ -34,10 +34,10 @@ RandomX is a proof-of-work algorithm optimized for general-purpose CPUs. It is d
 
 | Variant | Coin | Notes |
 |---------|------|-------|
-| rx/0 | Monero (XMR) | Primary Monero algorithm |
-| rx/wow | Wownero (WOW) | RandomX variant for Wownero |
-| rx/arq | ArQmA (ARQ) | ArQmA-specific parameters |
-| rx/graft | Graft (GRFT) | Graft Network |
+| rx/0 | [Monero (XMR)](https://www.getmonero.org/) | Primary Monero algorithm |
+| rx/wow | [Wownero (WOW)](https://wownero.org/) | RandomX variant for Wownero |
+| rx/arq | [ArQmA (ARQ)](https://arqma.com/) | ArQmA-specific parameters |
+| rx/graft | [Graft (GRFT)](https://graft.network/) | Graft Network |
 
 ### Configuration
 
@@ -295,12 +295,12 @@ CryptoNight is a memory-hard proof-of-work algorithm, formerly used by Monero be
 
 | Variant | Coin | Notes |
 |---------|------|-------|
-| cn/r | Monero (legacy) | CryptoNight R |
-| cn/0 | Bytecoin | Original CryptoNight |
-| cn/1 | MoneroV7 | CryptoNight v7 |
-| cn/2 | MoneroV8 | CryptoNight v8 |
-| cn/half | Masari | Half mode |
-| cn/fast | Electroneum | Fast mode |
+| cn/r | [Monero](https://www.getmonero.org/) (legacy) | CryptoNight R |
+| cn/0 | [Bytecoin](https://bytecoin.org/) | Original CryptoNight |
+| cn/1 | Monero v7 | CryptoNight v7 |
+| cn/2 | Monero v8 | CryptoNight v8 |
+| cn/half | [Masari](https://getmasari.org/) | Half mode |
+| cn/fast | [Electroneum](https://electroneum.com/) | Fast mode |
 
 ### Configuration
 

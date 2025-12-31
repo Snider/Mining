@@ -17,12 +17,12 @@ A modern, modular cryptocurrency mining management platform with GPU support, RE
 
 | Algorithm | Coin | CPU | GPU (OpenCL) | GPU (CUDA) |
 |-----------|------|-----|--------------|------------|
-| RandomX | Monero (XMR) | ✅ | ✅ | ✅ |
-| KawPow | Ravencoin (RVN) | ❌ | ✅ | ✅ |
-| ETChash | Ethereum Classic (ETC) | ❌ | ✅ | ✅ |
-| ProgPowZ | Zano (ZANO) | ❌ | ✅ | ✅ |
-| Blake3 | Decred (DCR) | ✅ | ✅ | ✅ |
-| CryptoNight | Various | ✅ | ✅ | ✅ |
+| [RandomX](https://miningpoolstats.stream/monero) | [Monero (XMR)](https://www.getmonero.org/) | ✅ | ✅ | ✅ |
+| [KawPow](https://miningpoolstats.stream/ravencoin) | [Ravencoin (RVN)](https://ravencoin.org/) | ❌ | ✅ | ✅ |
+| [ETChash](https://miningpoolstats.stream/ethereumclassic) | [Ethereum Classic (ETC)](https://ethereumclassic.org/) | ❌ | ✅ | ✅ |
+| [ProgPowZ](https://miningpoolstats.stream/zano) | [Zano (ZANO)](https://zano.org/) | ❌ | ✅ | ✅ |
+| [Blake3](https://miningpoolstats.stream/decred) | [Decred (DCR)](https://decred.org/) | ✅ | ✅ | ✅ |
+| [CryptoNight](https://miningpoolstats.stream/monero) | Various | ✅ | ✅ | ✅ |
 
 ### Core Capabilities
 
