@@ -1,10 +1,30 @@
 # Test suite for miner project
 
+# Manually specify source files needed for tests with absolute paths
+file(GLOB_RECURSE MINER_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/3rdparty/fmt/*.cc
+    ${CMAKE_SOURCE_DIR}/src/base/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/backend/common/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/backend/cpu/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/crypto/cn/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/crypto/cn/*.c
+    ${CMAKE_SOURCE_DIR}/src/crypto/common/*.cpp
+)
+
+# Remove test files and platform-specific files not for this architecture
+list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_test\\.cpp$")
+list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_arm.*")
+list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_riscv.*")
+if (WIN32)
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_unix\\.cpp$")
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_linux\\.cpp$")
+else()
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_win\\.cpp$")
+endif()
+
 # Create a library with common test utilities and miner components
 add_library(miner_test_lib STATIC
-    ${SOURCES}
-    ${SOURCES_OS}
-    ${SOURCES_CRYPTO}
+    ${MINER_SOURCES}
 )
 
 target_include_directories(miner_test_lib PUBLIC

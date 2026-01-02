@@ -1,0 +1,84 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  go-tests:
+    name: Go Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Run Go tests
+        run: make test-go
+
+      - name: Upload Go coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: go-coverage
+          path: coverage.out
+          retention-days: 30
+
+  cpp-tests:
+    name: C++ Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            build-essential \
+            libuv1-dev \
+            libssl-dev \
+            libhwloc-dev \
+            git
+
+      - name: Cache CMake builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            miner/core/build
+            miner/proxy/build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-
+
+      - name: Build C++ tests
+        run: make build-cpp-tests
+
+      - name: Run miner/core tests
+        run: make test-cpp-core
+
+      - name: Run miner/proxy tests
+        run: make test-cpp-proxy
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpp-test-results
+          path: |
+            miner/core/build/Testing/
+            miner/proxy/build/Testing/
+          retention-days: 30
