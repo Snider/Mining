@@ -363,7 +363,8 @@ void xmrig::Miner::parse(char *line, size_t len)
         return shutdown(true);
     }
 
-    if (parseRequest(id.GetInt64(), method.GetString(), doc.HasMember("params") ? doc["params"] : rapidjson::Value())) {
+    rapidjson::Value emptyParams(rapidjson::kNullType);
+    if (parseRequest(id.GetInt64(), method.GetString(), doc.HasMember("params") ? doc["params"] : emptyParams)) {
         return;
     }
 

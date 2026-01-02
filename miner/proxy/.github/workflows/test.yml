@@ -1,0 +1,155 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential libuv1-dev libssl-dev
+
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DWITH_TLS=ON -DWITH_HTTP=ON -DWITH_DEBUG_LOG=ON
+
+    - name: Build
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Build tests
+      run: |
+        cd build
+        make -C tests -j$(nproc)
+
+    - name: Run unit tests
+      run: |
+        cd build/tests
+        ./unit_tests --gtest_output=xml:unit_test_results.xml
+
+    - name: Run integration tests
+      run: |
+        cd build/tests
+        ./integration_tests --gtest_output=xml:integration_test_results.xml
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-linux
+        path: build/tests/*_test_results.xml
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew install cmake libuv openssl
+
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DWITH_TLS=ON -DWITH_HTTP=ON \
+          -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)
+
+    - name: Build
+      run: |
+        cd build
+        make -j$(sysctl -n hw.ncpu)
+
+    - name: Build tests
+      run: |
+        cd build
+        make -C tests -j$(sysctl -n hw.ncpu)
+
+    - name: Run tests
+      run: |
+        cd build/tests
+        ./unit_tests
+        ./integration_tests
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install vcpkg dependencies
+      run: |
+        vcpkg install libuv:x64-windows openssl:x64-windows
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+          -DWITH_TLS=ON -DWITH_HTTP=ON
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release
+
+    - name: Build tests
+      run: |
+        cd build
+        cmake --build tests --config Release
+
+    - name: Run tests
+      run: |
+        cd build/tests/Release
+        ./unit_tests.exe
+        ./integration_tests.exe
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential libuv1-dev libssl-dev gcovr
+
+    - name: Configure CMake with coverage
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug -DWITH_TLS=ON -DWITH_HTTP=ON \
+          -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_C_FLAGS="--coverage"
+
+    - name: Build and test
+      run: |
+        cd build
+        make -j$(nproc)
+        make -C tests -j$(nproc)
+        cd tests
+        ./unit_tests
+        ./integration_tests
+
+    - name: Generate coverage report
+      run: |
+        cd build
+        gcovr --root .. --exclude ../tests --xml coverage.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: build/coverage.xml
+        fail_ci_if_error: false
