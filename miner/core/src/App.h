@@ -32,6 +32,7 @@
 #include "base/tools/Object.h"
 
 
+#include <atomic>
 #include <memory>
 
 
@@ -66,6 +67,9 @@ private:
     std::shared_ptr<Console> m_console;
     std::shared_ptr<Controller> m_controller;
     std::shared_ptr<Signals> m_signals;
+
+    // SECURITY: Atomic flag to prevent double-close race condition
+    std::atomic<bool> m_closing{false};
 };
 
 

@@ -1,0 +1,252 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  test-linux:
+    name: Test on Linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+        compiler:
+          - { cc: gcc, cxx: g++ }
+          - { cc: clang, cxx: clang++ }
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          libhwloc-dev \
+          libuv1-dev \
+          libssl-dev \
+          opencl-headers \
+          ocl-icd-opencl-dev
+
+    - name: Configure CMake
+      env:
+        CC: ${{ matrix.compiler.cc }}
+        CXX: ${{ matrix.compiler.cxx }}
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DBUILD_TESTS=ON \
+          -DWITH_HWLOC=ON \
+          -DWITH_HTTP=ON \
+          -DWITH_TLS=ON \
+          -DWITH_OPENCL=ON \
+          -DWITH_CUDA=OFF \
+          -DWITH_BENCHMARK=ON
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} -j$(nproc)
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --build-config ${{ matrix.build_type }}
+
+  test-windows:
+    name: Test on Windows
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install dependencies
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. `
+          -G "Visual Studio 17 2022" `
+          -A x64 `
+          -DBUILD_TESTS=ON `
+          -DWITH_HWLOC=OFF `
+          -DWITH_HTTP=ON `
+          -DWITH_TLS=ON `
+          -DWITH_OPENCL=ON `
+          -DWITH_CUDA=OFF `
+          -DWITH_BENCHMARK=ON
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --build-config ${{ matrix.build_type }}
+
+  test-macos:
+    name: Test on macOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        brew install cmake hwloc libuv openssl
+
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DBUILD_TESTS=ON \
+          -DWITH_HWLOC=ON \
+          -DWITH_HTTP=ON \
+          -DWITH_TLS=ON \
+          -DWITH_OPENCL=OFF \
+          -DWITH_CUDA=OFF \
+          -DWITH_BENCHMARK=ON \
+          -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --build-config ${{ matrix.build_type }}
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          libhwloc-dev \
+          libuv1-dev \
+          libssl-dev \
+          gcov \
+          lcov
+
+    - name: Configure CMake with coverage
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_TESTS=ON \
+          -DCMAKE_CXX_FLAGS="--coverage" \
+          -DCMAKE_C_FLAGS="--coverage" \
+          -DWITH_HWLOC=ON \
+          -DWITH_HTTP=ON \
+          -DWITH_TLS=ON
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . -j$(nproc)
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure
+
+    - name: Generate coverage report
+      run: |
+        cd build
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/3rdparty/*' --output-file coverage.info
+        lcov --list coverage.info
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./build/coverage.info
+        fail_ci_if_error: false
+
+  benchmark:
+    name: Nightly Benchmark
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          build-essential \
+          libhwloc-dev \
+          libuv1-dev \
+          libssl-dev
+
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTS=ON \
+          -DWITH_HWLOC=ON \
+          -DWITH_BENCHMARK=ON
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . -j$(nproc)
+
+    - name: Run benchmark tests
+      run: |
+        cd build
+        ctest -R benchmark --output-on-failure
+
+    - name: Run built-in benchmark
+      run: |
+        cd build
+        ./miner --bench=1M

@@ -130,6 +130,9 @@ std::pair<bool, double> xmrig::Hashrate::hashrate(size_t index, size_t ms) const
         return { false, 0.0 };
     }
 
+    // SECURITY: Lock mutex to prevent data race with addData() called from worker threads
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     uint64_t earliestHashCount = 0;
     uint64_t earliestStamp     = 0;
     bool haveFullSet           = false;
@@ -184,6 +187,9 @@ std::pair<bool, double> xmrig::Hashrate::hashrate(size_t index, size_t ms) const
 
 void xmrig::Hashrate::addData(size_t index, uint64_t count, uint64_t timestamp)
 {
+    // SECURITY: Lock mutex to prevent data race with hashrate() called from tick thread
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     const size_t top         = m_top[index];
     m_counts[index][top]     = count;
     m_timestamps[index][top] = timestamp;

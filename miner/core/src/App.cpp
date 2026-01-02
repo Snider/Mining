@@ -127,6 +127,11 @@ void xmrig::App::onSignal(int signum)
 
 void xmrig::App::close()
 {
+    // SECURITY: Prevent double-close from concurrent signal handlers
+    if (m_closing.exchange(true)) {
+        return;
+    }
+
     m_signals.reset();
     m_console.reset();
 

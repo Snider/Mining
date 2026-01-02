@@ -33,6 +33,9 @@ xmrig::Console::Console(IConsoleListener *listener)
     uv_tty_init(uv_default_loop(), m_tty, 0, 1);
 
     if (!uv_is_readable(reinterpret_cast<uv_stream_t*>(m_tty))) {
+        // SECURITY: Clean up allocated handle to prevent memory leak
+        Handle::close(m_tty);
+        m_tty = nullptr;
         return;
     }
 

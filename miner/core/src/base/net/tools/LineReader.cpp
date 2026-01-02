@@ -90,7 +90,11 @@ void xmrig::LineReader::getline(char *data, size_t size)
         const auto len = static_cast<size_t>(end - start);
         if (m_pos) {
             add(start, len);
-            m_listener->onLine(m_buf, m_pos - 1);
+            // SECURITY: Check if add() triggered a reset due to buffer overflow
+            // If m_buf is null or m_pos is 0, skip the callback
+            if (m_buf && m_pos > 0) {
+                m_listener->onLine(m_buf, m_pos - 1);
+            }
             m_pos = 0;
         }
         else if (len > 1) {

@@ -17,8 +17,10 @@
  */
 
 #include "backend/opencl/runners/tools/OclSharedData.h"
+#include "backend/opencl/wrappers/OclError.h"
 #include "backend/opencl/wrappers/OclLib.h"
 #include "base/io/log/Log.h"
+#include "base/io/log/Tags.h"
 #include "base/tools/Chrono.h"
 #include "crypto/rx/Rx.h"
 #include "crypto/rx/RxDataset.h"
@@ -189,6 +191,13 @@ void xmrig::OclSharedData::createDataset(cl_context ctx, const Job &job, bool ho
     }
     else {
         m_dataset = OclLib::createBuffer(ctx, CL_MEM_READ_ONLY, RxDataset::maxSize(), nullptr, &ret);
+    }
+
+    // SECURITY: Check for allocation failure and throw descriptive exception
+    if (ret != CL_SUCCESS) {
+        LOG_ERR("%s" RED(" failed to allocate RandomX dataset buffer (%" PRIu64 " MB): %s"),
+                Tags::opencl(), RxDataset::maxSize() / (1024 * 1024), OclError::toString(ret));
+        throw std::runtime_error("Failed to allocate RandomX dataset on GPU");
     }
 }
 #endif

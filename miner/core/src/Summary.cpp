@@ -120,6 +120,12 @@ static void print_memory(const Config *config)
     const auto freeMem      = static_cast<double>(uv_get_free_memory());
     const auto totalMem     = static_cast<double>(uv_get_total_memory());
 
+    // SECURITY: Prevent division by zero if uv_get_total_memory() returns 0
+    if (totalMem <= 0.0) {
+        Log::print(GREEN_BOLD(" * ") WHITE_BOLD("%-13s") RED("unavailable"), "MEMORY");
+        return;
+    }
+
     const double percent = freeMem > 0 ? ((totalMem - freeMem) / totalMem * 100.0) : 100.0;
 
     Log::print(GREEN_BOLD(" * ") WHITE_BOLD("%-13s") CYAN_BOLD("%.1f/%.1f") CYAN(" GB") BLACK_BOLD(" (%.0f%%)"),

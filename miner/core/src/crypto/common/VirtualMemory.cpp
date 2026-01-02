@@ -52,16 +52,22 @@ xmrig::VirtualMemory::VirtualMemory(size_t size, bool hugePages, bool oneGbPages
 {
     if (usePool) {
         std::lock_guard<std::mutex> lock(mutex);
-        if (hugePages && !pool->isHugePages(node) && allocateLargePagesMemory()) {
-            return;
+        // SECURITY: Check if pool was initialized via VirtualMemory::init()
+        if (!pool) {
+            // Pool not initialized, fall through to regular allocation
         }
+        else {
+            if (hugePages && !pool->isHugePages(node) && allocateLargePagesMemory()) {
+                return;
+            }
 
-        m_scratchpad = pool->get(m_size, node);
-        if (m_scratchpad) {
-            m_flags.set(FLAG_HUGEPAGES, pool->isHugePages(node));
-            m_flags.set(FLAG_EXTERNAL,  true);
+            m_scratchpad = pool->get(m_size, node);
+            if (m_scratchpad) {
+                m_flags.set(FLAG_HUGEPAGES, pool->isHugePages(node));
+                m_flags.set(FLAG_EXTERNAL,  true);
 
-            return;
+                return;
+            }
         }
     }
 

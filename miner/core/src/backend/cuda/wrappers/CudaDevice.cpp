@@ -65,7 +65,11 @@ xmrig::CudaDevice::CudaDevice(CudaDevice &&other) noexcept :
 
 xmrig::CudaDevice::~CudaDevice()
 {
-    CudaLib::release(m_ctx);
+    // SECURITY: Check for null to prevent passing nullptr to CudaLib::release()
+    // after move constructor sets m_ctx to nullptr
+    if (m_ctx) {
+        CudaLib::release(m_ctx);
+    }
 }
 
 

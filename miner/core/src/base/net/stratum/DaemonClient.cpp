@@ -507,10 +507,19 @@ bool xmrig::DaemonClient::parseResponse(int64_t id, const rapidjson::Value &resu
     }
 
     if (error.IsObject()) {
-        const char *message = error["message"].GetString();
+        // SECURITY: Validate error object fields before accessing to prevent crashes from malformed responses
+        const char *message = "unknown error";
+        int errorCode = -1;
+
+        if (error.HasMember("message") && error["message"].IsString()) {
+            message = error["message"].GetString();
+        }
+        if (error.HasMember("code") && error["code"].IsInt()) {
+            errorCode = error["code"].GetInt();
+        }
 
         if (!handleSubmitResponse(id, message) && !isQuiet()) {
-            LOG_ERR("[%s:%d] error: " RED_BOLD("\"%s\"") RED_S ", code: %d", m_pool.host().data(), m_pool.port(), message, error["code"].GetInt());
+            LOG_ERR("[%s:%d] error: " RED_BOLD("\"%s\"") RED_S ", code: %d", m_pool.host().data(), m_pool.port(), message, errorCode);
         }
 
         return false;
@@ -863,6 +872,14 @@ void xmrig::DaemonClient::ZMQParse()
             size = static_cast<uint8_t>(*data);
             ++data;
             --avail;
+        }
+
+        // SECURITY: Validate size early to prevent issues with extremely large values
+        // and check for potential integer overflow in msg_size accumulation
+        if (size > 1024U) {
+            LOG_ERR("%s " RED("ZMQ frame size exceeds limit: %" PRIu64 " bytes"), tag(), size);
+            ZMQClose();
+            return;
         }
 
         if (size > 1024U - msg_size)

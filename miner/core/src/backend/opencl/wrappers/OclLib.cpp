@@ -689,7 +689,12 @@ cl_mem xmrig::OclLib::retain(cl_mem memobj) noexcept
     assert(pRetainMemObject != nullptr);
 
     if (memobj != nullptr) {
-        pRetainMemObject(memobj);
+        // SECURITY: Check return value to detect reference counting failures
+        cl_int ret = pRetainMemObject(memobj);
+        if (ret != CL_SUCCESS) {
+            LOG_ERR(kErrorTemplate, OclError::toString(ret), kRetainMemObject);
+            return nullptr;
+        }
     }
 
     return memobj;
@@ -731,7 +736,12 @@ cl_program xmrig::OclLib::retain(cl_program program) noexcept
     assert(pRetainProgram != nullptr);
 
     if (program != nullptr) {
-        pRetainProgram(program);
+        // SECURITY: Check return value to detect reference counting failures
+        cl_int ret = pRetainProgram(program);
+        if (ret != CL_SUCCESS) {
+            LOG_ERR(kErrorTemplate, OclError::toString(ret), kRetainProgram);
+            return nullptr;
+        }
     }
 
     return program;

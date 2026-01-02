@@ -537,7 +537,17 @@ void xmrig::CpuWorker<N>::allocateCnCtx()
 #       ifdef XMRIG_ALGO_CN_HEAVY
         // cn-heavy optimization for Zen3 CPUs
         if (m_memory == cn_heavyZen3Memory) {
-            shift = (id() / 8) * m_algorithm.l3() * 8 + (id() % 8) * 64;
+            const size_t l3Size = m_algorithm.l3();
+            const size_t calculatedShift = (id() / 8) * l3Size * 8 + (id() % 8) * 64;
+            // SECURITY: Validate bounds before accessing shared memory
+            // The allocation size is l3Size * num_threads where num_threads = ((m_threads + 7) / 8) * 8
+            const size_t maxAllowedOffset = m_memory->size() > l3Size * N ? m_memory->size() - l3Size * N : 0;
+            if (calculatedShift <= maxAllowedOffset) {
+                shift = static_cast<int>(calculatedShift);
+            } else {
+                // Fall back to no offset if bounds check fails
+                shift = 0;
+            }
         }
 #       endif
 

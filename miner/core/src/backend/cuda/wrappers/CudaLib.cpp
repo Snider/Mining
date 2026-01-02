@@ -175,7 +175,8 @@ void xmrig::CudaLib::close()
 
 bool xmrig::CudaLib::cnHash(nvid_ctx *ctx, uint32_t startNonce, uint64_t height, uint64_t target, uint32_t *rescount, uint32_t *resnonce)
 {
-    return pCnHash(ctx, startNonce, height, target, rescount, resnonce);
+    // SECURITY: Check function pointer to prevent null dereference if library loading failed partially
+    return pCnHash ? pCnHash(ctx, startNonce, height, target, rescount, resnonce) : false;
 }
 
 
@@ -183,23 +184,26 @@ bool xmrig::CudaLib::deviceInfo(nvid_ctx *ctx, int32_t blocks, int32_t threads, 
 {
     const Algorithm algo = RxAlgo::id(algorithm);
 
+    // SECURITY: Check function pointers to prevent null dereference
     if (pDeviceInfo) {
         return pDeviceInfo(ctx, blocks, threads, algo, dataset_host);
     }
 
-    return pDeviceInfo_v2(ctx, blocks, threads, algo.isValid() ? algo.name() : nullptr, dataset_host);
+    return pDeviceInfo_v2 ? pDeviceInfo_v2(ctx, blocks, threads, algo.isValid() ? algo.name() : nullptr, dataset_host) : false;
 }
 
 
 bool xmrig::CudaLib::deviceInit(nvid_ctx *ctx) noexcept
 {
-    return pDeviceInit(ctx);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceInit ? pDeviceInit(ctx) : false;
 }
 
 
 bool xmrig::CudaLib::rxHash(nvid_ctx *ctx, uint32_t startNonce, uint64_t target, uint32_t *rescount, uint32_t *resnonce) noexcept
 {
-    return pRxHash(ctx, startNonce, target, rescount, resnonce);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pRxHash ? pRxHash(ctx, startNonce, target, rescount, resnonce) : false;
 }
 
 
@@ -211,7 +215,8 @@ bool xmrig::CudaLib::rxPrepare(nvid_ctx *ctx, const void *dataset, size_t datase
     }
 #   endif
 
-    return pRxPrepare(ctx, dataset, datasetSize, dataset_host, batchSize);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pRxPrepare ? pRxPrepare(ctx, dataset, datasetSize, dataset_host, batchSize) : false;
 }
 
 
@@ -227,60 +232,69 @@ bool xmrig::CudaLib::rxUpdateDataset(nvid_ctx *ctx, const void *dataset, size_t 
 
 bool xmrig::CudaLib::kawPowHash(nvid_ctx *ctx, uint8_t* job_blob, uint64_t target, uint32_t *rescount, uint32_t *resnonce, uint32_t *skipped_hashes) noexcept
 {
-    return pKawPowHash(ctx, job_blob, target, rescount, resnonce, skipped_hashes);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pKawPowHash ? pKawPowHash(ctx, job_blob, target, rescount, resnonce, skipped_hashes) : false;
 }
 
 
 bool xmrig::CudaLib::kawPowPrepare(nvid_ctx *ctx, const void* cache, size_t cache_size, const void* dag_precalc, size_t dag_size, uint32_t height, const uint64_t* dag_sizes) noexcept
 {
-    return pKawPowPrepare_v2(ctx, cache, cache_size, dag_precalc, dag_size, height, dag_sizes);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pKawPowPrepare_v2 ? pKawPowPrepare_v2(ctx, cache, cache_size, dag_precalc, dag_size, height, dag_sizes) : false;
 }
 
 
 bool xmrig::CudaLib::kawPowStopHash(nvid_ctx *ctx) noexcept
 {
-    return pKawPowStopHash(ctx);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pKawPowStopHash ? pKawPowStopHash(ctx) : false;
 }
 
 
 bool xmrig::CudaLib::setJob(nvid_ctx *ctx, const void *data, size_t size, const Algorithm &algorithm) noexcept
 {
     const Algorithm algo = RxAlgo::id(algorithm);
+    // SECURITY: Check function pointers to prevent null dereference
     if (pSetJob) {
         return pSetJob(ctx, data, size, algo);
     }
 
-    return pSetJob_v2(ctx, data, size, algo.name());
+    return pSetJob_v2 ? pSetJob_v2(ctx, data, size, algo.name()) : false;
 }
 
 
 const char *xmrig::CudaLib::deviceName(nvid_ctx *ctx) noexcept
 {
-    return pDeviceName(ctx);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceName ? pDeviceName(ctx) : nullptr;
 }
 
 
 const char *xmrig::CudaLib::lastError(nvid_ctx *ctx) noexcept
 {
-    return pLastError(ctx);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pLastError ? pLastError(ctx) : nullptr;
 }
 
 
 const char *xmrig::CudaLib::pluginVersion() noexcept
 {
-    return pPluginVersion();
+    // SECURITY: Check function pointer to prevent null dereference
+    return pPluginVersion ? pPluginVersion() : nullptr;
 }
 
 
 int32_t xmrig::CudaLib::deviceInt(nvid_ctx *ctx, DeviceProperty property) noexcept
 {
-    return pDeviceInt(ctx, property);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceInt ? pDeviceInt(ctx, property) : 0;
 }
 
 
 nvid_ctx *xmrig::CudaLib::alloc(uint32_t id, int32_t bfactor, int32_t bsleep) noexcept
 {
-    return pAlloc(id, bfactor, bsleep);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pAlloc ? pAlloc(id, bfactor, bsleep) : nullptr;
 }
 
 
@@ -327,37 +341,45 @@ std::vector<xmrig::CudaDevice> xmrig::CudaLib::devices(int32_t bfactor, int32_t 
 
 uint32_t xmrig::CudaLib::deviceCount() noexcept
 {
-    return pDeviceCount();
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceCount ? pDeviceCount() : 0;
 }
 
 
 uint32_t xmrig::CudaLib::deviceUint(nvid_ctx *ctx, DeviceProperty property) noexcept
 {
-    return pDeviceUint(ctx, property);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceUint ? pDeviceUint(ctx, property) : 0;
 }
 
 
 uint32_t xmrig::CudaLib::driverVersion() noexcept
 {
-    return pVersion(DriverVersion);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pVersion ? pVersion(DriverVersion) : 0;
 }
 
 
 uint32_t xmrig::CudaLib::runtimeVersion() noexcept
 {
-    return pVersion(RuntimeVersion);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pVersion ? pVersion(RuntimeVersion) : 0;
 }
 
 
 uint64_t xmrig::CudaLib::deviceUlong(nvid_ctx *ctx, DeviceProperty property) noexcept
 {
-    return pDeviceUlong(ctx, property);
+    // SECURITY: Check function pointer to prevent null dereference
+    return pDeviceUlong ? pDeviceUlong(ctx, property) : 0;
 }
 
 
 void xmrig::CudaLib::release(nvid_ctx *ctx) noexcept
 {
-    pRelease(ctx);
+    // SECURITY: Check both function pointer and context to prevent null dereference
+    if (pRelease && ctx) {
+        pRelease(ctx);
+    }
 }
 
 

@@ -147,6 +147,12 @@ void xmrig::CudaWorker::start()
             }
 
             if (foundCount) {
+                // SECURITY: Validate foundCount to prevent buffer over-read
+                // foundNonce array has fixed size of 16 elements
+                if (foundCount > 16) {
+                    LOG_ERR("CUDA plugin returned invalid foundCount: %u (max 16)", foundCount);
+                    foundCount = 16;
+                }
                 JobResults::submit(m_job.currentJob(), foundNonce, foundCount, m_deviceIndex);
             }
 

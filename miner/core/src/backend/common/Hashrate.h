@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 
 
 #include "3rdparty/rapidjson/fwd.h"
@@ -77,6 +78,10 @@ private:
 
     uint64_t m_earliestTimestamp;
     uint64_t m_totalCount;
+
+    // SECURITY: Mutex to protect concurrent access to hashrate data arrays
+    // addData() is called from worker threads, hashrate() from tick thread
+    mutable std::mutex m_mutex;
 };
 
 

@@ -76,10 +76,15 @@ void xmrig::Controller::stop()
 {
     Base::stop();
 
-    m_network.reset();
-
-    m_miner->stop();
+    // SECURITY: Stop miner BEFORE destroying network to prevent use-after-free.
+    // Workers submit results via JobResults::submit() which calls Network::onJobResult().
+    // If network is destroyed first, workers may call into deleted memory.
+    if (m_miner) {
+        m_miner->stop();
+    }
     m_miner.reset();
+
+    m_network.reset();
 }
 
 

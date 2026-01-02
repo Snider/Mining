@@ -36,6 +36,9 @@ xmrig::ConsoleLog::ConsoleLog(const Title &title)
     m_tty = new uv_tty_t;
 
     if (uv_tty_init(uv_default_loop(), m_tty, 1, 0) < 0) {
+        // SECURITY: Free allocated memory to prevent memory leak
+        delete m_tty;
+        m_tty = nullptr;
         Log::setColors(false);
         return;
     }

@@ -41,8 +41,9 @@ bool xmrig::App::background(int &)
     if (hcon) {
         ShowWindow(hcon, SW_HIDE);
     } else {
-        HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-        CloseHandle(h);
+        // SECURITY: Do NOT call CloseHandle on standard handles from GetStdHandle()
+        // They are special pseudo-handles and closing them can cause undefined behavior
+        // FreeConsole() is sufficient to detach from the console
         FreeConsole();
     }
 
