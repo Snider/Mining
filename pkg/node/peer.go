@@ -704,3 +704,25 @@ func (r *PeerRegistry) load() error {
 
 	return nil
 }
+
+// Example usage inside a connection handler
+func (n *NodeManager) SendEthicalPacket(peerID string, intent uint8, data []byte) error {
+    // 1. Get the shared secret for this specific peer (derived from ECDH)
+    secret, err := n.DeriveSharedSecret(peerID)
+    if err != nil {
+        return err
+    }
+
+    // 2. Construct the UEPS frame
+    // Intent 0x20 = e.g., "Distributed Compute"
+    pkt := ueps.NewBuilder(intent, data)
+    
+    // 3. Seal it
+    wireBytes, err := pkt.MarshalAndSign(secret)
+    if err != nil {
+        return err
+    }
+
+    // 4. Send wireBytes over your TCP connection...
+    return nil
+}
