@@ -1,5 +1,6 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { MinerService } from '../../miner.service';
 import { NotificationService } from '../../notification.service';
 import { ProfileCreateComponent } from '../../profile-create.component';
@@ -555,9 +556,10 @@ import { ProfileCreateComponent } from '../../profile-create.component';
     }
   `]
 })
-export class ProfilesComponent {
+export class ProfilesComponent implements OnInit {
   private minerService = inject(MinerService);
   private notifications = inject(NotificationService);
+  private route = inject(ActivatedRoute);
   state = this.minerService.state;
 
   showCreateForm = signal(false);
@@ -570,6 +572,14 @@ export class ProfilesComponent {
   savingProfile = signal<string | null>(null);
 
   profiles = () => this.state().profiles;
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      if (params['id']) {
+        this.editingProfileId.set(params['id']);
+      }
+    });
+  }
 
   isRunning(profileId: string): boolean {
     return this.state().runningMiners.some(m => m.profile_id === profileId);

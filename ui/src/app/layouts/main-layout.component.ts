@@ -127,8 +127,7 @@ export class MainLayoutComponent implements AfterViewInit {
   }
 
   navigateToProfiles(profileId: string) {
-    // TODO: Could pass profileId via query params or state
-    this.router.navigate(['/', 'profiles']);
+    this.router.navigate(['/', 'profiles'], { queryParams: { id: profileId } });
   }
 
   navigateToConsole(minerName: string) {
