@@ -1,13 +1,8 @@
 package node
 
-import (
-	"fmt"
-
-	"github.com/Snider/Mining/pkg/ueps"
-)
-
 // pkg/node/dispatcher.go
 
+/*
 func (n *NodeManager) DispatchUEPS(pkt *ueps.ParsedPacket) error {
 	// 1. The "Threat" Circuit Breaker (L5 Guard)
 	if pkt.Header.ThreatScore > 50000 {
@@ -41,3 +36,4 @@ func (n *NodeManager) DispatchUEPS(pkt *ueps.ParsedPacket) error {
     }
 	return nil
 }
+*/
