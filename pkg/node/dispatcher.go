@@ -1,5 +1,8 @@
+package node
+
 // pkg/node/dispatcher.go
 
+/*
 func (n *NodeManager) DispatchUEPS(pkt *ueps.ParsedPacket) error {
     // 1. The "Threat" Circuit Breaker (L5 Guard)
     if pkt.Header.ThreatScore > 50000 {
@@ -32,3 +35,4 @@ func (n *NodeManager) DispatchUEPS(pkt *ueps.ParsedPacket) error {
         return fmt.Errorf("unknown intent ID: 0x%X", pkt.Header.IntentID)
     }
 }
+*/
