@@ -1,11 +1,14 @@
 package node
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/Snider/Mining/pkg/logging"
+	"github.com/adrg/xdg"
 )
 
 // MinerManager interface for the mining package integration.
@@ -76,7 +79,7 @@ func (w *Worker) HandleMessage(conn *PeerConnection, msg *Message) {
 	case MsgGetLogs:
 		response, err = w.handleGetLogs(msg)
 	case MsgDeploy:
-		response, err = w.handleDeploy(msg)
+		response, err = w.handleDeploy(conn, msg)
 	default:
 		// Unknown message type - ignore or send error
 		return
@@ -291,24 +294,42 @@ func (w *Worker) handleGetLogs(msg *Message) (*Message, error) {
 }
 
 // handleDeploy handles deployment of profiles or miner bundles.
-func (w *Worker) handleDeploy(msg *Message) (*Message, error) {
+func (w *Worker) handleDeploy(conn *PeerConnection, msg *Message) (*Message, error) {
 	var payload DeployPayload
 	if err := msg.ParsePayload(&payload); err != nil {
 		return nil, fmt.Errorf("invalid deploy payload: %w", err)
 	}
 
-	// TODO: Implement STIM bundle decryption and installation
-	// For now, just handle raw profile JSON
-	switch payload.BundleType {
-	case "profile":
+	// Reconstruct Bundle object from payload
+	bundle := &Bundle{
+		Type:     BundleType(payload.BundleType),
+		Name:     payload.Name,
+		Data:     payload.Data,
+		Checksum: payload.Checksum,
+	}
+
+	// Use shared secret as password (base64 encoded)
+	password := ""
+	if conn != nil && len(conn.SharedSecret) > 0 {
+		password = base64.StdEncoding.EncodeToString(conn.SharedSecret)
+	}
+
+	switch bundle.Type {
+	case BundleProfile:
 		if w.profileManager == nil {
 			return nil, fmt.Errorf("profile manager not configured")
 		}
 
-		// Decode the profile from the data
+		// Decrypt and extract profile data
+		profileData, err := ExtractProfileBundle(bundle, password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract profile bundle: %w", err)
+		}
+
+		// Unmarshal into interface{} to pass to ProfileManager
 		var profile interface{}
-		if err := json.Unmarshal(payload.Data, &profile); err != nil {
-			return nil, fmt.Errorf("invalid profile data: %w", err)
+		if err := json.Unmarshal(profileData, &profile); err != nil {
+			return nil, fmt.Errorf("invalid profile data JSON: %w", err)
 		}
 
 		if err := w.profileManager.SaveProfile(profile); err != nil {
@@ -326,13 +347,49 @@ func (w *Worker) handleDeploy(msg *Message) (*Message, error) {
 		}
 		return msg.Reply(MsgDeployAck, ack)
 
-	case "miner":
-		// TODO: Implement miner binary deployment via TIM bundles
-		return nil, fmt.Errorf("miner bundle deployment not yet implemented")
+	case BundleMiner, BundleFull:
+		// Determine installation directory
+		// We use xdg.DataHome/lethean-desktop/miners/<bundle_name>
+		minersDir := filepath.Join(xdg.DataHome, "lethean-desktop", "miners")
+		installDir := filepath.Join(minersDir, payload.Name)
 
-	case "full":
-		// TODO: Implement full deployment (miner + profiles)
-		return nil, fmt.Errorf("full bundle deployment not yet implemented")
+		logging.Info("deploying miner bundle", logging.Fields{
+			"name": payload.Name,
+			"path": installDir,
+			"type": payload.BundleType,
+		})
+
+		// Extract miner bundle
+		minerPath, profileData, err := ExtractMinerBundle(bundle, password, installDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract miner bundle: %w", err)
+		}
+
+		// If the bundle contained a profile config, save it
+		if len(profileData) > 0 && w.profileManager != nil {
+			var profile interface{}
+			if err := json.Unmarshal(profileData, &profile); err != nil {
+				logging.Warn("failed to parse profile from miner bundle", logging.Fields{"error": err})
+			} else {
+				if err := w.profileManager.SaveProfile(profile); err != nil {
+					logging.Warn("failed to save profile from miner bundle", logging.Fields{"error": err})
+				}
+			}
+		}
+
+		// Success response
+		ack := DeployAckPayload{
+			Success: true,
+			Name:    payload.Name,
+		}
+
+		// Log the installation
+		logging.Info("miner bundle installed successfully", logging.Fields{
+			"name":       payload.Name,
+			"miner_path": minerPath,
+		})
+
+		return msg.Reply(MsgDeployAck, ack)
 
 	default:
 		return nil, fmt.Errorf("unknown bundle type: %s", payload.BundleType)

@@ -372,7 +372,7 @@ func TestWorker_HandleDeploy_Profile(t *testing.T) {
 	}
 
 	// Without profile manager, should return error
-	_, err = worker.handleDeploy(msg)
+	_, err = worker.handleDeploy(nil, msg)
 	if err == nil {
 		t.Error("expected error when profile manager is nil")
 	}
@@ -413,7 +413,7 @@ func TestWorker_HandleDeploy_UnknownType(t *testing.T) {
 		t.Fatalf("failed to create deploy message: %v", err)
 	}
 
-	_, err = worker.handleDeploy(msg)
+	_, err = worker.handleDeploy(nil, msg)
 	if err == nil {
 		t.Error("expected error for unknown bundle type")
 	}
