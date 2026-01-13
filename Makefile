@@ -1,4 +1,4 @@
-.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package e2e e2e-ui e2e-api test-cpp test-cpp-core test-cpp-proxy build-cpp-tests
+.PHONY: all build test clean install run demo help lint fmt vet docs install-swag dev package e2e e2e-ui e2e-api test-cpp test-cpp-core test-cpp-proxy build-cpp-tests build-miner build-miner-core build-miner-proxy build-miner-all
 
 # Variables
 BINARY_NAME=miner-ctrl
@@ -65,6 +65,34 @@ build-cpp-tests-proxy:
 	@cd $(MINER_PROXY_BUILD_DIR) && \
 		$(CMAKE) -DBUILD_TESTS=ON .. && \
 		$(CMAKE) --build . --target unit_tests integration_tests --parallel
+
+# Build miner binaries (release builds)
+build-miner: build-miner-core build-miner-proxy
+	@echo "Miner binaries built successfully"
+
+# Build miner core (CPU/GPU miner)
+build-miner-core:
+	@echo "Building miner core..."
+	@mkdir -p $(MINER_CORE_BUILD_DIR)
+	@cd $(MINER_CORE_BUILD_DIR) && \
+		$(CMAKE) -DCMAKE_BUILD_TYPE=Release .. && \
+		$(CMAKE) --build . --config Release --parallel
+
+# Build miner proxy
+build-miner-proxy:
+	@echo "Building miner proxy..."
+	@mkdir -p $(MINER_PROXY_BUILD_DIR)
+	@cd $(MINER_PROXY_BUILD_DIR) && \
+		$(CMAKE) -DCMAKE_BUILD_TYPE=Release .. && \
+		$(CMAKE) --build . --config Release --parallel
+
+# Build all miner components and package
+build-miner-all: build-miner
+	@echo "Packaging miner binaries..."
+	@mkdir -p dist/miner
+	@cp $(MINER_CORE_BUILD_DIR)/miner dist/miner/ 2>/dev/null || true
+	@cp $(MINER_PROXY_BUILD_DIR)/miner-proxy dist/miner/ 2>/dev/null || true
+	@echo "Miner binaries available in dist/miner/"
 
 # Run C++ tests (builds first if needed)
 test-cpp: test-cpp-proxy
@@ -177,30 +205,41 @@ e2e-api: build
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  all         - Run tests and build"
-	@echo "  build       - Build the CLI binary"
-	@echo "  build-all   - Build for multiple platforms"
-	@echo "  install     - Install the binary"
-	@echo "  test        - Run all tests (Go + C++)"
-	@echo "  test-go     - Run Go tests only"
-	@echo "  test-cpp    - Run C++ tests (core + proxy)"
-	@echo "  test-cpp-core   - Run miner/core C++ tests"
-	@echo "  test-cpp-proxy  - Run miner/proxy C++ tests"
-	@echo "  build-cpp-tests - Build all C++ tests"
-	@echo "  coverage    - Run tests with coverage report"
-	@echo "  demo        - Run the demo"
-	@echo "  run         - Build and run the CLI"
-	@echo "  clean       - Clean build artifacts (including C++ builds)"
-	@echo "  fmt         - Format code"
-	@echo "  vet         - Run go vet"
-	@echo "  lint        - Run linters"
-	@echo "  tidy        - Tidy dependencies"
-	@echo "  deps        - Download dependencies"
-	@echo "  docs        - Generate Swagger documentation"
-	@echo "  install-swag- Install the swag CLI"
-	@echo "  package     - Create local distribution packages using GoReleaser"
-	@echo "  dev         - Start the development server with docs and build"
-	@echo "  e2e         - Run E2E tests with Playwright"
-	@echo "  e2e-ui      - Open Playwright UI for interactive testing"
-	@echo "  e2e-api     - Run API-only E2E tests"
-	@echo "  help        - Show this help message"
+	@echo ""
+	@echo "Go Application:"
+	@echo "  all           - Run tests and build"
+	@echo "  build         - Build the CLI binary"
+	@echo "  build-all     - Build for multiple platforms"
+	@echo "  install       - Install the binary"
+	@echo "  run           - Build and run the CLI"
+	@echo "  dev           - Start the development server with docs and build"
+	@echo ""
+	@echo "Miner (C++ Binaries):"
+	@echo "  build-miner       - Build miner core and proxy"
+	@echo "  build-miner-core  - Build miner core only"
+	@echo "  build-miner-proxy - Build miner proxy only"
+	@echo "  build-miner-all   - Build and package all miner binaries"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test          - Run all tests (Go + C++)"
+	@echo "  test-go       - Run Go tests only"
+	@echo "  test-cpp      - Run C++ tests (proxy)"
+	@echo "  test-cpp-core - Run miner/core C++ tests"
+	@echo "  test-cpp-proxy- Run miner/proxy C++ tests"
+	@echo "  coverage      - Run tests with coverage report"
+	@echo "  e2e           - Run E2E tests with Playwright"
+	@echo "  e2e-ui        - Open Playwright UI for interactive testing"
+	@echo "  e2e-api       - Run API-only E2E tests"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  fmt           - Format code"
+	@echo "  vet           - Run go vet"
+	@echo "  lint          - Run linters"
+	@echo "  tidy          - Tidy dependencies"
+	@echo ""
+	@echo "Other:"
+	@echo "  clean         - Clean all build artifacts"
+	@echo "  deps          - Download dependencies"
+	@echo "  docs          - Generate Swagger documentation"
+	@echo "  package       - Create local distribution packages"
+	@echo "  help          - Show this help message"

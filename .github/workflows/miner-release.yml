@@ -1,0 +1,251 @@
+name: Miner Release
+
+on:
+  push:
+    tags:
+      - 'miner-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., 0.1.0)'
+        required: true
+        default: '0.1.0'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-linux:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x86_64
+          - arch: arm64
+            cmake_arch: aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libuv1-dev \
+            libssl-dev \
+            libhwloc-dev \
+            git
+
+      - name: Build miner core
+        working-directory: miner/core
+        run: |
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DWITH_OPENCL=OFF \
+            -DWITH_CUDA=OFF
+          cmake --build . --config $BUILD_TYPE -j$(nproc)
+
+      - name: Build miner proxy
+        working-directory: miner/proxy
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          cmake --build . --config $BUILD_TYPE -j$(nproc)
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp miner/core/build/miner dist/
+          cp miner/proxy/build/miner-proxy dist/
+          chmod +x dist/*
+          cd dist
+          tar -czvf ../miner-linux-${{ matrix.arch }}.tar.gz *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miner-linux-${{ matrix.arch }}
+          path: miner-linux-${{ matrix.arch }}.tar.gz
+
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            cmake_osx_arch: x86_64
+          - arch: arm64
+            cmake_osx_arch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake libuv openssl hwloc
+
+      - name: Build miner core
+        working-directory: miner/core
+        env:
+          OSX_ARCH: ${{ matrix.cmake_osx_arch }}
+        run: |
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_OSX_ARCHITECTURES=$OSX_ARCH \
+            -DWITH_OPENCL=OFF \
+            -DWITH_CUDA=OFF \
+            -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)
+          cmake --build . --config $BUILD_TYPE -j$(sysctl -n hw.ncpu)
+
+      - name: Build miner proxy
+        working-directory: miner/proxy
+        env:
+          OSX_ARCH: ${{ matrix.cmake_osx_arch }}
+        run: |
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_OSX_ARCHITECTURES=$OSX_ARCH \
+            -DOPENSSL_ROOT_DIR=$(brew --prefix openssl)
+          cmake --build . --config $BUILD_TYPE -j$(sysctl -n hw.ncpu)
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp miner/core/build/miner dist/
+          cp miner/proxy/build/miner-proxy dist/
+          chmod +x dist/*
+          cd dist
+          tar -czvf ../miner-macos-${{ matrix.arch }}.tar.gz *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miner-macos-${{ matrix.arch }}
+          path: miner-macos-${{ matrix.arch }}.tar.gz
+
+  build-windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install dependencies
+        run: |
+          vcpkg install libuv:x64-windows openssl:x64-windows
+
+      - name: Build miner core
+        working-directory: miner/core
+        run: |
+          mkdir build
+          cd build
+          cmake .. `
+            -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DWITH_OPENCL=OFF `
+            -DWITH_CUDA=OFF
+          cmake --build . --config $env:BUILD_TYPE
+
+      - name: Build miner proxy
+        working-directory: miner/proxy
+        run: |
+          mkdir build
+          cd build
+          cmake .. `
+            -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build . --config $env:BUILD_TYPE
+
+      - name: Package binaries
+        run: |
+          mkdir dist
+          Copy-Item miner/core/build/$env:BUILD_TYPE/miner.exe dist/
+          Copy-Item miner/proxy/build/$env:BUILD_TYPE/miner-proxy.exe dist/
+          Compress-Archive -Path dist/* -DestinationPath miner-windows-x64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miner-windows-x64
+          path: miner-windows-x64.zip
+
+  release:
+    name: Create Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -la artifacts/*/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/miner-linux-x64/miner-linux-x64.tar.gz
+            artifacts/miner-linux-arm64/miner-linux-arm64.tar.gz
+            artifacts/miner-macos-x64/miner-macos-x64.tar.gz
+            artifacts/miner-macos-arm64/miner-macos-arm64.tar.gz
+            artifacts/miner-windows-x64/miner-windows-x64.zip
+          body: |
+            ## Miner Suite
+
+            ### Downloads
+
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
+            | Linux | x64 | `miner-linux-x64.tar.gz` |
+            | Linux | ARM64 | `miner-linux-arm64.tar.gz` |
+            | macOS | Intel | `miner-macos-x64.tar.gz` |
+            | macOS | Apple Silicon | `miner-macos-arm64.tar.gz` |
+            | Windows | x64 | `miner-windows-x64.zip` |
+
+            ### Included Binaries
+
+            - `miner` - CPU/GPU cryptocurrency miner
+            - `miner-proxy` - Stratum proxy for mining farms
+
+            ### Quick Start
+
+            ```bash
+            # Extract
+            tar -xzf miner-linux-x64.tar.gz
+
+            # Run miner
+            ./miner -o pool.example.com:3333 -u YOUR_WALLET -p x
+
+            # Run proxy
+            ./miner-proxy -o pool.example.com:3333 -u YOUR_WALLET -b 0.0.0.0:3333
+            ```
+
+            See [miner/README.md](miner/README.md) for full documentation.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

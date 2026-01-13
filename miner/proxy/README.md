@@ -1,105 +1,216 @@
-# XMRig Proxy
-[![Github All Releases](https://img.shields.io/github/downloads/xmrig/xmrig-proxy/total.svg)](https://github.com/xmrig/xmrig-proxy/releases)
-[![GitHub release](https://img.shields.io/github/release/xmrig/xmrig-proxy/all.svg)](https://github.com/xmrig/xmrig-proxy/releases)
-[![GitHub Release Date](https://img.shields.io/github/release-date-pre/xmrig/xmrig-proxy.svg)](https://github.com/xmrig/xmrig-proxy/releases)
-[![GitHub license](https://img.shields.io/github/license/xmrig/xmrig-proxy.svg)](https://github.com/xmrig/xmrig-proxy/blob/master/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/xmrig/xmrig-proxy.svg)](https://github.com/xmrig/xmrig-proxy/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/xmrig/xmrig-proxy.svg)](https://github.com/xmrig/xmrig-proxy/network)
+# Miner Proxy
 
-This is an extremely high-performance proxy for the CryptoNote stratum protocol (including Monero and others).
-It can efficiently manage over 100K connections on an inexpensive, low-memory virtual machine (with just 1024 MB of RAM).
-The proxy significantly reduces the number of connections to the pool, decreasing 100,000 workers down to just 391 on the pool side.
-The codebase is shared with the [XMRig](https://github.com/xmrig/xmrig) miner.
+High-performance stratum protocol proxy for cryptocurrency mining farms. Efficiently manages 100K+ miner connections while maintaining minimal pool-side connections through nonce splitting.
 
-## Compatibility
-Compatible with any pool and any miner that supports NiceHash.
+## Features
 
-## Why?
-This proxy is designed to handle donation traffic from XMRig. No other solution works well with high connection and disconnection rates.
+- Handle 100K+ concurrent miner connections
+- Reduce pool connections (100,000 miners → ~400 pool connections)
+- NiceHash compatibility mode
+- TLS/SSL support for secure connections
+- HTTP API for monitoring
+- Low memory footprint (~1GB RAM for 100K connections)
 
-## Download
-* Binary releases: https://github.com/xmrig/xmrig-proxy/releases
-* Git tree: https://github.com/xmrig/xmrig-proxy.git
-  * Clone with `git clone https://github.com/xmrig/xmrig-proxy.git` :hammer: [Build instructions](https://xmrig.com/docs/proxy).
-  
-## Usage
-:boom: If you are using Linux and need to manage over **1000 connections**, you must [increase the limits on open files](https://github.com/xmrig/xmrig-proxy/wiki/Ubuntu-setup).
-  
-### Options
+## Quick Start
+
+### Download
+
+Pre-built binaries are available from [Releases](https://github.com/letheanVPN/Mining/releases).
+
+### Usage
+
+```bash
+# Basic usage
+./miner-proxy -o pool.example.com:3333 -u YOUR_WALLET -b 0.0.0.0:3333
+
+# With config file (recommended)
+./miner-proxy -c config.json
+
+# Test configuration
+./miner-proxy --dry-run -c config.json
+
+# Show all options
+./miner-proxy --help
+```
+
+### Command Line Options
+
 ```
 Network:
   -o, --url=URL                 URL of mining server
-  -a, --algo=ALGO               mining algorithm https://xmrig.com/docs/algorithms
-      --coin=COIN               specify coin instead of algorithm
+  -a, --algo=ALGO               mining algorithm
   -u, --user=USERNAME           username for mining server
   -p, --pass=PASSWORD           password for mining server
-  -O, --userpass=U:P            username:password pair for mining server
-  -x, --proxy=HOST:PORT         connect through a SOCKS5 proxy
-  -k, --keepalive               send keepalived packet for prevent timeout (needs pool support)
-      --rig-id=ID               rig identifier for pool-side statistics (needs pool support)
-      --tls                     enable SSL/TLS support (needs pool support)
-      --tls-fingerprint=HEX     pool TLS certificate fingerprint for strict certificate pinning
-      --dns-ipv6                prefer IPv6 records from DNS responses
-      --dns-ttl=N               N seconds (default: 30) TTL for internal DNS cache
-      --daemon                  use daemon RPC instead of pool for solo mining
-      --daemon-zmq-port         daemon's zmq-pub port number (only use it if daemon has it enabled)
-      --daemon-poll-interval=N  daemon poll interval in milliseconds (default: 1000)
-      --daemon-job-timeout=N    daemon job timeout in milliseconds (default: 15000)
-      --self-select=URL         self-select block templates from URL
-      --submit-to-origin        also submit solution back to self-select URL
-  -r, --retries=N               number of times to retry before switch to backup server (default: 5)
-  -R, --retry-pause=N           time to pause between retries (default: 5)
-      --user-agent              set custom user-agent string for pool
-      --donate-level=N          donate level, default 0%%
+  -k, --keepalive               send keepalive packets
+      --tls                     enable SSL/TLS support
 
-Options:
-  -b, --bind=ADDR               bind to specified address, example "0.0.0.0:3333"
-  -m, --mode=MODE               proxy mode, nicehash (default) or simple
-      --custom-diff=N           override pool diff
-      --custom-diff-stats       calculate stats using custom diff shares instead of pool shares
-      --reuse-timeout=N         timeout in seconds for reuse pool connections in simple mode
-      --no-workers              disable per worker statistics
-      --access-password=P       set password to restrict connections to the proxy
-      --no-algo-ext             disable "algo" protocol extension
+Proxy:
+  -b, --bind=ADDR               bind to specified address (e.g., "0.0.0.0:3333")
+  -m, --mode=MODE               proxy mode: nicehash (default) or simple
+      --custom-diff=N           override pool difficulty
+      --access-password=P       password to restrict proxy access
 
 API:
-      --api-worker-id=ID        custom worker-id for API
-      --api-id=ID               custom instance ID for API
       --http-host=HOST          bind host for HTTP API (default: 127.0.0.1)
       --http-port=N             bind port for HTTP API
       --http-access-token=T     access token for HTTP API
-      --http-no-restricted      enable full remote access to HTTP API (only if access token set)
 
 TLS:
-      --tls-bind=ADDR           bind to specified address with enabled TLS
-      --tls-gen=HOSTNAME        generate TLS certificate for specific hostname
-      --tls-cert=FILE           load TLS certificate chain from a file in the PEM format
-      --tls-cert-key=FILE       load TLS certificate private key from a file in the PEM format
-      --tls-dhparam=FILE        load DH parameters for DHE ciphers from a file in the PEM format
-      --tls-protocols=N         enable specified TLS protocols, example: "TLSv1 TLSv1.1 TLSv1.2 TLSv1.3"
-      --tls-ciphers=S           set list of available ciphers (TLSv1.2 and below)
-      --tls-ciphersuites=S      set list of available TLSv1.3 ciphersuites
+      --tls-bind=ADDR           bind with TLS enabled
+      --tls-cert=FILE           TLS certificate file (PEM)
+      --tls-cert-key=FILE       TLS private key file (PEM)
 
 Logging:
-  -l, --log-file=FILE           log all output to a file
-  -A  --access-log-file=FILE    log all workers access to a file
-      --no-color                disable colored output
+  -l, --log-file=FILE           log all output to file
+  -A, --access-log-file=FILE    log worker access to file
       --verbose                 verbose output
 
 Misc:
-  -c, --config=FILE             load a JSON-format configuration file
-  -B, --background              run the proxy in the background
-  -V, --version                 output version information and exit
-  -h, --help                    display this help and exit
-      --dry-run                 test configuration and exit
+  -c, --config=FILE             load JSON configuration file
+  -B, --background              run in background
+  -V, --version                 show version
+  -h, --help                    show help
 ```
 
-## Donations
+## Configuration
 
-The default donation fee is 2%, which can be reduced to 1% or completely disabled using the `donate-level` option. This fee applies only when you utilize more than 256 miners.
+### JSON Config (config.json)
 
-* XMR: `48edfHu7V9Z84YzzMa6fUueoELZ9ZRXq9VetWzYGzKt52XU5xvqgzYnDK9URnRoJMk1j8nLwEVsaSWJ4fhdUyZijBGUicoD`
+```json
+{
+    "mode": "nicehash",
+    "pools": [
+        {
+            "url": "stratum+tcp://pool.example.com:3333",
+            "user": "YOUR_WALLET",
+            "pass": "x",
+            "keepalive": true
+        }
+    ],
+    "bind": [
+        {
+            "host": "0.0.0.0",
+            "port": 3333
+        },
+        {
+            "host": "0.0.0.0",
+            "port": 3334,
+            "tls": true
+        }
+    ],
+    "http": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 8081,
+        "access-token": "your-secret-token"
+    },
+    "tls": {
+        "cert": "/path/to/cert.pem",
+        "cert-key": "/path/to/key.pem"
+    },
+    "access-password": null,
+    "workers": true,
+    "verbose": false
+}
+```
 
-## Contacts
-* support@xmrig.com
-* [X](https://x.com/xmrig_dev)
+### Proxy Modes
+
+**NiceHash Mode** (default): Full nonce splitting for maximum efficiency
+- Best for large farms with many workers
+- Each worker gets unique nonce space
+- Maximum reduction in pool connections
+
+**Simple Mode**: Direct passthrough with shared connections
+- Simpler setup
+- Workers share pool connections
+- Good for smaller setups
+
+## Building from Source
+
+### Dependencies
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install build-essential cmake libuv1-dev libssl-dev
+```
+
+**macOS:**
+```bash
+brew install cmake libuv openssl
+```
+
+### Build
+
+```bash
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
+
+# With debug logging
+cmake .. -DWITH_DEBUG_LOG=ON
+```
+
+### CMake Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `WITH_TLS` | ON | SSL/TLS support |
+| `WITH_HTTP` | ON | HTTP API |
+| `WITH_DEBUG_LOG` | OFF | Debug logging |
+| `BUILD_TESTS` | ON | Build unit tests |
+
+## HTTP API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /1/summary` | Proxy statistics |
+| `GET /1/workers` | Connected workers list |
+| `GET /1/config` | Current configuration |
+
+Example:
+```bash
+curl http://127.0.0.1:8081/1/summary
+```
+
+## High Connection Setup (Linux)
+
+For 1000+ connections, increase file descriptor limits:
+
+```bash
+# /etc/security/limits.conf
+* soft nofile 1000000
+* hard nofile 1000000
+
+# /etc/sysctl.conf
+fs.file-max = 1000000
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+```
+
+Then apply:
+```bash
+sudo sysctl -p
+```
+
+## Testing
+
+```bash
+cd build
+
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test suites
+./tests/unit_tests
+./tests/integration_tests
+
+# Run with verbose output
+./tests/unit_tests --gtest_verbose
+```
+
+## License
+
+Copyright (c) 2025 Lethean <https://lethean.io>
+
+Licensed under the European Union Public License 1.2 (EUPL-1.2).

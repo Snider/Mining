@@ -108,24 +108,42 @@ wails3 build
 ```
 Mining/
 ├── cmd/
-│   ├── mining/              # CLI application
+│   ├── mining/              # CLI application (miner-ctrl)
 │   └── desktop/             # Wails desktop app
 ├── pkg/mining/              # Core Go package
 │   ├── mining.go            # Interfaces and types
 │   ├── manager.go           # Miner lifecycle management
 │   ├── service.go           # RESTful API (Gin)
-│   ├── xmrig.go             # XMRig implementation
 │   └── profile_manager.go   # Profile persistence
-├── miner/core/              # Modified XMRig with algorithm support
-│   └── src/
-│       ├── backend/opencl/  # OpenCL GPU kernels
-│       ├── backend/cuda/    # CUDA GPU kernels
-│       └── crypto/          # Algorithm implementations
+├── miner/                   # Standalone C++ mining tools
+│   ├── core/                # CPU/GPU miner binary
+│   ├── proxy/               # Stratum proxy for farms
+│   ├── cuda/                # CUDA plugin for NVIDIA
+│   └── README.md            # Miner documentation
 └── ui/                      # Angular 20+ web dashboard
     └── src/app/
         ├── components/      # Reusable UI components
         └── pages/           # Route pages
 ```
+
+## Standalone Miner Tools
+
+The `miner/` directory contains standalone C++ mining programs that can be used independently without the GUI:
+
+```bash
+# Build miner binaries
+make build-miner
+
+# Or build individually
+make build-miner-core   # CPU/GPU miner
+make build-miner-proxy  # Stratum proxy
+
+# Run directly
+./miner/core/build/miner -o pool.example.com:3333 -u WALLET -p x
+./miner/proxy/build/miner-proxy -o pool.example.com:3333 -b 0.0.0.0:3333
+```
+
+Pre-built binaries are available from [Releases](https://github.com/letheanVPN/Mining/releases). See [miner/README.md](miner/README.md) for full documentation.
 
 ## API Reference
 
@@ -158,26 +176,24 @@ Swagger UI: `http://localhost:9090/api/v1/mining/swagger/index.html`
 ### Build Commands
 
 ```bash
-# Backend
+# Go Backend
 make build              # Build CLI binary
-make test               # Run tests with coverage
+make test               # Run all tests (Go + C++)
 make dev                # Start dev server on :9090
+
+# Miner (C++ Binaries)
+make build-miner        # Build miner and proxy
+make build-miner-all    # Build and package to dist/miner/
 
 # Frontend
 cd ui
 npm install
 npm run build           # Build web component
-npm test                # Run unit tests (36 specs)
+npm test                # Run unit tests
 
 # Desktop
 cd cmd/desktop/mining-desktop
 wails3 build            # Build native app
-
-# Miner Core (GPU support)
-cd miner/core
-mkdir build && cd build
-cmake .. -DWITH_OPENCL=ON -DWITH_CUDA=ON
-make -j$(nproc)
 ```
 
 ## Configuration
