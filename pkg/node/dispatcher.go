@@ -1,20 +1,12 @@
-package node
-
-import (
-	"fmt"
-
-	"github.com/Snider/Mining/pkg/ueps"
-)
-
 // pkg/node/dispatcher.go
 
 func (n *NodeManager) DispatchUEPS(pkt *ueps.ParsedPacket) error {
-	// 1. The "Threat" Circuit Breaker (L5 Guard)
-	if pkt.Header.ThreatScore > 50000 {
-		// High threat? Drop it. Don't even parse the payload.
-		// This protects the Agent from "semantic viruses"
-		return fmt.Errorf("packet rejected: threat score %d exceeds safety limit", pkt.Header.ThreatScore)
-	}
+    // 1. The "Threat" Circuit Breaker (L5 Guard)
+    if pkt.Header.ThreatScore > 50000 {
+        // High threat? Drop it. Don't even parse the payload.
+        // This protects the Agent from "semantic viruses"
+        return fmt.Errorf("packet rejected: threat score %d exceeds safety limit", pkt.Header.ThreatScore)
+    }
 
     // 2. The "Intent" Router (L9 Semantic)
     switch pkt.Header.IntentID {
