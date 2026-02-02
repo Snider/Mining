@@ -27,6 +27,15 @@ else()
     list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_mac\\.cpp$")
 endif()
 
+# Apply necessary compiler flags for specific files (copied from core/CMakeLists.txt)
+if (CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID MATCHES Clang)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/src/crypto/cn/CnHash.cpp PROPERTIES COMPILE_FLAGS "-Ofast -fno-tree-vectorize")
+
+    if (WITH_VAES)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/src/crypto/cn/CryptoNight_x86_vaes.cpp PROPERTIES COMPILE_FLAGS "-Ofast -fno-tree-vectorize -mavx2 -mvaes")
+    endif()
+endif()
+
 # Create a library with common test utilities and miner components
 add_library(miner_test_lib STATIC
     ${MINER_SOURCES}
