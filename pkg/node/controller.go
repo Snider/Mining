@@ -30,14 +30,11 @@ func NewController(node *NodeManager, peers *PeerRegistry, transport *Transport)
 		pending:   make(map[string]chan *Message),
 	}
 
-	// Register message handler for responses
-	transport.OnMessage(c.handleResponse)
-
 	return c
 }
 
-// handleResponse processes incoming messages that are responses to our requests.
-func (c *Controller) handleResponse(conn *PeerConnection, msg *Message) {
+// HandleResponse processes incoming messages that are responses to our requests.
+func (c *Controller) HandleResponse(conn *PeerConnection, msg *Message) {
 	if msg.ReplyTo == "" {
 		return // Not a response, let worker handle it
 	}

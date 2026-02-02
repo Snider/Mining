@@ -150,9 +150,24 @@ This allows other nodes to connect, send commands, and receive stats.`,
 
 		transport := node.NewTransport(nm, pr, config)
 
+		// Create controller for outgoing requests
+		controller := node.NewController(nm, pr, transport)
+
 		// Create worker to handle incoming messages
 		worker := node.NewWorker(nm, transport)
-		worker.RegisterWithTransport()
+
+		// Use dispatcher to route messages to controller or worker
+		dispatcher := node.NewMessageDispatcher(controller, worker)
+		transport.OnMessage(dispatcher.Dispatch)
+
+		// Start IPC control server
+		controlListener, err := node.StartControlServer(controller)
+		if err != nil {
+			// Log error but continue (fail soft for control server)
+			fmt.Printf("Warning: failed to start control server: %v\n", err)
+		} else {
+			defer controlListener.Close()
+		}
 
 		if err := transport.Start(); err != nil {
 			return fmt.Errorf("failed to start transport: %w", err)
@@ -162,6 +177,9 @@ This allows other nodes to connect, send commands, and receive stats.`,
 		fmt.Printf("P2P server started on %s\n", config.ListenAddr)
 		fmt.Printf("Node ID: %s (%s)\n", identity.ID, identity.Name)
 		fmt.Printf("Role: %s\n", identity.Role)
+		if controlListener != nil {
+			fmt.Printf("Control Socket: %s\n", controlListener.Addr())
+		}
 		fmt.Println()
 		fmt.Println("Press Ctrl+C to stop...")
 
@@ -172,6 +190,10 @@ This allows other nodes to connect, send commands, and receive stats.`,
 		// Wait for shutdown signal
 		sig := <-sigChan
 		fmt.Printf("\nReceived signal %v, shutting down...\n", sig)
+
+		if controlListener != nil {
+			controlListener.Close()
+		}
 
 		// Graceful shutdown: stop transport and cleanup resources
 		if err := transport.Stop(); err != nil {

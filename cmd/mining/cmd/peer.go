@@ -149,13 +149,24 @@ var peerPingCmd = &cobra.Command{
 			return fmt.Errorf("peer not found: %s", peerID)
 		}
 
-		if !peer.Connected {
-			return fmt.Errorf("peer not connected: %s", peer.Name)
+		// Connect to the control service of the running node
+		client, err := node.NewControlClient()
+		if err != nil {
+			return fmt.Errorf("failed to connect to node: %w", err)
 		}
+		defer client.Close()
 
 		fmt.Printf("Pinging %s (%s)...\n", peer.Name, peer.Address)
-		// TODO: Actually send ping via transport
-		fmt.Println("Ping functionality requires active connection via 'node serve'")
+
+		// Call the Ping method via RPC
+		pingArgs := &node.PingArgs{PeerID: peer.ID}
+		var reply node.PingReply
+
+		if err := client.Call("ControlService.Ping", pingArgs, &reply); err != nil {
+			return fmt.Errorf("ping failed: %w", err)
+		}
+
+		fmt.Printf("Reply from %s: time=%.1f ms\n", peer.Name, reply.LatencyMS)
 		return nil
 	},
 }
