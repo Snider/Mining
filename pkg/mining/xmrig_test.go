@@ -119,11 +119,14 @@ func TestXMRigMiner_Start_Stop_Bad(t *testing.T) {
 
 func TestXMRigMiner_CheckInstallation(t *testing.T) {
 	tmpDir := t.TempDir()
-	dummyExePath := filepath.Join(tmpDir, "xmrig")
-	executableName := "xmrig"
+	// Use "miner" since that's what NewXMRigMiner() sets as ExecutableName
+	executableName := "miner"
 	if runtime.GOOS == "windows" {
 		executableName += ".exe"
-		dummyExePath = filepath.Join(tmpDir, executableName)
+	}
+	dummyExePath := filepath.Join(tmpDir, executableName)
+	
+	if runtime.GOOS == "windows" {
 		// Create a dummy batch file that prints version
 		if err := os.WriteFile(dummyExePath, []byte("@echo off\necho XMRig 6.24.0\n"), 0755); err != nil {
 			t.Fatalf("failed to create dummy executable: %v", err)

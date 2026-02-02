@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 )
 
 // setupTestManager creates a new Manager and a dummy executable for tests.
@@ -133,8 +132,9 @@ func TestListMiners_Good(t *testing.T) {
 	m.miners["xmrig-test"] = miner
 	m.mu.Unlock()
 
-	miners = m.ListMiners()
-	if len(miners) != 1 {
-		t.Errorf("Expected 1 miner, but got %d", len(miners))
+	finalMiners := m.ListMiners()
+	expectedCount := initialCount + 1
+	if len(finalMiners) != expectedCount {
+		t.Errorf("Expected %d miners, but got %d", expectedCount, len(finalMiners))
 	}
 }

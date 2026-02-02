@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Snider/Mining/pkg/logging"
-	"github.com/Snider/Mining/pkg/ueps"
 	"github.com/Snider/Poindexter"
 	"github.com/adrg/xdg"
 )
