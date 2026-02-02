@@ -2,6 +2,7 @@ package mining
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -203,9 +204,12 @@ func requestIDMiddleware() gin.HandlerFunc {
 
 // generateRequestID creates a unique request ID using timestamp and random bytes
 func generateRequestID() string {
-	b := make([]byte, 8)
-	_, _ = base64.StdEncoding.Decode(b, []byte(fmt.Sprintf("%d", time.Now().UnixNano())))
-	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b[:4])
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback if random source fails (unlikely)
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), b)
 }
 
 // getRequestID extracts the request ID from gin context

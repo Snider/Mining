@@ -18,8 +18,13 @@ list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_riscv.*")
 if (WIN32)
     list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_unix\\.cpp$")
     list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_linux\\.cpp$")
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_mac\\.cpp$")
+elseif (APPLE)
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_win\\.cpp$")
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_linux\\.cpp$")
 else()
     list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_win\\.cpp$")
+    list(FILTER MINER_SOURCES EXCLUDE REGEX ".*_mac\\.cpp$")
 endif()
 
 # Create a library with common test utilities and miner components

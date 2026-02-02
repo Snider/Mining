@@ -151,7 +151,14 @@ func TestGetMiner_Good(t *testing.T) {
 	}
 
 	// Case 1: Get an existing miner
-	startedMiner, _ := m.StartMiner(context.Background(), "xmrig", config)
+	startedMiner, err := m.StartMiner(context.Background(), "xmrig", config)
+	if err != nil {
+		t.Fatalf("Failed to start miner: %v", err)
+	}
+	if startedMiner == nil {
+		t.Fatal("StartMiner returned nil miner")
+	}
+
 	retrievedMiner, err := m.GetMiner(startedMiner.GetName())
 	if err != nil {
 		t.Fatalf("Expected to get miner, but got error: %v", err)
