@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Snider/Mining/pkg/logging"
+	"github.com/Snider/Mining/pkg/ueps"
 	"github.com/Snider/Poindexter"
 	"github.com/adrg/xdg"
 )
@@ -718,7 +719,7 @@ func (n *NodeManager) SendEthicalPacket(peerID string, intent uint8, data []byte
     pkt := ueps.NewBuilder(intent, data)
     
     // 3. Seal it
-    wireBytes, err := pkt.MarshalAndSign(secret)
+    _, err = pkt.MarshalAndSign(secret)
     if err != nil {
         return err
     }
